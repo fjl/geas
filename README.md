@@ -11,7 +11,7 @@ at a low level.
 
 To build the tool, clone the repository and then run
 
-	go build ./cmd/geas`
+	go build ./cmd/geas
 
 This creates the `geas` binary in the current directory. To create bytecode, run the tool
 with a filename as argument.
