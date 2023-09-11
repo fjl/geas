@@ -122,7 +122,7 @@ are verified.
 
 Common groups of instructions can be defined as instruction macros.
 
-	#define add5_and_store(x, location) {
+	#define %add5_and_store(x, location) {
 		push x
 		push 5
 		add
