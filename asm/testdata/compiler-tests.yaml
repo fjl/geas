@@ -609,3 +609,12 @@ push0-implicit:
       push 0
   output:
     bytecode: "5f"
+
+unicode-ident:
+  input:
+    code: |
+      läbel:
+        PUSH @läbel
+  output:
+    bytecode: '5b6000'
+      

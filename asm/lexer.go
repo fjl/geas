@@ -160,16 +160,14 @@ func (l *lexer) accept(valid string) bool {
 	if strings.ContainsRune(valid, l.next()) {
 		return true
 	}
-
 	l.backup()
-
 	return false
 }
 
 // acceptRun will continue to advance the seeker until valid
 // can no longer be met.
-func (l *lexer) acceptRun(valid string) {
-	for strings.ContainsRune(valid, l.next()) {
+func (l *lexer) acceptRun(fn func(rune) bool) {
+	for fn(l.next()) {
 	}
 	l.backup()
 }
@@ -242,10 +240,10 @@ func lexNext(l *lexer) stateFn {
 
 		// numbers and identifiers:
 
-		case isNumber(r):
+		case unicode.IsDigit(r):
 			return lexNumber
 
-		case isLetter(r) || r == '_' || r == '.':
+		case r == '.' || isIdentBegin(r):
 			return lexElement
 
 		// arithmetic:
@@ -323,16 +321,16 @@ func lexLabel(l *lexer) stateFn {
 		l.next() // consume optional .
 		l.ignore()
 	}
-	l.acceptRun(alpha + "_" + decimalNumbers)
+	l.acceptRun(isIdent)
 	l.emit(typ)
 	return lexNext
 }
 
 func lexPercent(l *lexer) stateFn {
 	r := l.peek()
-	if strings.ContainsRune(identChars, r) {
+	if isIdentBegin(r) {
 		l.ignore()
-		l.acceptRun(identChars)
+		l.acceptRun(isIdent)
 		l.emit(instMacroIdent)
 	} else {
 		l.emit(arithMod)
@@ -354,9 +352,9 @@ func lexInsideString(l *lexer) stateFn {
 }
 
 func lexNumber(l *lexer) stateFn {
-	acceptance := decimalNumbers
+	acceptance := unicode.IsDigit
 	if l.accept("xX") {
-		acceptance = hexNumbers
+		acceptance = isHex
 	}
 	l.acceptRun(acceptance)
 	l.emit(numberLiteral)
@@ -382,7 +380,7 @@ func lexRshift(l *lexer) stateFn {
 }
 
 func lexPreprocessor(l *lexer) stateFn {
-	l.acceptRun(identChars)
+	l.acceptRun(isIdent)
 	l.emit(directive)
 	return lexNext
 }
@@ -392,7 +390,7 @@ func lexElement(l *lexer) stateFn {
 	if firstIsDot {
 		l.ignore()
 	}
-	l.acceptRun(identChars)
+	l.acceptRun(isIdent)
 
 	if l.peek() == ':' {
 		if firstIsDot {
@@ -420,6 +418,14 @@ func isSpace(t rune) bool {
 	return unicode.IsSpace(t)
 }
 
-func isNumber(t rune) bool {
-	return unicode.IsNumber(t)
+func isHex(t rune) bool {
+	return unicode.IsDigit(t) || (t >= 'a' && t <= 'f') || (t >= 'A' && t <= 'F')
+}
+
+func isIdentBegin(t rune) bool {
+	return t == '_' || unicode.IsLetter(t)
+}
+
+func isIdent(t rune) bool {
+	return t == '_' || unicode.IsLetter(t) || unicode.IsNumber(t)
 }
