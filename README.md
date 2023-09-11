@@ -98,7 +98,8 @@ must fit into the declared push size. Negative results are not allowed right now
 Expression macros can be created with the `#define` directive. Macros can be used within
 PUSH argument expressions.
 
-Macros can have parameters. Parameters use a dollar sign ($) prefix.
+Macros can have parameters. Refer to parameter values using the dollar sign ($) prefix
+within the macro.
 
 	#define z 0x8823
 	#define myexpr(x, y)  ($x + $y) * z
