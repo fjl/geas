@@ -20,7 +20,7 @@ with a filename as argument.
 
 ### Use as a Go Library
 
-You can also use the assembler as a library. See the [API documentation](https://pkg.go.dev/github.com/fjl/geas/asm).
+You can also use the assembler as a library. See the [API documentation](https://pkg.go.dev/github.com/fjl/geas/asm)
 to get started.
 
 ## Language
