@@ -99,11 +99,11 @@ PUSH argument expressions.
 There are several builtin macros for common EVM tasks. Names of builtins start with a dot,
 and builtin macros cannot be redefined. Available builtins include:
 
-`.abs(...)` for getting the absolute value of a number:
+`.abs()` for getting the absolute value of a number:
 
 	push .abs(0 - 100)
 
-`.selector(...)` for computing 4-byte ABI selectors:
+`.selector()` for computing 4-byte ABI selectors:
 
 	push .selector("transfer(address,uint256)")
 	push 0
