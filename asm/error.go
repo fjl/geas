@@ -76,7 +76,6 @@ const (
 	ecUndefinedVariable
 	ecUndefinedMacro
 	ecUndefinedInstrMacro
-	ecUndefinedBuiltinVariable
 	ecUndefinedBuiltinMacro
 	ecRecursiveCall
 	ecInvalidArgumentCount
@@ -108,11 +107,9 @@ func (e compilerError) Error() string {
 	case ecUnknownOpcode:
 		return "unknown opcode"
 	case ecUndefinedVariable:
-		return "undefined macro/variable"
+		return "undefined macro parameter"
 	case ecUndefinedMacro:
 		return "undefined macro"
-	case ecUndefinedBuiltinVariable:
-		return "undefined builtin variable"
 	case ecUndefinedBuiltinMacro:
 		return "undefined builtin macro"
 	case ecUndefinedInstrMacro:

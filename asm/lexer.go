@@ -51,35 +51,36 @@ type tokenType byte
 //go:generate go run golang.org/x/tools/cmd/stringer@latest -type tokenType
 
 const (
-	eof              tokenType = iota // end of file
-	lineStart                         // emitted when a line starts
-	lineEnd                           // emitted when a line ends
-	invalidToken                      // any invalid statement
-	identifier                        //
-	dottedIdentifier                  // .something
-	labelRef                          // @label
-	dottedLabelRef                    // @.label
-	label                             // label:
-	dottedLabel                       // .label:
-	numberLiteral                     // number is emitted when a number is found
-	stringLiteral                     // stringValue is emitted when a string has been found
-	openParen                         // (
-	closeParen                        // )
-	comma                             // ,
-	arithPlus                         // +
-	arithMinus                        // -
-	arithMul                          // *
-	arithDiv                          // /
-	arithMod                          // %
-	arithLshift                       // <<
-	arithRshift                       // >>
-	arithAnd                          // &
-	arithOr                           // |
-	arithHat                          // ^
-	directive                         // #define, #include, ...
-	instMacroIdent                    // %macro
-	openBrace                         // {
-	closeBrace                        // }
+	eof                tokenType = iota // end of file
+	lineStart                           // emitted when a line starts
+	lineEnd                             // emitted when a line ends
+	invalidToken                        // any invalid statement
+	identifier                          // something
+	dottedIdentifier                    // .something
+	variableIdentifier                  // $something
+	labelRef                            // @label
+	dottedLabelRef                      // @.label
+	label                               // label:
+	dottedLabel                         // .label:
+	numberLiteral                       // number is emitted when a number is found
+	stringLiteral                       // stringValue is emitted when a string has been found
+	openParen                           // (
+	closeParen                          // )
+	comma                               // ,
+	arithPlus                           // +
+	arithMinus                          // -
+	arithMul                            // *
+	arithDiv                            // /
+	arithMod                            // %
+	arithLshift                         // <<
+	arithRshift                         // >>
+	arithAnd                            // &
+	arithOr                             // |
+	arithHat                            // ^
+	directive                           // #define, #include, ...
+	instMacroIdent                      // %macro
+	openBrace                           // {
+	closeBrace                          // }
 )
 
 const (
@@ -212,6 +213,10 @@ func lexNext(l *lexer) stateFn {
 			l.ignore()
 			return lexLabel
 
+		case r == '$':
+			l.ignore()
+			return lexVariable
+
 		case r == '"':
 			return lexInsideString
 
@@ -244,7 +249,7 @@ func lexNext(l *lexer) stateFn {
 			return lexNumber
 
 		case r == '.' || isIdentBegin(r):
-			return lexElement
+			return lexIdentifier
 
 		// arithmetic:
 
@@ -385,7 +390,13 @@ func lexPreprocessor(l *lexer) stateFn {
 	return lexNext
 }
 
-func lexElement(l *lexer) stateFn {
+func lexVariable(l *lexer) stateFn {
+	l.acceptRun(isIdent)
+	l.emit(variableIdentifier)
+	return lexNext
+}
+
+func lexIdentifier(l *lexer) stateFn {
 	firstIsDot := l.input[l.start] == '.'
 	if firstIsDot {
 		l.ignore()

@@ -62,7 +62,7 @@ expr-macro-undefined:
   output:
     errors:
       - ':1: undefined macro unknownMacro'
-      - ':2: undefined macro/variable unknownMacro2'
+      - ':2: undefined macro unknownMacro2'
 
 expr-macro-undefined-in-label-expr:
   input:
@@ -71,7 +71,7 @@ expr-macro-undefined-in-label-expr:
       .label:
   output:
     errors:
-      - ':1: undefined macro/variable unknownVar'
+      - ':1: undefined macro unknownVar'
 
 expr-macro-undefined-in-label-expr2:
   input:
@@ -81,17 +81,17 @@ expr-macro-undefined-in-label-expr2:
       label:
   output:
     errors:
-      - ':1: undefined macro/variable unknownVar'
+      - ':1: undefined macro unknownVar'
 
 expr-macro-variable-binding-nested:
   input:
     code: |
-      #define leaf(a) b+1
+      #define leaf(a) $b+1
       #define parent(a, b) leaf(10)
       PUSH parent(1, 2)
   output:
     errors:
-      - ':3: undefined macro/variable b'
+      - ':3: undefined macro parameter $b'
 
 global-macros:
   input:
@@ -103,9 +103,9 @@ global-macros:
     files:
       macros.evm: |
         #define %DoPush(x) {
-          push x
+          push $x
         }
-        #define Calculate(x) x*10
+        #define Calculate(x) $x*10
   output:
     bytecode: "60646004"
 
@@ -119,9 +119,9 @@ global-macros-include-after:
     files:
       macros.evm: |
         #define %DoPush(x) {
-          push x
+          push $x
         }
-        #define Calculate(x) x*10
+        #define Calculate(x) $x*10
   output:
     bytecode: "60646004"
 
@@ -319,8 +319,8 @@ instr-macro-def-with-params:
   input:
     code: |
       #define %myInstrMacro(a, b) {
-        push a + 1
-        push b + 2
+        push $a + 1
+        push $b + 2
         add
       }
 
@@ -425,27 +425,18 @@ instr-macro-use-multiple-times:
     bytecode: "6002 6004 6006"
 
 instr-macro-variable-shadow:
-  # This checks outer-scope references in macros.
-  # The intended behavior is for references to resolved within the
-  # scope containing the definition. So the macro 'refShadowed' below should
-  # access the toplevel definition of 'shadowed' even when called within an environment
-  # that redefines the 'shadowed' variable.
   input:
     code: |
-      #define c 5
-      #define shadowed 6
-      #define refShadowed() shadowed
-
-      #define %instrMacro(shadowed) {
-        push c
-        push shadowed
-        push refShadowed
+      #define %inner(shadow) {
+        push $shadow
       }
-
-      push refShadowed()
-      %instrMacro(1)
+      #define %outer(shadow) {
+        push $shadow
+        %inner($shadow + 1)
+      }
+      %outer(1)
   output:
-    bytecode: "6006 6005 6001 6006"
+    bytecode: "6001 6002"
 
 opcode-bad-with-args:
   input:
@@ -534,7 +525,7 @@ label-same-line-as-inst:
 macro-call:
   input:
     code: |
-      #define myMacro(a, b) (100 + a) / b
+      #define myMacro(a, b) (100 + $a) / $b
       start: PUSH myMacro(4, 2)
   output:
     bytecode: "5b 6034"

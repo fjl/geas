@@ -33,6 +33,9 @@ type document struct {
 	instrMacros  map[string]*instructionMacroDef
 	parent       *document
 
+	// instruction macro parameters are passed through this map
+	instrMacroArgs map[string]astExpr
+
 	// for compiler
 	includes map[*includeInstruction]*document // filled by compiler
 	creation astStatement
@@ -128,8 +131,7 @@ type (
 	}
 
 	variableExpr struct {
-		ident   string
-		builtin bool
+		ident string
 	}
 
 	macroCallExpr struct {
@@ -540,11 +542,13 @@ func parseInstructionMacroCall(p *parser, nameTok token) {
 func parseExpr(p *parser, tok token) astExpr {
 	switch tok.typ {
 	case identifier, dottedIdentifier:
-		arg := &variableExpr{ident: tok.text, builtin: tok.typ == dottedIdentifier}
+		arg := &macroCallExpr{ident: tok.text, builtin: tok.typ == dottedIdentifier}
 		return parseExprTail(p, arg)
-	case numberLiteral, stringLiteral:
-		arg := &literalExpr{tok: tok}
+
+	case variableIdentifier:
+		arg := &variableExpr{ident: tok.text}
 		return parseExprTail(p, arg)
+
 	case labelRef, dottedLabelRef:
 		arg := &labelRefExpr{
 			ident:  tok.text,
@@ -552,9 +556,15 @@ func parseExpr(p *parser, tok token) astExpr {
 			global: isGlobal(tok.text),
 		}
 		return parseExprTail(p, arg)
+
+	case numberLiteral, stringLiteral:
+		arg := &literalExpr{tok: tok}
+		return parseExprTail(p, arg)
+
 	case openParen:
 		e := parseParenExpr(p)
 		return parseExprTail(p, e)
+
 	default:
 		p.unexpected(tok)
 		return nil
@@ -592,16 +602,18 @@ func parseExprTail(p *parser, arg astExpr) astExpr {
 		case tok.is(closeParen, lineEnd, comma, closeBrace, eof):
 			p.unread(tok)
 			return arg
+
 		case tok.is(openParen):
-			varExpr, ok := arg.(*variableExpr)
+			call, ok := arg.(*macroCallExpr)
 			if !ok {
 				p.unexpected(tok)
 			}
-			call := &macroCallExpr{ident: varExpr.ident, builtin: varExpr.builtin}
 			call.args = parseCallArguments(p)
 			arg = call // continue parsing for arith binop after call
+
 		case tok.isArith():
 			return parseArith(p, arg, tok)
+
 		default:
 			p.unexpected(tok)
 		}

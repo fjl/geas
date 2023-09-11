@@ -55,11 +55,6 @@ func newEvalEnvironment(doc *document) *evalEnvironment {
 	return &evalEnvironment{doc: doc}
 }
 
-// lookupValue finds a bound variable value.
-func (env *evalEnvironment) lookupValue(name string) *big.Int {
-	return env.vars[name]
-}
-
 // lookupExprMacro finds a macro definition in the document chain.
 func (e *evaluator) lookupExprMacro(env *evalEnvironment, name string) (*expressionMacroDef, *document) {
 	if isGlobal(name) {
@@ -211,25 +206,17 @@ func (expr *arithExpr) eval(e *evaluator, env *evalEnvironment) (*big.Int, error
 }
 
 func (expr *variableExpr) eval(e *evaluator, env *evalEnvironment) (*big.Int, error) {
-	// There are no builtin variables, so reject those right away.
-	if expr.builtin {
-		return nil, fmt.Errorf("%w .%s", ecUndefinedBuiltinVariable, expr.ident)
-	}
-	// First check if it's a reference to a variable binding.
-	v := env.lookupValue(expr.ident)
+	v := env.vars[expr.ident]
 	if v != nil {
 		return v, nil
 	}
-	// It's not a bound parameter, check if it's a macro.
-	def, defdoc := e.lookupExprMacro(env, expr.ident)
-	if def == nil {
-		return nil, fmt.Errorf("%w %s", ecUndefinedVariable, expr.ident)
+	// Check for instruction macro args.
+	vexpr, ok := env.doc.instrMacroArgs[expr.ident]
+	if !ok {
+		return nil, fmt.Errorf("%w $%s", ecUndefinedVariable, expr.ident)
 	}
-	if len(def.params) > 0 {
-		return nil, fmt.Errorf("macro %s requires arguments", expr.ident)
-	}
-	macroEnv := &evalEnvironment{doc: defdoc}
-	return def.body.eval(e, macroEnv)
+	// Evaluate it in the parent scope.
+	return vexpr.eval(e, newEvalEnvironment(env.doc.parent))
 }
 
 func (expr *macroCallExpr) eval(e *evaluator, env *evalEnvironment) (*big.Int, error) {

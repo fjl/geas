@@ -339,22 +339,21 @@ func (inst *macroCallInstruction) expand(c *Compiler, doc *document, prog []*ins
 	}
 	defer c.exitMacro(def)
 
-	// Re-bind parameters to macros.
 	if len(inst.args) != len(def.params) {
 		return nil, fmt.Errorf("%w, macro %%%s needs %d", ecInvalidArgumentCount, name, len(def.params))
 	}
-	paramScope := newDocument(doc.file, doc)
-	for i, arg := range inst.args {
-		paramScope.exprMacros[def.params[i]] = &expressionMacroDef{body: arg}
+	args := make(map[string]astExpr)
+	for i, param := range def.params {
+		args[param] = inst.args[i]
 	}
 
-	// Expand. Note, here we wire in paramScope to be the parent of the macro's body
-	// document. This is to make parameter references work within the macro.
-	innerDoc := *def.body
-	innerDoc.parent = paramScope
-	innerDoc.creation = inst
+	// Expand. Here we clone the macro document and then run it.
+	macroDoc := *def.body
+	macroDoc.parent = doc
+	macroDoc.creation = inst
+	macroDoc.instrMacroArgs = args
 
-	prog = c.expand(&innerDoc, def.body.instructions, prog)
+	prog = c.expand(&macroDoc, def.body.instructions, prog)
 	return prog, nil
 }
 
