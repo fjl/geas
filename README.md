@@ -120,7 +120,8 @@ are verified.
 
 ### Instruction Macros
 
-Common groups of instructions can be defined as instruction macros.
+Common groups of instructions can be defined as instruction macros. Names of such macros
+always start with the percent (%) character.
 
 	#define %add5_and_store(x, location) {
 		push x
@@ -130,8 +131,8 @@ Common groups of instructions can be defined as instruction macros.
 		mstore
 	}
 
-To invoke an instruction macro, write the macro name prefixed by '%' as a statement on its
-own line.
+To invoke an instruction macro, write the macro name as a statement on its own line. If
+the macro has no arguments, you can also leave the parentheses off.
 
 	.begin:
 		%add5_and_store(3, 64)
@@ -140,7 +141,7 @@ own line.
 		push 64
 		sha3
 
-Nested macro definitions are not allowed.
+Nested macro definitions are not allowed. Macro recursion is also not allowed.
 
 ### Include Files
 
@@ -173,7 +174,8 @@ identifiers must be unique across the program, i.e. they can only be defined onc
 
 This means that files defining global macros or labels can only be included into the
 program once. It also means that instruction macros containing global labels can only be
-called once.
+called once. Use good judgement when structuring your includes to avoid redefinition
+errors.
 
 lib.eas:
 
