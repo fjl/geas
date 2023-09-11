@@ -35,7 +35,6 @@ type globalScope struct {
 	labelPC    map[string]int
 	label      map[string]*labelDefInstruction
 	labelDoc   map[string]*document
-	labelStack map[string][]astStatement
 	instrMacro map[string]globalDef[*instructionMacroDef]
 	exprMacro  map[string]globalDef[*expressionMacroDef]
 }
@@ -50,7 +49,6 @@ func newGlobalScope() *globalScope {
 		label:      make(map[string]*labelDefInstruction),
 		labelPC:    make(map[string]int),
 		labelDoc:   make(map[string]*document),
-		labelStack: make(map[string][]astStatement),
 		instrMacro: make(map[string]globalDef[*instructionMacroDef]),
 		exprMacro:  make(map[string]globalDef[*expressionMacroDef]),
 	}
