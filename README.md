@@ -48,7 +48,7 @@ using the notation `@label` together with JUMP or JUMPI.
 		add
 		jump @begin
 
-When using JUMP with an argument, it turns in to a PUSH of the label followed by the jump
+When using JUMP with an argument, it turns into a PUSH of the label followed by the jump
 instruction, so the above is equivalent to:
 
 	begin:
@@ -152,11 +152,11 @@ the macro has no arguments, you can also leave the parentheses off.
 
 Nested macro definitions are not allowed. Macro recursion is also not allowed.
 
-When defining labels within instruction macros, they're local to the macro. There is no
-way to refer to a macro label from outside the macro, though you can pass references to
-such internal labels into another macro. The example below illustrates this, and also
-shows that in order to jump to a label argument within a macro, you must use explicit PUSH
-and JUMP.
+When defining (local) labels within instruction macros, they will only be visible within
+the macro. There is no way to refer to a local macro label from the outside, though you
+can pass references to such internal labels into another macro. The example below
+illustrates this, and also shows that in order to jump to a label argument within a macro,
+you must use explicit PUSH and JUMP.
 
 	#define %jump_if_not(label) {
 		iszero
