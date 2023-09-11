@@ -177,7 +177,7 @@ This means that files defining global macros or labels can only be included into
 program once. It also means that instruction macros containing global labels can only be
 called once.
 
-	;; -- lib.evm --
+lib.eas:
 
 	#define result 128
 	#define StoreSum {
@@ -186,9 +186,9 @@ called once.
 		mstore
 	}
 
-	;; -- main.evm --
+main.eas:
 
-	#include "lib.evm"
+	#include "eas.evm"
 
 		push 1
 		push 2
