@@ -166,7 +166,7 @@ Names of labels and macros are case-sensitive. And just like in Go, the case of 
 letter determines visibility of the definition.
 
 Macro and label definitions whose name begins with a lower-case letter are local to the
-file they're defined in. This means local definitions cannot be referenced by #include
+file they're defined in. This means local definitions cannot be referenced by `#include`
 files.
 
 Identifiers beginning with an upper-case letter are registered in the global scope and are
