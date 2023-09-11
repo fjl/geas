@@ -188,7 +188,7 @@ lib.eas:
 
 main.eas:
 
-	#include "eas.evm"
+	#include "lib.eas"
 
 		push 1
 		push 2
