@@ -1,0 +1,611 @@
+comments-on-label:
+  input:
+    code: |
+      JUMP @label
+      label: ;; comment
+      ADD ;; comment
+  output:
+    bytecode: "6003 56 5b 01"
+
+dot-label-at-end:
+  input:
+    code: |
+      PUSH @.end
+      .end:
+  output:
+    bytecode: "6002"
+
+dot-label-begin:
+  input:
+    code: |
+      .begin:
+      push 1
+      push 2
+      add
+      push @.begin
+  output:
+    bytecode: "6001 6002 01 6000"
+
+expr-macro-passing-literal-to-builtin:
+  input:
+    code: |
+      #define customMacro(x) .address(x) + 2
+      PUSH customMacro(0x658bdf435d810c91414ec09147daa6db62406379)
+  output:
+    errors:
+      - ':2: .address(...) requires literal argument'
+
+expr-macro-recursion:
+  input:
+    code: |
+      #define rec(a) rec(a+1) + 2
+      #define parent(x) rec(5)
+      PUSH parent(1)
+  output:
+    errors:
+      - ':3: recursive call of macro rec'
+
+expr-macro-redefine-builtin:
+  input:
+    code: |
+      #define .Address(x) x*2
+      PUSH .Address(0x2)
+  output:
+    errors:
+      - ':1: unexpected dottedIdentifier Address'
+
+expr-macro-undefined:
+  input:
+    code: |
+      PUSH unknownMacro(1, 2)
+      PUSH unknownMacro2
+  output:
+    errors:
+      - ':1: undefined macro unknownMacro'
+      - ':2: undefined macro/variable unknownMacro2'
+
+expr-macro-undefined-in-label-expr:
+  input:
+    code: |
+      PUSH @.label + unknownVar
+      .label:
+  output:
+    errors:
+      - ':1: undefined macro/variable unknownVar'
+
+expr-macro-undefined-in-label-expr2:
+  input:
+    code: |
+      PUSH @label + unknownVar
+      JUMP @label
+      label:
+  output:
+    errors:
+      - ':1: undefined macro/variable unknownVar'
+
+expr-macro-variable-binding-nested:
+  input:
+    code: |
+      #define leaf(a) b+1
+      #define parent(a, b) leaf(10)
+      PUSH parent(1, 2)
+  output:
+    errors:
+      - ':3: undefined macro/variable b'
+
+global-macros:
+  input:
+    code: |
+      #include "macros.evm"
+      %DoPush(Calculate(10))
+      %DoPush(@.end)
+      .end:
+    files:
+      macros.evm: |
+        #define %DoPush(x) {
+          push x
+        }
+        #define Calculate(x) x*10
+  output:
+    bytecode: "60646004"
+
+global-macros-include-after:
+  input:
+    code: |
+      %DoPush(Calculate(10))
+      %DoPush(@.end)
+      .end:
+      #include "macros.evm"
+    files:
+      macros.evm: |
+        #define %DoPush(x) {
+          push x
+        }
+        #define Calculate(x) x*10
+  output:
+    bytecode: "60646004"
+
+global-label:
+  input:
+    code: |
+      #include "label.evm"
+      jump @LABEL
+    files:
+      label.evm: |
+        LABEL:
+          push 1
+  output:
+    # TODO: compiler should use push0 here
+    bytecode: "5b6001600056"
+
+global-label-after:
+  input:
+    code: |
+      jump @LABEL
+      #include "label.evm"
+    files:
+      label.evm: |
+        LABEL:
+          push 1
+  output:
+    bytecode: "6003565b6001"
+
+global-label-conflict-dotted:
+  input:
+    code: |
+      jump @LABEL
+      LABEL:
+      #include "label.evm"
+    files:
+      label.evm: |
+        .LABEL:
+          push 1
+  output:
+    errors:
+      - "label.evm:1: @.LABEL already defined (as jumpdest)"
+
+global-label-in-macro:
+  input:
+    code: |
+      #define %glob(x) {
+      .GLOBAL: add
+      }
+      %glob(1)
+      %glob(2)
+  output:
+    errors:
+      - ':2: @.GLOBAL already defined by invocation of %glob at :4'
+
+global-label-redefine-toplevel:
+  input:
+    code: |
+      .GLOBAL: add
+      .GLOBAL: add2
+  output:
+    errors:
+      - ':2: @.GLOBAL already defined'
+
+global-label-redefine-include:
+  input:
+    code: |
+      #include "f1.evm"
+      #include "f1.evm"
+    files:
+      f1.evm: |
+        GLOBAL: add
+  output:
+    errors:
+      - 'f1.evm:1: @GLOBAL already defined by #include "f1.evm" at :1'
+
+global-label-redefine-include-macro:
+  input:
+    code: |
+      #include "mac.evm"
+      %MAC
+      %MAC
+    files:
+      mac.evm: |
+        stop
+        #define %MAC {
+          #include "label.evm"
+        }
+      label.evm: |
+        LABEL:
+          JUMP @LABEL
+  output:
+    errors:
+      - 'label.evm:1: @LABEL already defined by #include "label.evm" at mac.evm:3'
+
+global-label-in-macro-not-called:
+  input:
+    code: |
+      #include "mac.evm"
+      JUMP @LABEL
+    files:
+      mac.evm: |
+        stop
+        #define %MAC {
+          #include "label.evm"
+        }
+      label.evm: |
+        LABEL:
+  output:
+    errors:
+      - ':2: @LABEL not instantiated in program'
+
+global-macro-redefine:
+  input:
+    code: |
+      #include "instr.evm"
+      #include "instr.evm"
+      #include "expr.evm"
+      #include "expr.evm"
+    files:
+      instr.evm: |
+        #define %IMAC {
+          add
+        }
+      expr.evm: |
+        #define EMAC 12
+  output:
+    errors:
+      - 'instr.evm:1: macro %IMAC already defined by #include "instr.evm" at :1'
+      - 'expr.evm:1: macro EMAC already defined by #include "expr.evm" at :3'
+
+include-basic:
+  input:
+    code: |
+      #include "a.evm"
+      push 2
+      stop
+    files:
+      a.evm: |
+        push 1
+        push 1
+        add
+  output:
+    bytecode: "6001 6001 01 6002 00"
+
+include-depth-limit:
+  input:
+    code: '#include "a.evm"'
+    files:
+      a.evm: |
+        #include "b.evm"
+      b.evm: |
+        #include "a.evm"
+  output:
+    errors:
+      - 'b.evm:1: #include depth limit reached'
+
+include-macro-private:
+  input:
+    code: |
+      #include "a.evm"
+      #include "b.evm"
+    files:
+      a.evm: |
+        #define em(x) 1
+        #define %im(x) {
+          push em(5)
+          add
+        }
+        %im(5)
+      b.evm: |
+        #define em(x) 2
+        #define %im(x) {
+          push em(5)
+          sub
+        }
+        %im(5)
+  output:
+    bytecode: "6001 01 6002 03"
+
+include-relative-path:
+  input:
+    code: |
+      #include "dir/subdir/file.evm"
+    files:
+      "dir/other/file.evm": |
+        #include "neighbor.evm"
+      dir/other/neighbor.evm: |
+        push "neighbor"
+      dir/subdir/file.evm: |
+        #include "../other/file.evm"
+  output:
+    bytecode: "676e65696768626f72"
+
+instr-macro-def-with-params:
+  input:
+    code: |
+      #define %myInstrMacro(a, b) {
+        push a + 1
+        push b + 2
+        add
+      }
+
+      stop
+      %myInstrMacro(1, 2)
+      mul
+  output:
+    bytecode: "00 6002 6004 01 02"
+
+instr-macro-def-without-params:
+  input:
+    code: |
+      #define %myInstrMacro {
+        push 1
+        push 2
+        add
+      }
+
+      stop
+      %myInstrMacro
+      mul
+  output:
+    bytecode: "00 6001 6002 01 02"
+
+instr-macro-include:
+  input:
+    code: |
+      #define %doInclude {
+        #include "inc.evm"
+        #include "inc.evm"
+      }
+      %doInclude
+    files:
+      inc.evm: |
+        .label:
+        push @.label
+  output:
+    bytecode: "6000 6002"
+
+instr-macro-inner-label:
+  input:
+    code: |
+      #define %hasInnerLabel() {
+        jump @theLabel
+        push 2
+      theLabel:
+      }
+
+      %hasInnerLabel()
+      push 1
+      theLabel: stop
+  output:
+    bytecode: "6005 56 6002 5b 6001 5b 00"
+
+instr-macro-outer-label:
+  input:
+    code: |
+      #define %jumpToOuter() {
+        jump @outer
+      }
+      stop
+      %jumpToOuter()
+      push 1
+      outer: stop
+  output:
+    bytecode: "00 6006 56 6001 5b 00"
+
+instr-macro-recursion:
+  input:
+    code: |
+      #define %rec(a) {
+        %parent(a+1)
+      }
+      #define %parent(x) {
+        %rec(x)
+      }
+      %parent(1)
+  output:
+    errors:
+      - ':2: recursive call of macro %parent'
+
+instr-macro-redefine-builtin:
+  input:
+    code: |
+      #define .address(x) { }
+      %address(0x2)
+  output:
+    errors:
+      - ':1: unexpected dottedIdentifier address'
+
+instr-macro-use-multiple-times:
+  input:
+    code: |
+      #define %macro() {
+        push @.label
+      .label:
+      }
+      %macro()
+      %macro()
+      %macro()
+  output:
+    bytecode: "6002 6004 6006"
+
+instr-macro-variable-shadow:
+  # This checks outer-scope references in macros.
+  # The intended behavior is for references to resolved within the
+  # scope containing the definition. So the macro 'refShadowed' below should
+  # access the toplevel definition of 'shadowed' even when called within an environment
+  # that redefines the 'shadowed' variable.
+  input:
+    code: |
+      #define c 5
+      #define shadowed 6
+      #define refShadowed() shadowed
+
+      #define %instrMacro(shadowed) {
+        push c
+        push shadowed
+        push refShadowed
+      }
+
+      push refShadowed()
+      %instrMacro(1)
+  output:
+    bytecode: "6006 6005 6001 6006"
+
+opcode-bad-with-args:
+  input:
+    code: |
+      myop(foo)
+  output:
+    errors:
+      - ':1: unknown opcode MYOP'
+
+opcode-known-with-args:
+  input:
+    code: |
+      call(1)
+  output:
+    errors:
+      - ':1: only JUMP* and PUSH* support immediate arguments'
+
+jump:
+  input:
+    code: |
+      JUMP @label
+      label:
+  output:
+    bytecode: "6003 56 5b"
+
+jump-dotted-label:
+  input:
+    code: |
+      JUMP @.wrong
+      .wrong: STOP
+  output:
+    errors:
+      - ':1: JUMP to dotted label @.wrong'
+
+jump-undefined-label:
+  input:
+    code: |
+      JUMP @wrong
+      right: STOP
+  output:
+    errors:
+      - ':1: JUMP to undefined label @wrong'
+
+jump-with-expression-argument:
+  input:
+    code: |
+      JUMP 1 + 2
+  output:
+    errors:
+      - ':1: JUMP argument must be literal label'
+
+jump-without-argument:
+  input:
+    code: |
+      PUSH @label
+      JUMP
+      label:
+  output:
+    bytecode: "6003 56 5b"
+
+label-def-after-use:
+  input:
+    code: |
+      PUSH @label
+      label:
+  output:
+    bytecode: "6002 5b"
+
+label-def-before-use:
+  input:
+    code: |
+      GAS
+      label:
+      PUSH @label
+  output:
+    bytecode: "5a 5b 6001"
+
+label-same-line-as-inst:
+  input:
+    code: |
+      label: JUMP @label
+  output:
+    # TODO: compiler should output push0 zero here
+    bytecode: "5b 6000 56"
+
+macro-call:
+  input:
+    code: |
+      #define myMacro(a, b) (100 + a) / b
+      start: PUSH myMacro(4, 2)
+  output:
+    bytecode: "5b 6034"
+
+macro-ref:
+  input:
+    code: |
+      #define myMacro 100
+      start:
+      PUSH myMacro
+  output:
+    bytecode: "5b 60 64"
+
+macro-ref-call-empty:
+  input:
+    code: |
+      #define myMacro() 100
+      start: PUSH myMacro
+  output:
+    bytecode: "5b 6064"
+
+macro-ref-call-empty-2:
+  input:
+    code: |
+      #define myMacro 100
+      start: PUSH myMacro()
+  output:
+    bytecode: 5b 6064
+
+push-expression:
+  input:
+    code: |
+      PUSH ((1299933 * 2) / 4) + @label
+      label: STOP
+  output:
+    bytecode: "6209eaf2 5b 00"
+
+push-overflow-256bits:
+  input:
+    code: |
+      PUSH (1 << 256)
+  output:
+    errors:
+      - ':1: instruction argument > 256 bits'
+
+push-value-overflow:
+  input:
+    code: |
+      PUSH2 0xffff01
+  output:
+    errors:
+      - ':1: instruction argument overflows explicitly given PUSH<n> size'
+
+push-negative:
+  input:
+    code: |
+      PUSH 0 - 1
+  output:
+    errors:
+      - ':1: negative PUSH argument not supported'
+
+push0-explicit:
+  input:
+    code: |
+      push0
+  output:
+    bytecode: "5f"
+
+push0-implicit:
+  input:
+    code: |
+      push 0
+  output:
+    bytecode: "5f"
