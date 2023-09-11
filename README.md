@@ -35,9 +35,12 @@ Comments can appear anywhere and are introduced by the semicolon (;) character.
 		push 2
 		add
 
-Opcodes listed in the program correspond directly with the bytecodes in output. There are
-some conveniences though. Jump destinations are written as a label followed by colon (:)
-and can be referred to using the notation @label together with JUMP or JUMPI.
+Opcodes listed in the program correspond directly with the bytecodes in output.
+
+### Jump
+
+Jump destinations are written as a label followed by colon (:) and can be referred to
+using the notation `@label` together with JUMP or JUMPI.
 
 	begin:
 		push 1
@@ -56,17 +59,23 @@ instruction, so the above is equivalent to:
 		jump
 
 It is also possible to create labels without emitting a JUMPDEST instruction by prefixing
-the label name with the dot (.) character. Note that dotted labels are not valid for use
-as an argument to JUMP.
+the label name with the dot (.) character. While dotted labels are not valid for use as an
+argument to JUMP, they can be used with PUSH to measure code offsets.
 
-	.begin:
 		push @.end
-		push 0
-		mstore
+		codesize
+		eq
 	.end:
 
-PUSH instructions must be followed by an immediate argument on the same line. Simple math
-expressions and label references can be used within the argument:
+### Push
+
+The EVM instruction has sized push instructions from size zero (`PUSH0`) up to a size of
+32 bytes (`PUSH32`). While you can use sized push instructions directly, it is preferable
+to let the assembler figure out the right size for you. To do this use the variable-size
+`PUSH` instruction.
+
+All PUSH-type instructions must be followed by an immediate argument on the same line.
+Simple math expressions and label references can be used within the argument:
 
 	.begin:
 		push (@add_it * 2) - 3
@@ -81,8 +90,8 @@ division (/), and modulo (%). There is also support for bit-shifts (<<, >>), bit
 (&), OR (|), XOR (^).
 
 All arithmetic is performed with arbitrary precision integers. The result of calculations
-must fit into 256 bits in order to be valid as a PUSH argument. Negative results are not
-allowed right now.
+must fit into 256 bits in order to be valid as a PUSH argument. For sized push, the result
+must fit into the declared push size. Negative results are not allowed right now.
 
 ### Expression Macros
 
@@ -142,6 +151,37 @@ the macro has no arguments, you can also leave the parentheses off.
 		sha3
 
 Nested macro definitions are not allowed. Macro recursion is also not allowed.
+
+When defining labels within instruction macros, they're local to the macro. There is no
+way to refer to a macro label from outside the macro, though you can pass references to
+such internal labels into another macro. The example below illustrates this, and also
+shows that in order to jump to a label argument within a macro, you must use explicit PUSH
+and JUMP.
+
+	#define %jump_if_not(label) {
+		iszero
+		push label
+		jumpi
+	}
+
+	#define %read_input(bytes) {
+		calldatasize
+		push bytes
+		eq
+		%jump_if_not(@revert)
+
+		push 0
+		push bytes
+		calldataload
+		jump @continue
+
+	  revert:
+		push 0
+		push 0
+		revert
+
+	  continue:
+	}
 
 ### Include Files
 
