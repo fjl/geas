@@ -98,8 +98,10 @@ must fit into the declared push size. Negative results are not allowed right now
 Expression macros can be created with the `#define` directive. Macros can be used within
 PUSH argument expressions.
 
+Macros can have parameters. Parameters use a dollar sign ($) prefix.
+
 	#define z 0x8823
-	#define myexpr(x, y)  (x + y) * z
+	#define myexpr(x, y)  ($x + $y) * z
 
 		push myexpr(1, 2)
 
@@ -133,10 +135,10 @@ Common groups of instructions can be defined as instruction macros. Names of suc
 always start with the percent (%) character.
 
 	#define %add5_and_store(x, location) {
-		push x
+		push $x
 		push 5
 		add
-		push location
+		push $location
 		mstore
 	}
 
@@ -160,18 +162,18 @@ you must use explicit PUSH and JUMP.
 
 	#define %jump_if_not(label) {
 		iszero
-		push label
+		push $label
 		jumpi
 	}
 
 	#define %read_input(bytes) {
 		calldatasize
-		push bytes
+		push $bytes
 		eq
 		%jump_if_not(@revert)
 
 		push 0
-		push bytes
+		push $bytes
 		calldataload
 		jump @continue
 
