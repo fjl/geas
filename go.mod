@@ -1,6 +1,6 @@
 module github.com/fjl/geas
 
-go 1.21.1
+go 1.21
 
 require (
 	github.com/ethereum/go-ethereum v1.12.2
