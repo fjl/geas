@@ -189,21 +189,6 @@ func (l *lexer) acceptRunUntil(until rune) bool {
 	}
 }
 
-// acceptLiteral expects the given literal input. It returns when all of 'lit'
-// was present in the input.
-func (l *lexer) acceptLiteral(lit string) bool {
-	// save l.pos
-	begin := l.pos
-	for _, c := range []rune(lit) {
-		if l.next() != c {
-			// Undo all read characters.
-			l.pos = begin
-			return false
-		}
-	}
-	return true
-}
-
 // emit creates a new token and sends it to token channel for processing.
 func (l *lexer) emit(t tokenType) {
 	token := token{line: l.lineno, text: l.input[l.start:l.pos], typ: t}
@@ -343,15 +328,9 @@ func lexLabel(l *lexer) stateFn {
 	return lexNext
 }
 
-func lexMacroIdent(l *lexer) stateFn {
-	l.acceptRun(alpha + "_" + decimalNumbers)
-	l.emit(instMacroIdent)
-	return lexNext
-}
-
 func lexPercent(l *lexer) stateFn {
 	r := l.peek()
-	if strings.IndexRune(identChars, r) >= 0 {
+	if strings.ContainsRune(identChars, r) {
 		l.ignore()
 		l.acceptRun(identChars)
 		l.emit(instMacroIdent)

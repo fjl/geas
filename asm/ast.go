@@ -239,7 +239,7 @@ func (p *parser) next() token {
 		p.buffer = p.buffer[:len(p.buffer)-1]
 		return t
 	}
-	t, _ := <-p.in
+	t := <-p.in
 	return t
 }
 

@@ -76,7 +76,7 @@ func keccak256Macro(e *evaluator, env *evalEnvironment, call *macroCallExpr) (*b
 }
 
 var (
-	errSelectorWantsLiteral = errors.New("Selector(...) requires literal string argument")
+	errSelectorWantsLiteral = fmt.Errorf(".selector(...) requires literal string argument")
 )
 
 func selectorMacro(e *evaluator, env *evalEnvironment, call *macroCallExpr) (*big.Int, error) {
@@ -85,7 +85,7 @@ func selectorMacro(e *evaluator, env *evalEnvironment, call *macroCallExpr) (*bi
 	}
 	lit, ok := call.args[0].(*literalExpr)
 	if !ok || lit.tok.typ != stringLiteral {
-		return nil, fmt.Errorf("Selector(...) requires literal string argument")
+		return nil, errSelectorWantsLiteral
 	}
 	text := lit.tok.text
 	if _, err := abi.ParseSelector(text); err != nil {
@@ -100,7 +100,7 @@ func selectorMacro(e *evaluator, env *evalEnvironment, call *macroCallExpr) (*bi
 var (
 	errAddressWantsLiteral = errors.New(".address(...) requires literal argument")
 	errAddressInvalid      = errors.New("invalid Ethereum address")
-	errAddressChecksum     = errors.New("Ethereum address has invalid checksum")
+	errAddressChecksum     = errors.New("address has invalid checksum")
 )
 
 func addressMacro(e *evaluator, env *evalEnvironment, call *macroCallExpr) (*big.Int, error) {
