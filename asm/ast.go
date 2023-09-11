@@ -407,7 +407,7 @@ loop:
 			p.throwError(tok, "incomplete macro definition")
 
 		case openBrace:
-			p.unexpected(tok)
+			p.throwError(tok, "unexpected { in expression macro definition")
 
 		case openParen:
 			if !didParams {

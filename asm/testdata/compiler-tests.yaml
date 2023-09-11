@@ -330,6 +330,19 @@ instr-macro-def-with-params:
   output:
     bytecode: "00 6002 6004 01 02"
 
+instr-macro-def-missing-percent:
+  input:
+    code: |
+      #define myInstrMacro(a, b) {
+        push $a + 1
+        push $b + 2
+        add
+      }
+  output:
+    errors:
+      - ':1: unexpected { in expression macro definition'
+      - ':5: unexpected closeBrace }'
+
 instr-macro-def-without-params:
   input:
     code: |
@@ -608,4 +621,3 @@ unicode-ident:
         PUSH @läbel
   output:
     bytecode: '5b6000'
-      
