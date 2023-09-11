@@ -86,7 +86,7 @@ allowed right now.
 
 ### Expression Macros
 
-Expression macros can be created with the #define directive. Macros can be used within
+Expression macros can be created with the `#define` directive. Macros can be used within
 PUSH argument expressions.
 
 	#define z 0x8823
@@ -97,9 +97,7 @@ PUSH argument expressions.
 ### Builtin Macros
 
 There are several builtin macros for common EVM tasks. Names of builtins start with a dot,
-and builtin macros cannot be redefined.
-
-Available builtins include:
+and builtin macros cannot be redefined. Available builtins include:
 
 `.abs(...)` for getting the absolute value of a number:
 
