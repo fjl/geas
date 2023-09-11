@@ -192,4 +192,4 @@ main.eas:
 		push 2
 		%StoreSum  ;; calling global macro defined in lib.evm
 
-[^1]: Under no circumstances must it be called the 'geth assembler'.
+[^1]: Under no circumstances must it be called the geth assembler.
