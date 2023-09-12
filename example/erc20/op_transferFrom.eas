@@ -1,0 +1,84 @@
+;;; ERC20 - transferFrom
+;;;
+;;; calldata structure
+;;; +--------------------+-----------------+---------------+-------------------+
+;;; | selector (4 bytes) | from (32 bytes) | to (32 bytes) | amount (32 bytes) |
+;;; +--------------------+-----------------+---------------+-------------------+
+
+#define S_transferFrom .selector("transferFrom(address,address,uint256)")
+#define logtopic .keccak256("Transfer(address,address,uint256)")
+
+OpTransferFrom:
+    push 64          ; [len]
+    push 4           ; [offset, len]
+    keccak256        ; [key]
+    dup1             ; [key, key]
+
+    sload            ; [available, key]
+
+    push 68          ; [68, available, key]
+    mload            ; [amt, available, key]
+
+    ;; if amt > available, revert
+    dup2             ; [available, amt, available, key]
+    dup2             ; [amt, available, amt, available, key]
+    gt               ; [amt > available, amt, available, key]
+    jumpi @FAIL      ; [amt, available, key]
+
+    ;; load the sender balance
+    push 4           ; [4, amt, available, key]
+    calldataload     ; [from, amt, available, key]
+    sload            ; [from_balance, amt, available, key]
+
+    lt               ; [from_balance < amt, available, key]
+    jumpi @FAIL      ; [available, key]
+
+    ;; reduce allowance by amt
+    push 68          ; [68, available, key]
+    calldataload     ; [amt, available, key]
+    swap1            ; [available, amt, key]
+    sub              ; [available - amt, key]
+    swap1            ; [key, available - amt]
+    sstore           ; []
+
+    ;; reduce from balance by amt
+    push 4           ; [4]
+    calldataload     ; [from]
+    dup1             ; [from, from]
+    sload            ; [from_balance, from]
+
+    push 68          ; [68, from_balance, from]
+    calldataload     ; [amt, from_balance, from]
+    dup1             ; [amt, amt, from_balance, from]
+
+    swap2            ; [from_balance, amt, amt, from]
+    sub              ; [from_balance - amt, amt from]
+    swap1            ; [amt, from_balance - amt, from]
+    swap2            ; [from, from_balance - amt, amt]]
+    sstore           ; [amt]
+
+    ;; increase to balance by amt
+    push 36          ; [36, amt]
+    calldataload     ; [to, amt]
+    dup1             ; [to, to, amt]
+    sload            ; [to_balance, to, amt]
+
+    swap1            ; [to, to_balance, amt]
+    swap2            ; [amt, to_balance, to]
+    add              ; [amt + to_balance, to]
+    swap1            ; [to, amt + to_balance]
+    sstore
+
+    ;; output event
+    push 36          ; [36]
+    calldataload     ; [to]
+    push 4           ; [4, to]
+    calldataload     ; [from, to]
+    push 68          ; [68, from, to]
+    calldataload     ; [amt, from, to]
+    push 0           ; [0, amt, from, to]
+    mstore           ; [from, to]
+    push logtopic    ; [topic, from, to]
+    push 32          ; [32, topic, from, to]
+    push 0           ; [0, 32, topic, from, to]
+    log3             ; []

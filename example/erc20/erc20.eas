@@ -1,0 +1,73 @@
+;;; erc20
+;;;
+;;; Minimal ERC-20 implementation in raw assembly.
+;;;
+;;; Storage Layout
+;;; --
+;;; balance(address)          => 0x000000000000000000000000 || address
+;;; allowance(owner, spender) => keccak(owner || spender)
+
+#define %match(selector, label) {
+    dup1                   ; [selector, selector]
+    push $selector         ; [candidate, selector, selector]
+    eq                     ; [success, selector]
+    push $label			   ; [label, success, selector]
+    jumpi
+}
+
+.start:
+    ;; Read the calldata into memory.
+    calldatasize           ; [calldatasize]
+    push 0                 ; [0, calldatasize]
+    dup1                   ; [0, 0, calldatasize]
+    calldatacopy           ; []
+
+    ;; Extract only the function selector
+    push 0                 ; [0]
+    mload                  ; [dirty_selector]
+    push 224               ; [224, dirty_selector]
+    shr                    ; [selector]
+
+    ;; Jump to the coresponding function.
+    %match(S_transferFrom, @OpTransferFrom)
+    %match(S_approve, @OpApprove)
+    %match(S_transfer, @OpTransfer)
+
+    ;; Check the view functions last to not waste gas on-chain.
+    %match(S_decimals, @OpDecimals)
+    %match(S_totalSupply, @OpTotalSupply)
+    %match(S_balanceOf, @OpBalanceOf)
+    %match(S_allowance, @OpAllowance)
+
+    ;; [ selector ] is left on stack here.
+
+;;; Catchall for reverts.
+FAIL:
+    push 0
+    push 0
+    revert
+
+;;; Write operations.
+;;; These do not return, so there are STOPs in between.
+
+#include "op_transferFrom.eas"
+    stop
+#include "op_approve.eas"
+    stop
+#include "op_transfer.eas"
+    stop
+
+;;; View functions, these return on their own.
+
+#include "op_balanceOf.eas"
+#include "op_allowance.eas"
+
+#define S_decimals .selector("decimals()")
+OpDecimals:
+    ;; return 0
+    stop
+
+#define S_totalSupply .selector("totalSupply()")
+OpTotalSupply:
+    ;; return 0
+    stop

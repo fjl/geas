@@ -1,0 +1,26 @@
+;;; ERC20 - balanceOf
+;;;
+;;; calldata structure
+;;; +--------------------+------------------+--------------------+
+;;; | selector (4 bytes) | zeros (12 bytes) | address (20 bytes) |
+;;; +--------------------+------------------+--------------------+
+
+#define S_balanceOf .selector("balanceOf(address)")
+
+OpBalanceOf:
+    ;; prepare return parameters
+    push 32         ; [ret_len]
+    push 0			; [ret_offset, ret_len]
+
+    ;; skip the selector, load the address
+    push 4			; [4, ret_offset, ret_len]
+    mload			; [addr, ret_offset, ret_len]
+
+    ;; load balance
+    sload			; [balance, ret_offset, ret_len]
+
+    ;; prepare balance to return
+    dup2			; [0, balance, ret_offset, ret_len]
+    mstore			; [ret_offset, ret_len]
+
+    return			; []

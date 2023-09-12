@@ -1,0 +1,21 @@
+;;; ERC20 - allowance
+;;;
+;;; calldata structure
+;;; +--------------------+------------------+------------------+------------------+--------------------+
+;;; | selector (4 bytes) | zeros (12 bytes) | owner (20 bytes) | zeros (20 bytes) | spender (20 bytes) |
+;;; +--------------------+------------------+------------------+------------------+--------------------+
+
+#define S_allowance .selector("allowance(address,address)")
+
+OpAllowance:
+    push 64          ; [len]
+    push 4           ; [offset]
+    keccak256        ; [key]
+
+    sload            ; [allowance]
+    push 0           ; [offset, allowance]
+    mstore           ; []
+
+    push 32          ; [32]
+    push 0           ; [0, 32]
+    return           ; []

@@ -1,0 +1,51 @@
+;;; ERC20 - approve
+;;;
+;;; calldata structure
+;;; +--------------------+------------------+--------------------+-------------------+
+;;; | selector (4 bytes) | zeros (12 bytes) | spender (20 bytes) | amount (32 bytes) |
+;;; +--------------------+------------------+--------------------+-------------------+
+
+#define S_approve .selector("approve(address,uint256)")
+#define logtopic .keccak256("Approval(address,address,uint256)")
+
+OpApprove:
+    push 36          ; [36]
+    mload            ; [amt]
+
+    push 4           ; [4, amt]
+    mload            ; [sender, amt]
+
+    ;; write the sender to mem[36..68]
+    push 36          ; [36, sender, amt]
+    mstore           ; [amt]
+
+    ;; write the caller to mem[4..36]
+    caller           ; [caller, amt]
+    push 4           ; [4, caller, amt]
+    mstore           ; [amt]
+
+    ;; hash mem[4..68]
+    push 64          ; [len, amt]
+    push 4           ; [offset, len, amt]
+    keccak256        ; [key, amt]
+    dup1             ; [key, key, amt]
+
+    sload            ; [allowance, key, amt]
+    swap1            ; [key, allowance, amt]
+    swap2            ; [amt, allowance, key]
+    add              ; [new_allowance, key]
+    swap1            ; [key, new_allowance]
+    sstore           ; []
+
+    ;; output event
+    push 4           ; [4]
+    calldataload     ; [spender]
+    caller           ; [owner, spender]
+    push 36          ; [36, owner, spender]
+    calldataload     ; [amt, owner, spender]
+    push 0           ; [0, value, owner, spender]
+    mstore           ; [owner, spender]
+    push logtopic    ; [topic, owner, spender]
+    push 32          ; [32, topic, owner, spender]
+    push 0           ; [0, 32, topic, ownder, spender]
+    log3             ; []

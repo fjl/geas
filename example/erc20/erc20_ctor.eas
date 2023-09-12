@@ -1,0 +1,24 @@
+;;; ERC20 - constructor
+;;;
+
+    pc                  ; [0]
+
+    ;; give deployer initial supply
+    push4 10000			; [balance, 0]
+    caller				; [caller, balance, 0]
+    sstore				; [0]
+
+    push1 @.start       ; [start, 0]
+    dup1                ; [start, start, 0]
+    codesize            ; [codesize, start, start, 0]
+    sub                 ; [length, start, 0]
+    swap2               ; [0, start, length]
+    swap1               ; [start, 0, length]
+    dup3                ; [length, start, 0, length]
+    swap1               ; [start, length, 0, length]
+    dup3                ; [0, start, length, 0, length]
+    codecopy            ; [0, length]
+    return              ; []
+
+.start:
+#assemble "erc20.eas"
