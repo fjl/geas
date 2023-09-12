@@ -94,6 +94,12 @@ type (
 		src      *document
 		filename string
 	}
+
+	assembleInstruction struct {
+		tok      token
+		src      *document
+		filename string
+	}
 )
 
 // definitions
@@ -161,6 +167,14 @@ func (inst *includeInstruction) position() Position {
 
 func (inst *includeInstruction) description() string {
 	return fmt.Sprintf("#include %q", inst.filename)
+}
+
+func (inst *assembleInstruction) position() Position {
+	return Position{File: inst.src.file, Line: inst.tok.line}
+}
+
+func (inst *assembleInstruction) description() string {
+	return fmt.Sprintf("#assemble %q", inst.filename)
 }
 
 func (inst *opcodeInstruction) position() Position {
@@ -379,6 +393,9 @@ func parseDirective(p *parser, tok token) {
 	case "#include":
 		parseInclude(p, tok)
 
+	case "#assemble":
+		parseAssemble(p, tok)
+
 	default:
 		p.throwError(tok, "unknown compiler directive %q", tok.text)
 	}
@@ -488,6 +505,17 @@ func parseInclude(p *parser, d token) {
 		p.doc.instructions = append(p.doc.instructions, instr)
 	default:
 		p.throwError(tok, "expected filename following #include")
+	}
+}
+
+func parseAssemble(p *parser, d token) {
+	instr := &assembleInstruction{src: p.doc, tok: d}
+	switch tok := p.next(); tok.typ {
+	case stringLiteral:
+		instr.filename = tok.text
+		p.doc.instructions = append(p.doc.instructions, instr)
+	default:
+		p.throwError(tok, "expected filename following #assemble")
 	}
 }
 

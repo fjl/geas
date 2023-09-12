@@ -1,3 +1,18 @@
+assemble-directive:
+  input:
+    code: |
+      push 1
+      push 1
+      add
+      #assemble "file.eas"
+    files:
+      file.eas: |
+        add
+        label:
+        jump @label
+  output:
+    bytecode: '6001 6001 01 01 5b 6001 56'
+
 comments-on-label:
   input:
     code: |

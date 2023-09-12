@@ -23,6 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"math"
 	"math/big"
 	"path"
 	"strings"
@@ -54,10 +55,10 @@ type instruction struct {
 	doc *document
 
 	// compiler-assigned fields:
-	pc          int      // pc at this instruction
-	pushSize    int      // computed size of push instruction
-	argv        *big.Int // computed argument value
-	argNoLabels bool     // true if arg expression does not contain @label
+	pc          int    // pc at this instruction
+	pushSize    int    // computed size of push instruction
+	data        []byte // computed argument value
+	argNoLabels bool   // true if arg expression does not contain @label
 }
 
 func newInstruction(doc *document, ast astInstruction, op string) *instruction {
@@ -83,6 +84,9 @@ func (inst *instruction) explicitPushSize() (int, bool) {
 
 // pushArg returns the instruction argument.
 func (inst *instruction) pushArg() astExpr {
+	if !isPush(inst.op) {
+		return nil
+	}
 	op, ok := inst.ast.(*opcodeInstruction)
 	if ok {
 		return op.arg
@@ -182,9 +186,6 @@ func (c *Compiler) compile(doc *document) (output []byte) {
 		if panicking != nil && panicking != errCancelCompilation {
 			panic(panicking)
 		}
-		if len(c.errors) > 0 {
-			output = nil
-		}
 	}()
 
 	// First, load all #include files and register their definitions.
@@ -234,8 +235,6 @@ func (c *Compiler) expand(doc *document, input []astInstruction, prog []*instruc
 	return prog
 }
 
-var zero = new(big.Int)
-
 // expand creates an instruction for the label. For dotted labels, the instruction is
 // empty (i.e. has size zero). For regular labels, a JUMPDEST is created.
 func (li *labelDefInstruction) expand(c *Compiler, doc *document, prog []*instruction) ([]*instruction, error) {
@@ -269,7 +268,6 @@ func (op *opcodeInstruction) expand(c *Compiler, doc *document, prog []*instruct
 		if op.arg == nil {
 			return prog, ecPushWithoutArgument
 		}
-		inst.argv = zero
 
 	case isJump(opcode):
 		if err := c.validateJumpArg(doc, op.arg); err != nil {
@@ -278,7 +276,6 @@ func (op *opcodeInstruction) expand(c *Compiler, doc *document, prog []*instruct
 		// 'JUMP @label' instructions turn into 'PUSH @label' + 'JUMP'.
 		if op.arg != nil {
 			push := newInstruction(doc, op, "PUSH")
-			push.argv = zero
 			prog = append(prog, push)
 		}
 
@@ -380,7 +377,11 @@ func (c *Compiler) processIncludes(doc *document, stack []astStatement) {
 		if !ok {
 			continue
 		}
-		file := path.Clean(path.Join(path.Dir(doc.file), inc.filename))
+		file, err := resolveRelative(doc.file, inc.filename)
+		if err != nil {
+			c.addError(inst, err)
+			continue
+		}
 		incdoc := c.parseIncludeFile(file, inc, len(stack)+1)
 		if incdoc == nil {
 			continue // there were parse errors
@@ -400,6 +401,14 @@ func (c *Compiler) processIncludes(doc *document, stack []astStatement) {
 		incdoc := doc.includes[inst]
 		c.processIncludes(incdoc, append(stack, inst))
 	}
+}
+
+func resolveRelative(basepath string, filename string) (string, error) {
+	res := path.Clean(path.Join(path.Dir(basepath), filename))
+	if strings.Contains(res, "..") {
+		return "", fmt.Errorf("path %q escapes project root", filename)
+	}
+	return res, nil
 }
 
 func (c *Compiler) parseIncludeFile(file string, inst *includeInstruction, depth int) *document {
@@ -429,7 +438,7 @@ func (c *Compiler) parseIncludeFile(file string, inst *includeInstruction, depth
 	return doc
 }
 
-// expand of includes appends the included file's instructions to the program.
+// expand of #include appends the included file's instructions to the program.
 // Note this accesses the documents parsed by processIncludes.
 func (inst *includeInstruction) expand(c *Compiler, doc *document, prog []*instruction) ([]*instruction, error) {
 	incdoc := doc.includes[inst]
@@ -440,16 +449,34 @@ func (inst *includeInstruction) expand(c *Compiler, doc *document, prog []*instr
 	return prog, nil
 }
 
+// expand of #assemble performs compilation of the given assembly file.
+func (inst *assembleInstruction) expand(c *Compiler, doc *document, prog []*instruction) ([]*instruction, error) {
+	subc := NewCompiler(c.fsys)
+	subc.SetIncludeDepthLimit(c.maxIncDepth)
+	subc.SetMaxErrors(math.MaxInt)
+
+	file, err := resolveRelative(doc.file, inst.filename)
+	if err != nil {
+		return prog, err
+	}
+	bytecode := c.CompileFile(file)
+	if len(c.Errors()) > 0 {
+		c.addErrors(c.Errors())
+		return prog, nil
+	}
+	datainst := &instruction{data: bytecode}
+	return append(prog, datainst), nil
+}
+
+var zero = new(big.Int)
+
 // assignInitialPushSizes sets the pushSize of all PUSH and PUSH<n> instructions.
 // Arguments are pre-evaluated in this compilation step if they contain no label references.
 func (c *Compiler) assignInitialPushSizes(e *evaluator, prog []*instruction) {
 	for _, inst := range prog {
-		if !isPush(inst.op) || inst.op == "PUSH0" {
-			continue
-		}
 		argument := inst.pushArg()
 		if argument == nil {
-			panic("PUSH without argument")
+			continue
 		}
 		inst.pushSize = 1
 		if s, ok := inst.explicitPushSize(); ok {
@@ -483,15 +510,16 @@ func (c *Compiler) computePC(e *evaluator, prog []*instruction) {
 		if li, ok := inst.ast.(*labelDefInstruction); ok {
 			e.setLabelPC(inst.doc, li, pc)
 		}
+
 		inst.pc = pc
-		var size int
-		switch {
-		case inst.op == "":
-			// dotted label, size zero
-		case isPush(inst.op):
-			size = 1 + inst.pushSize
-		default:
+		size := 0
+		if inst.op != "" {
 			size = 1
+		}
+		if isPush(inst.op) {
+			size += inst.pushSize
+		} else {
+			size += len(inst.data)
 		}
 		pc += size
 	}
@@ -544,37 +572,33 @@ func (inst *instruction) assignPushArg(v *big.Int, setSize bool) error {
 		}
 		return ecFixedSizePushOverflow
 	}
-	inst.argv = v
+
+	// Store data padded.
+	b := v.Bytes()
+	inst.data = make([]byte, inst.pushSize)
+	copy(inst.data[len(inst.data)-len(b):], b)
 	return nil
 }
 
 // generateOutput creates the bytecode. This is also where instruction names get resolved.
 func (c *Compiler) generateOutput(prog []*instruction) []byte {
+	if len(c.errors) > 0 {
+		return nil
+	}
 	var output []byte
 	for i, inst := range prog {
 		if len(output) != inst.pc {
 			panic(fmt.Sprintf("BUG: instruction %d has pc=%d, but output has size %d", i, inst.pc, len(output)))
 		}
-		if inst.op == "" {
-			li, ok := inst.ast.(*labelDefInstruction)
-			if !ok || !li.dotted {
-				panic(fmt.Sprintf("BUG: instruction %d has empty op", i))
+		if inst.op != "" {
+			opcode, ok := inst.opcode()
+			if !ok {
+				c.addError(inst.ast, fmt.Errorf("%w %s", ecUnknownOpcode, inst.op))
+				continue
 			}
-			continue // skip label without JUMPDEST
+			output = append(output, byte(opcode))
 		}
-
-		opcode, ok := inst.opcode()
-		if !ok {
-			c.addError(inst.ast, fmt.Errorf("%w %s", ecUnknownOpcode, inst.op))
-		}
-		output = append(output, byte(opcode))
-		if opcode.IsPush() {
-			pushdata := inst.argv.Bytes()
-			if len(pushdata) == 0 {
-				pushdata = []byte{0}
-			}
-			output = append(output, pushdata...)
-		}
+		output = append(output, inst.data...)
 	}
 	return output
 }
