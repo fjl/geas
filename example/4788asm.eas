@@ -109,6 +109,7 @@ loadtime:
     ;; the timestamp input wasn't a valid previous timestamp.
     eq               ; [stored_timestamp == input_timestamp, time_index]
     jumpi @loadroot  ; [time_index]
+    %do_revert       ; []
 
 loadroot:
     ;; Extend index to get root index.
