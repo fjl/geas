@@ -8,7 +8,7 @@
 #define S_approve .selector("approve(address,uint256)")
 #define logtopic .keccak256("Approval(address,address,uint256)")
 
-OpApprove:
+Approve:
     push 36          ; [36]
     mload            ; [amt]
 

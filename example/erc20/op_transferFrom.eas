@@ -8,7 +8,7 @@
 #define S_transferFrom .selector("transferFrom(address,address,uint256)")
 #define logtopic .keccak256("Transfer(address,address,uint256)")
 
-OpTransferFrom:
+TransferFrom:
     push 64          ; [len]
     push 4           ; [offset, len]
     keccak256        ; [key]

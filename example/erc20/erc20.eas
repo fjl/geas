@@ -29,15 +29,15 @@
     shr              ; [selector]
 
     ;; Jump to the selected function.
-    %match(S_transferFrom, @OpTransferFrom)
-    %match(S_approve, @OpApprove)
-    %match(S_transfer, @OpTransfer)
+    %match(S_transferFrom, @TransferFrom)
+    %match(S_approve, @Approve)
+    %match(S_transfer, @Transfer)
 
     ;; Check the view functions last to not waste gas on-chain.
-    %match(S_decimals, @OpDecimals)
-    %match(S_totalSupply, @OpTotalSupply)
-    %match(S_balanceOf, @OpBalanceOf)
-    %match(S_allowance, @OpAllowance)
+    %match(S_balanceOf, @BalanceOf)
+    %match(S_allowance, @Allowance)
+    %match(S_decimals, @Return0)
+    %match(S_totalSupply, @Return0)
 
                      ; [selector] is left on stack here.
 
@@ -61,4 +61,10 @@ FAIL:
 
 #include "op_balanceOf.eas"
 #include "op_allowance.eas"
-#include "op_meta.eas"
+
+;;; View functions for token metadata, these just return zero.
+
+#define S_decimals .selector("decimals()")
+#define S_totalSupply .selector("totalSupply()")
+
+Return0:

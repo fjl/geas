@@ -8,7 +8,7 @@
 #define S_transfer .selector("transfer(address,uint256)")
 #define logtopic .keccak256("Transfer(address,address,uint256)")
 
-OpTransfer:
+Transfer:
     caller           ; [from]
     sload            ; [from_balance]
     push1 36         ; [36, from_balance]

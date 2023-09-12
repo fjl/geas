@@ -7,7 +7,7 @@
 
 #define S_balanceOf .selector("balanceOf(address)")
 
-OpBalanceOf:
+BalanceOf:
     ;; prepare return parameters
     push 32          ; [ret_len]
     push 0           ; [ret_offset, ret_len]
