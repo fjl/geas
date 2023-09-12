@@ -1,0 +1,13 @@
+;;; ERC20 - metadata operations
+;;;
+
+#define S_decimals .selector("decimals()")
+#define S_totalSupply .selector("totalSupply()")
+
+OpDecimals:
+    ;; return 0
+    stop
+
+OpTotalSupply:
+    ;; return 0
+    stop

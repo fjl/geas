@@ -1,4 +1,4 @@
-;;; erc20
+;;; ERC20
 ;;;
 ;;; Minimal ERC-20 implementation in raw assembly.
 ;;;
@@ -7,12 +7,12 @@
 ;;; balance(address)          => 0x000000000000000000000000 || address
 ;;; allowance(owner, spender) => keccak(owner || spender)
 
-#define %match(selector, label) {
+#define %match(candidate, label) { ; [selector]
     dup1                   ; [selector, selector]
-    push $selector         ; [candidate, selector, selector]
+    push $candidate        ; [candidate, selector, selector]
     eq                     ; [success, selector]
-    push $label			   ; [label, success, selector]
-    jumpi
+    push $label            ; [label, success, selector]
+    jumpi                  ; [selector]
 }
 
 .start:
@@ -61,13 +61,4 @@ FAIL:
 
 #include "op_balanceOf.eas"
 #include "op_allowance.eas"
-
-#define S_decimals .selector("decimals()")
-OpDecimals:
-    ;; return 0
-    stop
-
-#define S_totalSupply .selector("totalSupply()")
-OpTotalSupply:
-    ;; return 0
-    stop
+#include "op_meta.eas"

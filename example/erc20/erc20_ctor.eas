@@ -4,11 +4,11 @@
     pc                  ; [0]
 
     ;; give deployer initial supply
-    push4 10000			; [balance, 0]
-    caller				; [caller, balance, 0]
-    sstore				; [0]
+    push 10000          ; [balance, 0]
+    caller              ; [caller, balance, 0]
+    sstore              ; [0]
 
-    push1 @.start       ; [start, 0]
+    push @.start        ; [start, 0]
     dup1                ; [start, start, 0]
     codesize            ; [codesize, start, start, 0]
     sub                 ; [length, start, 0]
