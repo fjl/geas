@@ -1,0 +1,19 @@
+;;;    __ ___________  ____
+;;;   / // /__  ( __ )( __ )____ __________ ___
+;;;  / // /_ / / __  / __  / __ `/ ___/ __ `__ \
+;;; /__  __// / /_/ / /_/ / /_/ (__  ) / / / / /
+;;;   /_/  /_/\____/\____/\__,_/____/_/ /_/ /_/
+;;;
+;;; constructor code
+    
+    push @.end - @.start  ; [size]
+    dup1                  ; [size, size] 
+    push @.start          ; [start, size, size]
+    push 0                ; [0, size, size, size]
+    codecopy              ; [size]
+    push 0                ; [0, size]
+    return                ; []
+
+.start:
+#assemble "4788asm.eas"
+.end:
