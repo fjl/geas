@@ -61,31 +61,6 @@
     jumpi @loadtime  ; []
     %do_revert       ; []
 
-time:
-    ;; Load input timestamp.
-    push 0           ; [0]
-    calldataload     ; [input_timestamp]
-    dup1             ; [input_timestamp, input_timestamp]
-
-    ;; Verify input timestamp is non-zero.
-    iszero           ; [input_timestamp == 0, input_timestamp]
-    jumpi @throw     ; [input_timestamp]
-
-    ;; Compute the timestamp index and load from storage.
-    push buflen      ; [buflen, input_timestamp]
-    dup2             ; [input_timestamp, buflen, input_timestamp]
-    mod              ; [time_index, input_timestamp]
-    swap1            ; [input_timestamp, time_index]
-    dup2             ; [time_index, input_timestamp, time_index]
-    sload            ; [stored_timestamp, input_timestamp, time_index]
-
-    ;; Verify stored timestamp matches input timestamp. It's possible these
-    ;; don't match if the slot has been overwritten by the ring buffer or if
-    ;; the timestamp input wasn't a valid previous timestamp.
-    eq               ; [stored_timestamp == input_timestamp, time_index]
-    jumpi @loadroot  ; [time_index]
-    %do_revert       ; []
-
 loadtime:
     ;; Load input timestamp.
     push 0           ; [0]
