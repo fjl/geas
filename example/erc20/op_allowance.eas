@@ -2,14 +2,14 @@
 ;;;
 ;;; calldata structure
 ;;; +--------------------+------------------+------------------+------------------+--------------------+
-;;; | selector (4 bytes) | zeros (12 bytes) | owner (20 bytes) | zeros (20 bytes) | spender (20 bytes) |
+;;; | selector (4 bytes) | zeros (12 bytes) | owner (20 bytes) | zeros (12 bytes) | spender (20 bytes) |
 ;;; +--------------------+------------------+------------------+------------------+--------------------+
 
 #define S_allowance .selector("allowance(address,address)")
 
 Allowance:
     push 64          ; [len]
-    push 4           ; [offset]
+    push 4           ; [offset, len]
     keccak256        ; [key]
 
     sload            ; [allowance]
