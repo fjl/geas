@@ -1,6 +1,6 @@
-# geas
+![geas](assets/geas-b.svg)
 
-This is `geas` – the Good Ethereum Assembler[^1] – a macro assembler for the EVM.
+This is geas – the Good Ethereum Assembler[^1] – a macro assembler for the EVM.
 
 You can use it to create any contract for Ethereum, though it's probably a bad idea.
 For real contracts, you should use a well-tested language compiler like Solidity.
