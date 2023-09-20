@@ -186,7 +186,7 @@ you must use explicit PUSH and JUMP.
 	  continue:
 	}
 
-### Include Files
+### Including Files
 
 EVM assembly files can be included into the current program using the `#include`
 directive. Top-level instructions in the included file will be inserted at the position of
@@ -205,20 +205,21 @@ the directive.
 ### Local and Global Scope
 
 Names of labels and macros are case-sensitive. And just like in Go, the case of the first
-letter determines visibility of the definition.
+letter determines visibility of definitions.
 
 Macro and label definitions whose name begins with a lower-case letter are local to the
 file they're defined in. This means local definitions cannot be referenced by `#include`
 files.
 
 Identifiers beginning with an upper-case letter are registered in the global scope and are
-available for use in all files of the program, regardless of `#include` structure. Global
-identifiers must be unique across the program, i.e. they can only be defined once.
+available for use across files. When using `#include`, global definitions in the included
+file also become available in all other files.
 
-This means that files defining global macros or labels can only be included into the
-program once. It also means that instruction macros containing global labels can only be
-called once. Use good judgement when structuring your includes to avoid redefinition
-errors.
+Global identifiers must be unique across the program, i.e. they can only be defined once.
+Files defining global macros or labels can only be included into the program once. Note
+that the uniqueness requirement also means that instruction macros containing global
+labels can only be called once. Use good judgement when structuring your includes to avoid
+redefinition errors.
 
 lib.eas:
 
@@ -236,5 +237,25 @@ main.eas:
 		push 1
 		push 2
 		%StoreSum  ;; calling global macro defined in lib.evm
+
+### #assemble
+
+For contract constructors and advanced CALL constructions, it can be necessary to include
+sub-program bytecode as-is. The `#assemble` directive can do this for you.
+
+Using `#assemble` runs the assembler on the specified file, and includes the resulting
+bytecode into the current program. Labels of the subprogram will start at offset zero.
+Unlike with `#include`, global definitions of the subprogram are not imported.
+
+		;; copy subprogram to memory
+		push @.end - @.begin   ; [size]
+		push @.begin           ; [offset, size]
+		push 128               ; [dest, offset, codesize]
+		codecopy               ; []
+
+	.begin:
+	#assemble "subprogram.eas"
+	.end
+
 
 [^1]: Under no circumstances must it be called the geth assembler.
