@@ -240,8 +240,8 @@ main.eas:
 
 ### #assemble
 
-For contract constructors and advanced CALL constructions, it can be necessary to include
-sub-program bytecode as-is. The `#assemble` directive can do this for you.
+When writing contract constructors and advanced CALL scenarios, it can be necessary to
+include sub-program bytecode as-is. The `#assemble` directive can do this for you.
 
 Using `#assemble` runs the assembler on the specified file, and includes the resulting
 bytecode into the current program. Labels of the subprogram will start at offset zero.
