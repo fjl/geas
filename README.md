@@ -11,12 +11,12 @@ at a low level.
 
 To build the tool, clone the repository and then run
 
-	go build ./cmd/geas
+    go build ./cmd/geas
 
 This creates the `geas` binary in the current directory. To create bytecode, run the tool
 with a filename as argument.
 
-	./geas file.eas
+    ./geas file.eas
 
 ### Use as a Go Library
 
@@ -31,9 +31,9 @@ are supported.
 
 Comments can appear anywhere and are introduced by the semicolon (;) character.
 
-		push 1  ;; comment
-		push 2
-		add
+        push 1  ;; comment
+        push 2
+        add
 
 Opcodes listed in the program correspond directly with the bytecodes in output.
 
@@ -42,30 +42,30 @@ Opcodes listed in the program correspond directly with the bytecodes in output.
 Jump destinations are written as a label followed by colon (:) and can be referred to
 using the notation `@label` together with JUMP or JUMPI.
 
-	begin:
-		push 1
-		push 2
-		add
-		jump @begin
+    begin:
+        push 1
+        push 2
+        add
+        jump @begin
 
 When using JUMP with an argument, it turns into a PUSH of the label followed by the jump
 instruction, so the above is equivalent to:
 
-	begin:
-		push 1
-		push 2
-		add
-		push @begin
-		jump
+    begin:
+        push 1
+        push 2
+        add
+        push @begin
+        jump
 
 It is also possible to create labels without emitting a JUMPDEST instruction by prefixing
 the label name with the dot (.) character. While dotted labels are not valid for use as an
 argument to JUMP, they can be used with PUSH to measure code offsets.
 
-		push @.end
-		codesize
-		eq
-	.end:
+        push @.end
+        codesize
+        eq
+    .end:
 
 ### Push
 
@@ -77,11 +77,11 @@ to let the assembler figure out the right size for you. To do this use the varia
 All PUSH-type instructions must be followed by an immediate argument on the same line.
 Simple math expressions and label references can be used within the argument:
 
-	.begin:
-		push (@add_it * 2) - 3
-		push 5
-	add_it:
-		add
+    .begin:
+        push (@add_it * 2) - 3
+        push 5
+    add_it:
+        add
 
 At this time, there is no precedence in expressions. Use parentheses to indicate precedence.
 
@@ -101,10 +101,10 @@ PUSH argument expressions.
 Macros can have parameters. Refer to parameter values using the dollar sign ($) prefix
 within the macro.
 
-	#define z 0x8823
-	#define myexpr(x, y)  ($x + $y) * z
+    #define z 0x8823
+    #define myexpr(x, y)  ($x + $y) * z
 
-		push myexpr(1, 2)
+        push myexpr(1, 2)
 
 ### Builtin Macros
 
@@ -113,45 +113,45 @@ and builtin macros cannot be redefined. Available builtins include:
 
 `.abs()` for getting the absolute value of a number:
 
-	push .abs(0 - 100)
+    push .abs(0 - 100)
 
 `.selector()` for computing 4-byte ABI selectors:
 
-	push .selector("transfer(address,uint256)")
-	push 0
-	mstore
+    push .selector("transfer(address,uint256)")
+    push 0
+    mstore
 
 `.keccak256()`, `.sha256()` hash functions:
 
-	push .sha256("data")
+    push .sha256("data")
 
 `.address()` for declaring contract addresses. The checksum and byte length of the address
 are verified.
 
-	#define otherContract .address(0x658bdf435d810c91414ec09147daa6db62406379)
+    #define otherContract .address(0x658bdf435d810c91414ec09147daa6db62406379)
 
 ### Instruction Macros
 
 Common groups of instructions can be defined as instruction macros. Names of such macros
 always start with the percent (%) character.
 
-	#define %add5_and_store(x, location) {
-		push $x
-		push 5
-		add
-		push $location
-		mstore
-	}
+    #define %add5_and_store(x, location) {
+        push $x
+        push 5
+        add
+        push $location
+        mstore
+    }
 
 To invoke an instruction macro, write the macro name as a statement on its own line. If
 the macro has no arguments, you can also leave the parentheses off.
 
-	.begin:
-		%add5_and_store(3, 64)
-		%add5_and_store(4, 32)
-		push 32
-		push 64
-		sha3
+    .begin:
+        %add5_and_store(3, 64)
+        %add5_and_store(4, 32)
+        push 32
+        push 64
+        sha3
 
 Nested macro definitions are not allowed. Macro recursion is also not allowed.
 
@@ -161,30 +161,30 @@ can pass references to such internal labels into another macro. The example belo
 illustrates this, and also shows that in order to jump to a label argument within a macro,
 you must use explicit PUSH and JUMP.
 
-	#define %jump_if_not(label) {
-		iszero
-		push $label
-		jumpi
-	}
+    #define %jump_if_not(label) {
+        iszero
+        push $label
+        jumpi
+    }
 
-	#define %read_input(bytes) {
-		calldatasize
-		push $bytes
-		eq
-		%jump_if_not(@revert)
+    #define %read_input(bytes) {
+        calldatasize
+        push $bytes
+        eq
+        %jump_if_not(@revert)
 
-		push 0
-		push $bytes
-		calldataload
-		jump @continue
+        push 0
+        push $bytes
+        calldataload
+        jump @continue
 
-	  revert:
-		push 0
-		push 0
-		revert
+      revert:
+        push 0
+        push 0
+        revert
 
-	  continue:
-	}
+      continue:
+    }
 
 ### Including Files
 
@@ -194,13 +194,13 @@ the directive.
 
 `#include` filenames are resolved relative to the file containing the directive.
 
-	.begin:
-		push @.end
-		push 32
-		mstore
+    .begin:
+        push @.end
+        push 32
+        mstore
 
-	#include "file.evm"
-	.end:
+    #include "file.evm"
+    .end:
 
 ### Local and Global Scope
 
@@ -223,20 +223,20 @@ redefinition errors.
 
 lib.eas:
 
-	#define result 128
-	#define StoreSum {
-		add
-		push result
-		mstore
-	}
+    #define result 128
+    #define StoreSum {
+        add
+        push result
+        mstore
+    }
 
 main.eas:
 
-	#include "lib.eas"
+    #include "lib.eas"
 
-		push 1
-		push 2
-		%StoreSum  ;; calling global macro defined in lib.evm
+        push 1
+        push 2
+        %StoreSum  ;; calling global macro defined in lib.evm
 
 ### #assemble
 
@@ -247,15 +247,15 @@ Using `#assemble` runs the assembler on the specified file, and includes the res
 bytecode into the current program. Labels of the subprogram will start at offset zero.
 Unlike with `#include`, global definitions of the subprogram are not imported.
 
-		;; copy subprogram to memory
-		push @.end - @.begin   ; [size]
-		push @.begin           ; [offset, size]
-		push 128               ; [dest, offset, codesize]
-		codecopy               ; []
+        ;; copy subprogram to memory
+        push @.end - @.begin   ; [size]
+        push @.begin           ; [offset, size]
+        push 128               ; [dest, offset, codesize]
+        codecopy               ; []
 
-	.begin:
-	#assemble "subprogram.eas"
-	.end
+    .begin:
+    #assemble "subprogram.eas"
+    .end
 
 
 [^1]: Under no circumstances must it be called the geth assembler.
