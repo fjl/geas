@@ -9,7 +9,7 @@
     push @.end - @.start  ; [size]
     dup1                  ; [size, size] 
     push @.start          ; [start, size, size]
-    push 0                ; [0, size, size, size]
+    push 0                ; [0, start, size, size]
     codecopy              ; [size]
     push 0                ; [0, size]
     return                ; []
