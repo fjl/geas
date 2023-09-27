@@ -29,6 +29,8 @@ import (
 )
 
 var builtinMacros = map[string]builtinMacroFn{
+	"bitlen":    bitlenMacro,
+	"bytelen":   bytelenMacro,
 	"abs":       absMacro,
 	"address":   addressMacro,
 	"selector":  selectorMacro,
@@ -37,6 +39,29 @@ var builtinMacros = map[string]builtinMacroFn{
 }
 
 type builtinMacroFn func(*evaluator, *evalEnvironment, *macroCallExpr) (*big.Int, error)
+
+func bitlenMacro(e *evaluator, env *evalEnvironment, call *macroCallExpr) (*big.Int, error) {
+	if err := call.checkArgCount(1); err != nil {
+		return nil, err
+	}
+	v, err := call.args[0].eval(e, env)
+	if err != nil {
+		return nil, err
+	}
+	return big.NewInt(int64(v.BitLen())), nil
+}
+
+func bytelenMacro(e *evaluator, env *evalEnvironment, call *macroCallExpr) (*big.Int, error) {
+	if err := call.checkArgCount(1); err != nil {
+		return nil, err
+	}
+	v, err := call.args[0].eval(e, env)
+	if err != nil {
+		return nil, err
+	}
+	bytes := (v.BitLen() + 7) / 8
+	return big.NewInt(int64(bytes)), nil
+}
 
 func absMacro(e *evaluator, env *evalEnvironment, call *macroCallExpr) (*big.Int, error) {
 	if err := call.checkArgCount(1); err != nil {

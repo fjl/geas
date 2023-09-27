@@ -58,6 +58,13 @@ var evalTests = []evalTest{
 	{expr: `"A"`, result: "65"},
 	{expr: `"foo"`, result: "6713199"},
 	// builtins
+	{expr: `.bitlen(0)`, result: "0"},
+	{expr: `.bitlen(0xff)`, result: "8"},
+	{expr: `.bitlen(0x01ff)`, result: "9"},
+	{expr: `.bytelen(0)`, result: "0"},
+	{expr: `.bytelen(0xff)`, result: "1"},
+	{expr: `.bytelen(0x01ff)`, result: "2"},
+	{expr: `.bytelen("foobar")`, result: "6"},
 	{expr: `.abs(0 - 10)`, result: "10"},
 	{expr: `.sha256("text")`, result: "68832153269555879243704685382415794081420120252170153643880971663484982053329"},
 	{expr: `.sha256(33)`, result: "84783983549258160669137366770885509408211009960610860350324922232842582506338"},
