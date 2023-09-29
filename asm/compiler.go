@@ -37,6 +37,7 @@ type Compiler struct {
 	lexDebug    bool
 	maxIncDepth int
 	maxErrors   int
+	usePush0    bool
 
 	globals    *globalScope
 	errors     []error
@@ -101,12 +102,19 @@ func NewCompiler(fsys fs.FS) *Compiler {
 		macroStack:  make(map[*instructionMacroDef]struct{}),
 		maxIncDepth: 128,
 		maxErrors:   10,
+		usePush0:    true,
 	}
 }
 
 // SetDebugLexer enables/disables printing of the token stream to stdout.
 func (c *Compiler) SetDebugLexer(on bool) {
 	c.lexDebug = on
+}
+
+// SetUsePush0 enables/disables use of the PUSH0 instruction.
+// It's on by default.
+func (c *Compiler) SetUsePush0(on bool) {
+	c.usePush0 = on
 }
 
 // SetDebugLexer enables/disables printing of the token stream to stdout.
@@ -496,7 +504,7 @@ func (c *Compiler) assignInitialPushSizes(e *evaluator, prog []*instruction) {
 			c.addError(inst.ast, err)
 			continue
 		}
-		if err := inst.assignPushArg(v, true); err != nil {
+		if err := c.assignPushArg(inst, v, true); err != nil {
 			c.addError(inst.ast, err)
 			continue
 		}
@@ -540,7 +548,7 @@ func (c *Compiler) assignArgs(e *evaluator, prog []*instruction) (inst *instruct
 		if err != nil {
 			return inst, err
 		}
-		if err := inst.assignPushArg(v, false); err != nil {
+		if err := c.assignPushArg(inst, v, false); err != nil {
 			return inst, err
 		}
 	}
@@ -552,21 +560,21 @@ func (c *Compiler) assignArgs(e *evaluator, prog []*instruction) (inst *instruct
 //
 // If setSize is true, the pushSize of variable-size "PUSH" instructions will be assigned
 // based on the value.
-func (inst *instruction) assignPushArg(v *big.Int, setSize bool) error {
+func (c *Compiler) assignPushArg(inst *instruction, v *big.Int, setSize bool) error {
 	if v.Sign() < 0 {
 		return ecNegativeResult
 	}
-	bytesSize := (v.BitLen() + 7) / 8
-	if bytesSize > 32 {
+	b := v.Bytes()
+	if len(b) > 32 {
 		return ecPushOverflow256
 	}
 	// TODO: also handle negative int
 
 	_, hasExplicitSize := inst.explicitPushSize()
 	if setSize && !hasExplicitSize {
-		inst.pushSize = bytesSize
+		inst.pushSize = c.autoPushSize(b)
 	}
-	if bytesSize > inst.pushSize {
+	if len(b) > inst.pushSize {
 		if !hasExplicitSize {
 			return ecVariablePushOverflow
 		}
@@ -574,10 +582,23 @@ func (inst *instruction) assignPushArg(v *big.Int, setSize bool) error {
 	}
 
 	// Store data padded.
-	b := v.Bytes()
 	inst.data = make([]byte, inst.pushSize)
 	copy(inst.data[len(inst.data)-len(b):], b)
 	return nil
+}
+
+func (c *Compiler) autoPushSize(value []byte) int {
+	if len(value) > 32 {
+		panic("value too big")
+	}
+	if len(value) == 0 {
+		if c.usePush0 {
+			return 0
+		} else {
+			return 1
+		}
+	}
+	return len(value)
 }
 
 // generateOutput creates the bytecode. This is also where instruction names get resolved.
