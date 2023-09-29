@@ -33,10 +33,15 @@ func main() {
 	)
 	flag.Parse()
 
-	if flag.NArg() != 1 {
+	var file string
+	switch flag.NArg() {
+	case 0:
 		exit(fmt.Errorf("need filename as argument"))
+	case 1:
+		file = flag.Arg(0)
+	default:
+		exit(fmt.Errorf("too many arguments"))
 	}
-	file := flag.Arg(0)
 
 	c := asm.NewCompiler(os.DirFS("."))
 	c.SetUsePush0(!*noPush0)
