@@ -28,6 +28,8 @@ import (
 func main() {
 	var (
 		binaryOutput = flag.Bool("bin", false, "binary output")
+		noNL         = flag.Bool("no-nl", false, "remove newline at end of output")
+		noPush0      = flag.Bool("no-push0", false, "disable use of PUSH0 instruction")
 	)
 	flag.Parse()
 
@@ -37,6 +39,7 @@ func main() {
 	file := flag.Arg(0)
 
 	c := asm.NewCompiler(os.DirFS("."))
+	c.SetUsePush0(!*noPush0)
 	bin := c.CompileFile(file)
 	if len(c.Errors()) > 0 {
 		for _, err := range c.Errors() {
@@ -47,10 +50,12 @@ func main() {
 
 	if *binaryOutput {
 		os.Stdout.Write(bin)
-		return
+	} else {
+		os.Stdout.WriteString(hex.EncodeToString(bin))
+		if !*noNL {
+			os.Stdout.WriteString("\n")
+		}
 	}
-	os.Stdout.WriteString(hex.EncodeToString(bin))
-	os.Stdout.WriteString("\n")
 }
 
 func exit(err error) {
