@@ -34,11 +34,16 @@ type document struct {
 	parent       *document
 
 	// instruction macro parameters are passed through this map
-	instrMacroArgs map[string]astExpr
+	instrMacroArgs map[string]instrMacroArg
 
 	// for compiler
 	includes map[*includeInstruction]*document // filled by compiler
 	creation astStatement
+}
+
+type instrMacroArg struct {
+	calldoc *document // document of callsite
+	expr    astExpr   // the argument
 }
 
 func (doc *document) lookupLabel(lref *labelRefExpr) (*labelDefInstruction, *document) {

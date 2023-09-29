@@ -329,10 +329,11 @@ func (inst *macroCallInstruction) expand(c *Compiler, doc *document, prog []*ins
 	name := inst.ident.text
 
 	var def *instructionMacroDef
+	var defdoc *document
 	if isGlobal(name) {
-		def, _ = c.globals.lookupInstrMacro(name)
+		def, defdoc = c.globals.lookupInstrMacro(name)
 	} else {
-		def, _ = doc.lookupInstrMacro(name)
+		def, defdoc = doc.lookupInstrMacro(name)
 	}
 	if def == nil {
 		return nil, fmt.Errorf("%w %%%s", ecUndefinedInstrMacro, name)
@@ -347,14 +348,14 @@ func (inst *macroCallInstruction) expand(c *Compiler, doc *document, prog []*ins
 	if len(inst.args) != len(def.params) {
 		return nil, fmt.Errorf("%w, macro %%%s needs %d", ecInvalidArgumentCount, name, len(def.params))
 	}
-	args := make(map[string]astExpr)
+	args := make(map[string]instrMacroArg)
 	for i, param := range def.params {
-		args[param] = inst.args[i]
+		args[param] = instrMacroArg{calldoc: doc, expr: inst.args[i]}
 	}
 
 	// Expand. Here we clone the macro document and then run it.
 	macroDoc := *def.body
-	macroDoc.parent = doc
+	macroDoc.parent = defdoc
 	macroDoc.creation = inst
 	macroDoc.instrMacroArgs = args
 

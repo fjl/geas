@@ -416,6 +416,22 @@ instr-macro-outer-label:
   output:
     bytecode: "00 6006 56 6001 5b 00"
 
+instr-macro-global-ref-local:
+  input:
+    code: |
+      %Gmac
+      #include "incfile.eas"
+    files:
+      incfile.eas: |
+        #define %Gmac {
+           %local
+        }
+        #define %local {
+           push 1
+        }
+  output:
+    bytecode: "6001"
+
 instr-macro-recursion:
   input:
     code: |

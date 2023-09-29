@@ -211,12 +211,12 @@ func (expr *variableExpr) eval(e *evaluator, env *evalEnvironment) (*big.Int, er
 		return v, nil
 	}
 	// Check for instruction macro args.
-	vexpr, ok := env.doc.instrMacroArgs[expr.ident]
+	arg, ok := env.doc.instrMacroArgs[expr.ident]
 	if !ok {
 		return nil, fmt.Errorf("%w $%s", ecUndefinedVariable, expr.ident)
 	}
 	// Evaluate it in the parent scope.
-	return vexpr.eval(e, newEvalEnvironment(env.doc.parent))
+	return arg.expr.eval(e, newEvalEnvironment(arg.calldoc))
 }
 
 func (expr *macroCallExpr) eval(e *evaluator, env *evalEnvironment) (*big.Int, error) {
