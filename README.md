@@ -18,6 +18,10 @@ with a filename as argument.
 
     ./geas file.eas
 
+### Editor Support
+
+VIM users may be interested in [vim-geas](https://github.com/lightclient/vim-geas).
+
 ### Use as a Go Library
 
 You can also use the assembler as a library. See the [API documentation](https://pkg.go.dev/github.com/fjl/geas/asm)
