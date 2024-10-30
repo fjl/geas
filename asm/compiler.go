@@ -186,8 +186,9 @@ func (c *Compiler) addErrors(errs []error) {
 
 // compile is the toplevel entry point into the compiler.
 func (c *Compiler) compile(doc *document) (output []byte) {
+	prevGlobals := c.globals
 	c.globals = newGlobalScope()
-	defer func() { c.globals = nil }()
+	defer func() { c.globals = prevGlobals }()
 
 	defer func() {
 		panicking := recover()
