@@ -159,6 +159,17 @@ global-macros:
   output:
     bytecode: "60646004"
 
+global-macro-undef:
+  input:
+    code: |
+      push Calcullate(10)
+    files:
+      macros.evm: |
+        #define Calculate(x) $x*10
+  output:
+    errors:
+      - ':1: undefined macro Calcullate'
+
 global-macros-include-after:
   input:
     code: |
