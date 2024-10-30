@@ -471,7 +471,6 @@ func (inst *assembleInstruction) expand(c *Compiler, doc *document, prog []*inst
 	}
 	bytecode := c.CompileFile(file)
 	if len(c.Errors()) > 0 {
-		c.addErrors(c.Errors())
 		return prog, nil
 	}
 	datainst := &instruction{data: bytecode}

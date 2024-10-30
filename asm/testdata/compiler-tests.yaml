@@ -30,6 +30,24 @@ assemble-directive-and-globals:
   output:
     bytecode: '6001 6001 01 01 5b 6001 56'
 
+assemble-directive-globals-not-shared:
+  input:
+    code: |
+      #define Global 1
+      push 1
+      push Global
+      add
+      #assemble "file.eas"
+    files:
+      file.eas: |
+        push Global
+        add
+        label:
+        jump @label
+  output:
+    errors:
+      - "file.eas:1: undefined macro Global"
+
 comments-on-label:
   input:
     code: |
