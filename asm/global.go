@@ -18,92 +18,69 @@ package asm
 
 import (
 	"fmt"
-	"unicode"
 
-	"golang.org/x/exp/constraints"
-	"golang.org/x/exp/maps"
-	"golang.org/x/exp/slices"
+	"github.com/fjl/geas/internal/ast"
 )
-
-// isGlobal returns true when 'name' is a global identifier.
-func isGlobal(name string) bool {
-	return len(name) > 0 && unicode.IsUpper([]rune(name)[0])
-}
 
 // globalScope holds definitions across files.
 type globalScope struct {
+	label      map[string]*ast.LabelDefSt
 	labelPC    map[string]int
-	label      map[string]*labelDefInstruction
-	labelDoc   map[string]*document
-	instrMacro map[string]globalDef[*instructionMacroDef]
-	exprMacro  map[string]globalDef[*expressionMacroDef]
+	labelDoc   map[string]*ast.Document
+	instrMacro map[string]globalDef[*ast.InstructionMacroDef]
+	exprMacro  map[string]globalDef[*ast.ExpressionMacroDef]
 }
 
 type globalDef[M any] struct {
 	def M
-	doc *document
+	doc *ast.Document
 }
 
 func newGlobalScope() *globalScope {
 	return &globalScope{
-		label:      make(map[string]*labelDefInstruction),
+		label:      make(map[string]*ast.LabelDefSt),
 		labelPC:    make(map[string]int),
-		labelDoc:   make(map[string]*document),
-		instrMacro: make(map[string]globalDef[*instructionMacroDef]),
-		exprMacro:  make(map[string]globalDef[*expressionMacroDef]),
+		labelDoc:   make(map[string]*ast.Document),
+		instrMacro: make(map[string]globalDef[*ast.InstructionMacroDef]),
+		exprMacro:  make(map[string]globalDef[*ast.ExpressionMacroDef]),
 	}
 }
 
 // registerDefinitions processes a document and registers the globals contained in it.
-func (gs *globalScope) registerDefinitions(doc *document) (errs []error) {
-	for _, li := range doc.labels {
-		if li.global {
-			gs.registerLabel(li, doc)
+func (gs *globalScope) registerDefinitions(doc *ast.Document) (errs []error) {
+	for _, li := range doc.GlobalLabels() {
+		gs.registerLabel(li, doc)
+	}
+	for _, mac := range doc.GlobalExprMacros() {
+		def := globalDef[*ast.ExpressionMacroDef]{mac, doc}
+		if err := gs.registerExprMacro(mac.Name, def); err != nil {
+			errs = append(errs, err)
 		}
 	}
-	for _, name := range sortedKeys(doc.exprMacros) {
-		if isGlobal(name) {
-			m := doc.exprMacros[name]
-			def := globalDef[*expressionMacroDef]{m, doc}
-			if err := gs.registerExprMacro(name, def); err != nil {
-				errs = append(errs, err)
-			}
-		}
-	}
-	for _, name := range sortedKeys(doc.instrMacros) {
-		if isGlobal(name) {
-			m := doc.instrMacros[name]
-			def := globalDef[*instructionMacroDef]{m, doc}
-			if err := gs.registerInstrMacro(name, def); err != nil {
-				errs = append(errs, err)
-			}
+	for _, mac := range doc.GlobalInstrMacros() {
+		def := globalDef[*ast.InstructionMacroDef]{mac, doc}
+		if err := gs.registerInstrMacro(mac.Name, def); err != nil {
+			errs = append(errs, err)
 		}
 	}
 	return errs
 }
 
-func sortedKeys[K constraints.Ordered, V any](m map[K]V) []K {
-	keys := maps.Keys(m)
-	slices.Sort(keys)
-	return keys
-}
-
 // registerLabel registers a label as known.
-func (gs *globalScope) registerLabel(def *labelDefInstruction, doc *document) {
-	name := def.tok.text
-	_, found := gs.label[name]
+func (gs *globalScope) registerLabel(def *ast.LabelDefSt, doc *ast.Document) {
+	_, found := gs.label[def.Name()]
 	if !found {
-		gs.label[name] = def
+		gs.label[def.Name()] = def
 	}
 }
 
 // registerInstrMacro registers the first definition of an instruction macro.
-func (gs *globalScope) registerInstrMacro(name string, def globalDef[*instructionMacroDef]) error {
+func (gs *globalScope) registerInstrMacro(name string, def globalDef[*ast.InstructionMacroDef]) error {
 	firstDef, found := gs.instrMacro[name]
 	if found {
 		return &astError{
 			inst: def.def,
-			err:  fmt.Errorf("macro %%%s already defined%s", name, documentCreationString(firstDef.doc)),
+			err:  fmt.Errorf("macro %%%s already defined%s", name, firstDef.doc.CreationString()),
 		}
 	}
 	gs.instrMacro[name] = def
@@ -111,24 +88,24 @@ func (gs *globalScope) registerInstrMacro(name string, def globalDef[*instructio
 }
 
 // registerExprMacro registers the first definition of an expression macro.
-func (gs *globalScope) registerExprMacro(name string, def globalDef[*expressionMacroDef]) error {
+func (gs *globalScope) registerExprMacro(name string, def globalDef[*ast.ExpressionMacroDef]) error {
 	firstDef, found := gs.exprMacro[name]
 	if found {
 		return &astError{
 			inst: def.def,
-			err:  fmt.Errorf("macro %s already defined%s", name, documentCreationString(firstDef.doc)),
+			err:  fmt.Errorf("macro %s already defined%s", name, firstDef.doc.CreationString()),
 		}
 	}
 	gs.exprMacro[name] = def
 	return nil
 }
 
-func (gs *globalScope) lookupInstrMacro(name string) (*instructionMacroDef, *document) {
+func (gs *globalScope) lookupInstrMacro(name string) (*ast.InstructionMacroDef, *ast.Document) {
 	gdef := gs.instrMacro[name]
 	return gdef.def, gdef.doc
 }
 
-func (gs *globalScope) lookupExprMacro(name string) (*expressionMacroDef, *document) {
+func (gs *globalScope) lookupExprMacro(name string) (*ast.ExpressionMacroDef, *ast.Document) {
 	gdef := gs.exprMacro[name]
 	return gdef.def, gdef.doc
 }
@@ -139,19 +116,19 @@ func (gs *globalScope) lookupExprMacro(name string) (*expressionMacroDef, *docum
 //
 // These documents need to be tracked here in order to report the first macro invocation
 // or #include statement that created a label.
-func (gs *globalScope) setLabelDocument(li *labelDefInstruction, doc *document) error {
-	name := li.tok.text
+func (gs *globalScope) setLabelDocument(li *ast.LabelDefSt, doc *ast.Document) error {
+	name := li.Name()
 	firstDefDoc := gs.labelDoc[name]
 	if firstDefDoc == nil {
 		gs.labelDoc[name] = doc
 		return nil
 	}
 	firstDef := gs.label[name]
-	err := errLabelAlreadyDef(firstDef, li)
-	if loc := documentCreationString(firstDefDoc); loc != "" {
+	err := ast.ErrLabelAlreadyDef(firstDef, li)
+	if loc := firstDefDoc.CreationString(); loc != "" {
 		err = fmt.Errorf("%w%s", err, loc)
 	}
-	return &astError{inst: li, err: err}
+	return err
 }
 
 // setLabelPC is called by the compiler when the PC value of a label becomes available.
@@ -160,21 +137,11 @@ func (gs *globalScope) setLabelPC(name string, pc int) {
 }
 
 // lookupLabel returns the PC value of a label, and also reports whether the label was found at all.
-func (gs *globalScope) lookupLabel(lref *labelRefExpr) (pc int, pcValid bool, def *labelDefInstruction) {
-	li, ok := gs.label[lref.ident]
+func (gs *globalScope) lookupLabel(lref *ast.LabelRefExpr) (pc int, pcValid bool, def *ast.LabelDefSt) {
+	li, ok := gs.label[lref.Ident]
 	if !ok {
 		return 0, false, nil
 	}
-	pc, pcValid = gs.labelPC[lref.ident]
+	pc, pcValid = gs.labelPC[lref.Ident]
 	return pc, pcValid, li
-}
-
-func documentCreationString(doc *document) string {
-	if doc.creation == nil {
-		if doc.file == "" {
-			return ""
-		}
-		return " in " + doc.file
-	}
-	return fmt.Sprintf(" by %s at %v", doc.creation.description(), doc.creation.position())
 }
