@@ -17,10 +17,10 @@ func _() {
 	_ = x[ArithRshift-7]
 	_ = x[ArithAnd-8]
 	_ = x[ArithOr-9]
-	_ = x[ArithHat-10]
+	_ = x[ArithNot-10]
 }
 
-const _ArithOp_name = "ArithPlusArithMinusArithMulArithDivArithModArithLshiftArithRshiftArithAndArithOrArithHat"
+const _ArithOp_name = "ArithPlusArithMinusArithMulArithDivArithModArithLshiftArithRshiftArithAndArithOrArithNot"
 
 var _ArithOp_index = [...]uint8{0, 9, 19, 27, 35, 43, 54, 65, 73, 80, 88}
 

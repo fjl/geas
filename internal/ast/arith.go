@@ -31,7 +31,7 @@ const (
 	ArithRshift                     // >>
 	ArithAnd                        // &
 	ArithOr                         // |
-	ArithHat                        // ^
+	ArithNot                        // ^
 )
 
 // arithChars contains all the single-character arithmetic operations.
@@ -43,7 +43,7 @@ var arithChars = map[rune]ArithOp{
 	'/': ArithDiv,
 	'&': ArithAnd,
 	'|': ArithOr,
-	'^': ArithHat,
+	'^': ArithNot,
 }
 
 func tokenArithOp(tok token) ArithOp {
