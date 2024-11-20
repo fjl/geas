@@ -327,7 +327,7 @@ func parsePragma(p *Parser, d token) {
 		case stringLiteral, numberLiteral:
 			instr.Value = v.text
 		default:
-			p.throwError(tok, "#assemble option value must be literal")
+			p.throwError(tok, "#pragma option value must be string or number literal")
 		}
 		p.doc.Statements = append(p.doc.Statements, instr)
 	default:
