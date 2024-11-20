@@ -28,12 +28,13 @@ func _() {
 	_ = x[instMacroIdent-17]
 	_ = x[openBrace-18]
 	_ = x[closeBrace-19]
-	_ = x[arith-20]
+	_ = x[equals-20]
+	_ = x[arith-21]
 }
 
-const _tokenType_name = "eoflineStartlineEndinvalidTokenidentifierdottedIdentifiervariableIdentifierlabelRefdottedLabelReflabeldottedLabelnumberLiteralstringLiteralopenParencloseParencommadirectiveinstMacroIdentopenBracecloseBracearith"
+const _tokenType_name = "eoflineStartlineEndinvalidTokenidentifierdottedIdentifiervariableIdentifierlabelRefdottedLabelReflabeldottedLabelnumberLiteralstringLiteralopenParencloseParencommadirectiveinstMacroIdentopenBracecloseBraceequalsarith"
 
-var _tokenType_index = [...]uint8{0, 3, 12, 19, 31, 41, 57, 75, 83, 97, 102, 113, 126, 139, 148, 158, 163, 172, 186, 195, 205, 210}
+var _tokenType_index = [...]uint8{0, 3, 12, 19, 31, 41, 57, 75, 83, 97, 102, 113, 126, 139, 148, 158, 163, 172, 186, 195, 205, 211, 216}
 
 func (i tokenType) String() string {
 	if i >= tokenType(len(_tokenType_index)-1) {

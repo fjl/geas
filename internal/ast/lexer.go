@@ -69,6 +69,7 @@ const (
 	instMacroIdent                      // %macro
 	openBrace                           // {
 	closeBrace                          // }
+	equals                              // =
 	arith                               // +, -, *, /, ... (see arith.go)
 )
 
@@ -232,6 +233,10 @@ func lexNext(l *lexer) stateFn {
 		case r == '#':
 			return lexPreprocessor
 
+		case r == '=':
+			l.emit(equals)
+			return lexNext
+
 		// numbers and identifiers:
 
 		case unicode.IsDigit(r):
@@ -241,6 +246,7 @@ func lexNext(l *lexer) stateFn {
 			return lexIdentifier
 
 		// arithmetic:
+
 		case r == '<':
 			return lexLshift
 

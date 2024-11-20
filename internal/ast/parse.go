@@ -320,12 +320,16 @@ func parsePragma(p *Parser, d token) {
 	switch tok := p.next(); tok.typ {
 	case identifier:
 		instr.Option = tok.text
+		if eq := p.next(); eq.typ != equals {
+			p.throwError(eq, "expected = after #pragma %s", instr.Option)
+		}
 		switch v := p.next(); v.typ {
 		case stringLiteral, numberLiteral:
 			instr.Value = v.text
 		default:
 			p.throwError(tok, "#assemble option value must be literal")
 		}
+		p.doc.Statements = append(p.doc.Statements, instr)
 	default:
 		p.throwError(tok, "expected option name following #pragma")
 	}
