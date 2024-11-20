@@ -186,7 +186,7 @@ var ireg = map[string]*InstructionSetDef{
 
 	"istanbul": {
 		Names:  []string{"istanbul"},
-		Parent: "petersburg",
+		Parent: "constantinople",
 		Added: []*Op{
 			&CHAINID,
 			&SELFBALANCE,
