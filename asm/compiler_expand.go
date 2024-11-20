@@ -68,6 +68,9 @@ func (op opcodeStatement) expand(c *Compiler, doc *ast.Document, prog *compilerP
 			if op.Arg != nil {
 				return ecPushzeroWithArgument
 			}
+			if !prog.evm.SupportsPush0() {
+				return fmt.Errorf("%w %s (in fork %q)", ecUnknownOpcode, opcode, prog.evm.Name())
+			}
 			break
 		}
 		if op.Arg == nil {
@@ -86,7 +89,7 @@ func (op opcodeStatement) expand(c *Compiler, doc *ast.Document, prog *compilerP
 
 	default:
 		if prog.evm.OpByName(inst.op) == nil {
-			return fmt.Errorf("%w %s", ecUnknownOpcode, inst.op)
+			return fmt.Errorf("%w %s (in fork %q)", ecUnknownOpcode, inst.op, prog.evm.Name())
 		}
 		if op.Arg != nil {
 			return ecUnexpectedArgument

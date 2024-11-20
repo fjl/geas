@@ -222,8 +222,10 @@ func (c *Compiler) processIncludes(doc *ast.Document, prog *compilerProg, stack 
 				}
 				prog.evm = evm.FindInstructionSet(st.Value)
 				if prog.evm == nil {
-					c.addError(st, fmt.Errorf("unknown fork %q", st.Value))
+					c.addError(st, fmt.Errorf("%w %q", ecPragmaForkUnknown, st.Value))
 				}
+			default:
+				c.addError(st, fmt.Errorf("%w %s", ecUnknownPragma, st.Option))
 			}
 		}
 	}
@@ -238,10 +240,6 @@ func (c *Compiler) processIncludes(doc *ast.Document, prog *compilerProg, stack 
 		incdoc := c.includes[inst]
 		c.processIncludes(incdoc, prog, append(stack, inst))
 	}
-}
-
-func (c *Compiler) processPragma(st *ast.PragmaSt, prog *compilerProg, stack []ast.Statement) {
-
 }
 
 func resolveRelative(basepath string, filename string) (string, error) {
@@ -313,7 +311,7 @@ func (c *Compiler) generateOutput(prog *compilerProg) []byte {
 				if size == 0 && !prog.evm.SupportsPush0() {
 					size = 1
 				}
-				pushName := strconv.AppendInt(pushNameBuf[:4], int64(inst.pushSize), 10)
+				pushName := strconv.AppendInt(pushNameBuf[:4], int64(size), 10)
 				op = prog.evm.OpByName(string(pushName))
 			} else {
 				op = prog.evm.OpByName(inst.op)
