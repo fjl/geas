@@ -29,3 +29,45 @@ func TestForkDefs(t *testing.T) {
 		}
 	}
 }
+
+// In this test, we just check for a few known ops.
+func TestForkOps(t *testing.T) {
+	is := FindInstructionSet("cancun")
+
+	{
+		op := is.OpByName("ADD")
+		if op.Name != "ADD" {
+			t.Fatal("wrong op name:", op.Name)
+		}
+		if op.Code != 0x01 {
+			t.Fatal("wrong op code:", op.Code)
+		}
+		if op2 := is.OpByCode(0x01); op2 != op {
+			t.Fatal("reverse lookup returned incorrect op", op2)
+		}
+	}
+	{
+		op := is.OpByName("SHR")
+		if op.Name != "SHR" {
+			t.Fatal("wrong op name:", op.Name)
+		}
+		if op.Code != 0x1c {
+			t.Fatal("wrong op code:", op.Code)
+		}
+		if op2 := is.OpByCode(0x1c); op2 != op {
+			t.Fatal("reverse lookup returned incorrect op", op2)
+		}
+	}
+	{
+		op := is.OpByName("RANDOM")
+		if op.Name != "RANDOM" {
+			t.Fatal("wrong op name:", op.Name)
+		}
+		if op.Code != 0x44 {
+			t.Fatal("wrong op code:", op.Code)
+		}
+		if op2 := is.OpByCode(0x44); op2 != op {
+			t.Fatal("reverse lookup returned incorrect op", op2)
+		}
+	}
+}

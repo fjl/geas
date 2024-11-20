@@ -108,8 +108,17 @@ func (is *InstructionSet) resolveDefs(toplevel *InstructionSetDef) error {
 	if err != nil {
 		return err
 	}
-
 	for _, def := range lineage {
+		for _, op := range def.Removed {
+			if _, ok := is.byName[op.Name]; !ok {
+				return fmt.Errorf("removed op %s does not exist in fork %s", op.Name, def.Name())
+			}
+			if _, ok := is.byCode[op.Code]; !ok {
+				return fmt.Errorf("removed opcode %d (%s) does not exist in fork %s", op.Code, op.Name, def.Name())
+			}
+			delete(is.byName, op.Name)
+			delete(is.byCode, op.Code)
+		}
 		for _, op := range def.Added {
 			_, nameDefined := is.byName[op.Name]
 			if nameDefined {
@@ -120,11 +129,7 @@ func (is *InstructionSet) resolveDefs(toplevel *InstructionSetDef) error {
 			if codeDefined {
 				return fmt.Errorf("opcode %v added multiple times (adding %s, existing def %s)", op.Code, op.Name, is.byCode[op.Code].Name)
 			}
-		}
-		for _, op := range def.Removed {
-			// TODO: check
-			delete(is.byName, op.Name)
-			delete(is.byCode, op.Code)
+			is.byCode[op.Code] = op
 		}
 	}
 	return nil
