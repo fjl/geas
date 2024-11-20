@@ -42,9 +42,11 @@ func main() {
 	default:
 		exit(fmt.Errorf("too many arguments"))
 	}
+	if *noPush0 {
+		exit(fmt.Errorf("option -no-push0 is not supported anymore"))
+	}
 
 	c := asm.NewCompiler(os.DirFS("."))
-	c.SetUsePush0(!*noPush0)
 	bin := c.CompileFile(file)
 	if len(c.Errors()) > 0 {
 		for _, err := range c.Errors() {
