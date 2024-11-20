@@ -1,15 +1,13 @@
 package evm
 
 import (
-	"sort"
+	"maps"
+	"slices"
 	"testing"
-
-	"golang.org/x/exp/maps"
 )
 
 func TestForkDefs(t *testing.T) {
-	names := maps.Keys(ireg)
-	sort.Strings(names)
+	names := slices.Sorted(maps.Keys(ireg))
 
 	// Check canon name is listed first in def.Names.
 	for _, name := range names {
