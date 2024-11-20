@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"math/big"
 	"testing"
+
+	"github.com/fjl/geas/internal/ast"
 )
 
 type evalTest struct {
@@ -83,22 +85,22 @@ var evalErrorTests = []evalErrorTest{
 	{expr: `.address(0x658bdf435d810c91414EC09147daa6db62406379)`, err: errAddressChecksum.Error()},
 }
 
-var evalTestDoc = newDocument("", nil)
+var evalTestDoc *ast.Document
 
 func init() {
-	evalTestDoc.labels = map[string]*labelDefInstruction{
-		"label1": {tok: token{typ: label, text: "label1"}, src: evalTestDoc},
-		"label2": {tok: token{typ: dottedLabel, text: "label2"}, dotted: true, src: evalTestDoc},
-		"Label3": {tok: token{typ: label, text: "Label3"}, global: true, src: evalTestDoc},
-		"Label4": {tok: token{typ: dottedLabel, text: "Label4"}, global: true, dotted: true, src: evalTestDoc},
+	source := `
+label1:
+.label2:
+Label3:
+.Label4:
+#define macro3() 3
+#define macroFunc(a) $a
+`
+	doc, errs := ast.NewParser("", []byte(source), false).Parse()
+	if len(errs) != 0 {
+		panic("parse error: " + errs[0].Error())
 	}
-	evalTestDoc.exprMacros = map[string]*expressionMacroDef{
-		"macro3": {body: &literalExpr{tok: token{typ: numberLiteral, text: "3"}}},
-		"macroFunc": {
-			body:   &variableExpr{ident: "a"},
-			params: []string{"a"},
-		},
-	}
+	evalTestDoc = doc
 }
 
 func evaluatorForTesting() *evaluator {
@@ -108,11 +110,17 @@ func evaluatorForTesting() *evaluator {
 		panic(fmt.Errorf("error in registerDefinitions: %v", errs[0]))
 	}
 	e := newEvaluator(gs)
-	e.setLabelPC(evalTestDoc, evalTestDoc.labels["label1"], 1)
-	e.setLabelPC(evalTestDoc, evalTestDoc.labels["label2"], 2)
-	e.setLabelPC(evalTestDoc, evalTestDoc.labels["Label3"], 3)
-	e.setLabelPC(evalTestDoc, evalTestDoc.labels["Label4"], 4)
+	e.setLabelPC(evalTestDoc, evalTestDoc.Statements[0].(*ast.LabelDefSt), 1)
+	e.setLabelPC(evalTestDoc, evalTestDoc.Statements[1].(*ast.LabelDefSt), 2)
+	e.setLabelPC(evalTestDoc, evalTestDoc.Statements[2].(*ast.LabelDefSt), 3)
+	e.setLabelPC(evalTestDoc, evalTestDoc.Statements[3].(*ast.LabelDefSt), 4)
 	return e
+}
+
+func evalEnvironmentForTesting() *evalEnvironment {
+	return newEvalEnvironment(&compilerSection{
+		doc: evalTestDoc,
+	})
 }
 
 func TestExprEval(t *testing.T) {
@@ -124,8 +132,8 @@ func TestExprEval(t *testing.T) {
 		}
 		expectedResult := mustParseBigInt(test.result)
 		e := evaluatorForTesting()
-		env := newEvalEnvironment(evalTestDoc)
-		result, err := expr.eval(e, env)
+		env := evalEnvironmentForTesting()
+		result, err := e.eval(expr, env)
 		if err != nil {
 			t.Errorf("eval error in %q: %v", test.expr, err)
 			continue
@@ -145,8 +153,8 @@ func TestExprEvalErrors(t *testing.T) {
 			continue
 		}
 		e := evaluatorForTesting()
-		env := newEvalEnvironment(evalTestDoc)
-		result, err := expr.eval(e, env)
+		env := evalEnvironmentForTesting()
+		result, err := e.eval(expr, env)
 		if err == nil {
 			t.Errorf("expected error evaluating %q, got %d", test.expr, result)
 			continue
@@ -158,9 +166,9 @@ func TestExprEvalErrors(t *testing.T) {
 	}
 }
 
-func parseExprString(str string) (astExpr, error) {
-	p := newParser("string", []byte(str), false)
-	return p.parseExpression()
+func parseExprString(str string) (ast.Expr, error) {
+	p := ast.NewParser("string", []byte(str), false)
+	return p.ParseExpression()
 }
 
 func mustParseBigInt(str string) *big.Int {

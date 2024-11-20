@@ -14,16 +14,15 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-package asm
+package ast
 
 import (
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 	"unicode"
 	"unicode/utf8"
-
-	"golang.org/x/exp/slices"
 )
 
 // stateFn is used through the lifetime of the
@@ -41,7 +40,6 @@ type token struct {
 }
 
 func (t *token) is(types ...tokenType) bool { return slices.Contains(types, t.typ) }
-func (t *token) isArith() bool              { return t.typ >= arithPlus && t.typ <= arithHat }
 func (t *token) String() string             { return fmt.Sprintf("%v %s (line %d)", t.typ, t.text, t.line) }
 
 // tokenType are the different types the lexer
@@ -67,20 +65,11 @@ const (
 	openParen                           // (
 	closeParen                          // )
 	comma                               // ,
-	arithPlus                           // +
-	arithMinus                          // -
-	arithMul                            // *
-	arithDiv                            // /
-	arithMod                            // %
-	arithLshift                         // <<
-	arithRshift                         // >>
-	arithAnd                            // &
-	arithOr                             // |
-	arithHat                            // ^
 	directive                           // #define, #include, ...
 	instMacroIdent                      // %macro
 	openBrace                           // {
 	closeBrace                          // }
+	arith                               // +, -, *, /, ... (see arith.go)
 )
 
 const (
@@ -252,43 +241,18 @@ func lexNext(l *lexer) stateFn {
 			return lexIdentifier
 
 		// arithmetic:
-
-		case r == '+':
-			l.emit(arithPlus)
-			return lexNext
-
-		case r == '-':
-			l.emit(arithMinus)
-			return lexNext
-
-		case r == '*':
-			l.emit(arithMul)
-			return lexNext
-
-		case r == '/':
-			l.emit(arithDiv)
-			return lexNext
-
-		case r == '%':
-			return lexPercent
-
-		case r == '&':
-			l.emit(arithAnd)
-			return lexNext
-
-		case r == '|':
-			l.emit(arithOr)
-			return lexNext
-
-		case r == '^':
-			l.emit(arithHat)
-			return lexNext
-
 		case r == '<':
 			return lexLshift
 
 		case r == '>':
 			return lexRshift
+
+		case r == '%':
+			return lexPercent
+
+		case arithChars[r] != 0:
+			l.emit(arith)
+			return lexNext
 
 		// whitespace, etc.
 
@@ -338,7 +302,7 @@ func lexPercent(l *lexer) stateFn {
 		l.acceptRun(isIdent)
 		l.emit(instMacroIdent)
 	} else {
-		l.emit(arithMod)
+		l.emit(arith)
 	}
 	return lexNext
 }
@@ -370,7 +334,7 @@ func lexLshift(l *lexer) stateFn {
 	if !l.accept("<") {
 		l.emit(invalidToken)
 	} else {
-		l.emit(arithLshift)
+		l.emit(arith)
 	}
 	return lexNext
 }
@@ -379,7 +343,7 @@ func lexRshift(l *lexer) stateFn {
 	if !l.accept(">") {
 		l.emit(invalidToken)
 	} else {
-		l.emit(arithRshift)
+		l.emit(arith)
 	}
 	return lexNext
 }

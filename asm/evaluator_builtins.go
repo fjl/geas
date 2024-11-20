@@ -25,37 +25,40 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/fjl/geas/internal/ast"
 	"golang.org/x/crypto/sha3"
 )
 
-var builtinMacros = map[string]builtinMacroFn{
-	"bitlen":    bitlenMacro,
-	"bytelen":   bytelenMacro,
-	"abs":       absMacro,
-	"address":   addressMacro,
-	"selector":  selectorMacro,
-	"keccak256": keccak256Macro,
-	"sha256":    sha256Macro,
+var builtinMacros = make(map[string]builtinMacroFn)
+
+func init() {
+	builtinMacros["bitlen"] = bitlenMacro
+	builtinMacros["bytelen"] = bytelenMacro
+	builtinMacros["abs"] = absMacro
+	builtinMacros["address"] = addressMacro
+	builtinMacros["selector"] = selectorMacro
+	builtinMacros["keccak256"] = keccak256Macro
+	builtinMacros["sha256"] = sha256Macro
 }
 
-type builtinMacroFn func(*evaluator, *evalEnvironment, *macroCallExpr) (*big.Int, error)
+type builtinMacroFn func(*evaluator, *evalEnvironment, *ast.MacroCallExpr) (*big.Int, error)
 
-func bitlenMacro(e *evaluator, env *evalEnvironment, call *macroCallExpr) (*big.Int, error) {
-	if err := call.checkArgCount(1); err != nil {
+func bitlenMacro(e *evaluator, env *evalEnvironment, call *ast.MacroCallExpr) (*big.Int, error) {
+	if err := checkArgCount(call, 1); err != nil {
 		return nil, err
 	}
-	v, err := call.args[0].eval(e, env)
+	v, err := e.eval(call.Args[0], env)
 	if err != nil {
 		return nil, err
 	}
 	return big.NewInt(int64(v.BitLen())), nil
 }
 
-func bytelenMacro(e *evaluator, env *evalEnvironment, call *macroCallExpr) (*big.Int, error) {
-	if err := call.checkArgCount(1); err != nil {
+func bytelenMacro(e *evaluator, env *evalEnvironment, call *ast.MacroCallExpr) (*big.Int, error) {
+	if err := checkArgCount(call, 1); err != nil {
 		return nil, err
 	}
-	v, err := call.args[0].eval(e, env)
+	v, err := e.eval(call.Args[0], env)
 	if err != nil {
 		return nil, err
 	}
@@ -63,22 +66,22 @@ func bytelenMacro(e *evaluator, env *evalEnvironment, call *macroCallExpr) (*big
 	return big.NewInt(int64(bytes)), nil
 }
 
-func absMacro(e *evaluator, env *evalEnvironment, call *macroCallExpr) (*big.Int, error) {
-	if err := call.checkArgCount(1); err != nil {
+func absMacro(e *evaluator, env *evalEnvironment, call *ast.MacroCallExpr) (*big.Int, error) {
+	if err := checkArgCount(call, 1); err != nil {
 		return nil, err
 	}
-	v, err := call.args[0].eval(e, env)
+	v, err := e.eval(call.Args[0], env)
 	if err != nil {
 		return nil, err
 	}
 	return new(big.Int).Abs(v), nil
 }
 
-func sha256Macro(e *evaluator, env *evalEnvironment, call *macroCallExpr) (*big.Int, error) {
-	if err := call.checkArgCount(1); err != nil {
+func sha256Macro(e *evaluator, env *evalEnvironment, call *ast.MacroCallExpr) (*big.Int, error) {
+	if err := checkArgCount(call, 1); err != nil {
 		return nil, err
 	}
-	bytes, err := evalAsBytes(e, env, call.args[0])
+	bytes, err := e.evalAsBytes(call.Args[0], env)
 	if err != nil {
 		return nil, err
 	}
@@ -86,11 +89,11 @@ func sha256Macro(e *evaluator, env *evalEnvironment, call *macroCallExpr) (*big.
 	return new(big.Int).SetBytes(hash[:]), nil
 }
 
-func keccak256Macro(e *evaluator, env *evalEnvironment, call *macroCallExpr) (*big.Int, error) {
-	if err := call.checkArgCount(1); err != nil {
+func keccak256Macro(e *evaluator, env *evalEnvironment, call *ast.MacroCallExpr) (*big.Int, error) {
+	if err := checkArgCount(call, 1); err != nil {
 		return nil, err
 	}
-	bytes, err := evalAsBytes(e, env, call.args[0])
+	bytes, err := e.evalAsBytes(call.Args[0], env)
 	if err != nil {
 		return nil, err
 	}
@@ -104,15 +107,15 @@ var (
 	errSelectorWantsLiteral = fmt.Errorf(".selector(...) requires literal string argument")
 )
 
-func selectorMacro(e *evaluator, env *evalEnvironment, call *macroCallExpr) (*big.Int, error) {
-	if err := call.checkArgCount(1); err != nil {
+func selectorMacro(e *evaluator, env *evalEnvironment, call *ast.MacroCallExpr) (*big.Int, error) {
+	if err := checkArgCount(call, 1); err != nil {
 		return nil, err
 	}
-	lit, ok := call.args[0].(*literalExpr)
-	if !ok || lit.tok.typ != stringLiteral {
+	lit, ok := call.Args[0].(*ast.LiteralExpr)
+	if !ok {
 		return nil, errSelectorWantsLiteral
 	}
-	text := lit.tok.text
+	text := lit.Text()
 	if _, err := abi.ParseSelector(text); err != nil {
 		return nil, fmt.Errorf("invalid ABI selector")
 	}
@@ -128,15 +131,15 @@ var (
 	errAddressChecksum     = errors.New("address has invalid checksum")
 )
 
-func addressMacro(e *evaluator, env *evalEnvironment, call *macroCallExpr) (*big.Int, error) {
-	if err := call.checkArgCount(1); err != nil {
+func addressMacro(e *evaluator, env *evalEnvironment, call *ast.MacroCallExpr) (*big.Int, error) {
+	if err := checkArgCount(call, 1); err != nil {
 		return nil, err
 	}
-	lit, ok := call.args[0].(*literalExpr)
+	lit, ok := call.Args[0].(*ast.LiteralExpr)
 	if !ok {
 		return nil, errAddressWantsLiteral
 	}
-	text := lit.tok.text
+	text := lit.Text()
 	addr, err := common.NewMixedcaseAddressFromString(text)
 	if err != nil {
 		return nil, errAddressInvalid
@@ -149,21 +152,21 @@ func addressMacro(e *evaluator, env *evalEnvironment, call *macroCallExpr) (*big
 	return addr.Address().Big(), nil
 }
 
+func isChecksumAddress(str string) bool {
+	return strings.ContainsAny(str, "ABCDEF")
+}
+
 // evalAsBytes gives the byte value of an expression.
 // In most cases, this is just the big-endian encoding of an integer value.
 // For string literals, the bytes of the literal are used directly.
-func evalAsBytes(e *evaluator, env *evalEnvironment, expr astExpr) ([]byte, error) {
-	lit, ok := expr.(*literalExpr)
-	if ok && lit.tok.typ == stringLiteral {
-		return []byte(lit.tok.text), nil
+func (e *evaluator) evalAsBytes(expr ast.Expr, env *evalEnvironment) ([]byte, error) {
+	lit, ok := expr.(*ast.LiteralExpr)
+	if ok && lit.IsString() {
+		return []byte(lit.Text()), nil
 	}
-	v, err := expr.eval(e, env)
+	v, err := e.eval(expr, env)
 	if err != nil {
 		return nil, err
 	}
 	return v.Bytes(), nil
-}
-
-func isChecksumAddress(str string) bool {
-	return strings.ContainsAny(str, "ABCDEF")
 }

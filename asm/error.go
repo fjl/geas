@@ -19,44 +19,17 @@ package asm
 import (
 	"errors"
 	"fmt"
+
+	"github.com/fjl/geas/internal/ast"
 )
 
 // panic sentinel value:
 var errCancelCompilation = errors.New("end compilation")
 
-// Position represents the position of an error in a file.
-type Position struct {
-	File string
-	Line int
-}
-
-func (p Position) String() string {
-	return fmt.Sprintf("%s:%d", p.File, p.Line)
-}
-
 // PositionError is an error containing a file position.
 type PositionError interface {
 	error
-	Position() Position
-}
-
-// parseError is an error that happened during parsing.
-type parseError struct {
-	tok  token
-	file string
-	err  error
-}
-
-func (e *parseError) Error() string {
-	return fmt.Sprintf("%s:%d: %v", e.file, e.tok.line, e.err)
-}
-
-func (e *parseError) Position() Position {
-	return Position{File: e.file, Line: e.tok.line}
-}
-
-func (e *parseError) Unwrap() error {
-	return e.err
+	Position() ast.Position
 }
 
 // compilerErrorCode represents an error detected by the compiler.
@@ -131,12 +104,12 @@ func (e compilerError) Error() string {
 
 // astError is an error related to an assembler instruction.
 type astError struct {
-	inst astStatement
+	inst ast.Statement
 	err  error
 }
 
-func (e *astError) Position() Position {
-	return e.inst.position()
+func (e *astError) Position() ast.Position {
+	return e.inst.Position()
 }
 
 func (e *astError) Unwrap() error {
@@ -144,23 +117,12 @@ func (e *astError) Unwrap() error {
 }
 
 func (e *astError) Error() string {
-	return fmt.Sprintf("%v: %s", e.inst.position(), e.err.Error())
-}
-
-func errLabelAlreadyDef(firstDef, secondDef *labelDefInstruction) error {
-	dotInfo := ""
-	if firstDef.dotted && !secondDef.dotted {
-		dotInfo = " (as dotted label)"
-	}
-	if !firstDef.dotted && secondDef.dotted {
-		dotInfo = " (as jumpdest)"
-	}
-	return fmt.Errorf("%v already defined%s", secondDef, dotInfo)
+	return fmt.Sprintf("%v: %s", e.inst.Position(), e.err.Error())
 }
 
 // unassignedLabelError signals use of a label that doesn't have a valid PC.
 type unassignedLabelError struct {
-	lref *labelRefExpr
+	lref *ast.LabelRefExpr
 }
 
 func (e unassignedLabelError) Error() string {

@@ -1,4 +1,4 @@
-// Copyright 2019 The go-ethereum Authors
+// Copyright 2023 The go-ethereum Authors
 // This file is part of the go-ethereum library.
 //
 // The go-ethereum library is free software: you can redistribute it and/or modify
@@ -20,14 +20,14 @@ import (
 	"bytes"
 	"encoding/hex"
 	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 	"testing"
 	"testing/fstest"
 
-	"golang.org/x/exp/maps"
 	"gopkg.in/yaml.v3"
 )
 
@@ -58,8 +58,7 @@ func TestCompiler(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	names := maps.Keys(tests)
-	sort.Strings(names)
+	names := slices.Sorted(maps.Keys(tests))
 	for _, name := range names {
 		test := tests[name]
 		t.Run(name, func(t *testing.T) {
