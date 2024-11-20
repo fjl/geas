@@ -124,22 +124,15 @@ func (c *Compiler) assignPushArg(inst *instruction, v *big.Int, setSize bool) er
 		return ecFixedSizePushOverflow
 	}
 
-	// Store data padded.
-	inst.data = make([]byte, inst.pushSize)
-	copy(inst.data[len(inst.data)-len(b):], b)
+	// Store data. Note there is no padding applied here.
+	// Padding will be added at the bytecode output stage.
+	inst.data = b
 	return nil
 }
 
 func (c *Compiler) autoPushSize(value []byte) int {
 	if len(value) > 32 {
 		panic("value too big")
-	}
-	if len(value) == 0 {
-		if c.usePush0 {
-			return 0
-		} else {
-			return 1
-		}
 	}
 	return len(value)
 }

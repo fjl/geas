@@ -55,6 +55,8 @@ const (
 	ecNegativeResult
 	ecIncludeNoFS
 	ecIncludeDepthLimit
+	ecPragmaForkInIncludeFile
+	ecPragmaForkConflict
 )
 
 func (e compilerError) Error() string {
@@ -97,6 +99,10 @@ func (e compilerError) Error() string {
 		return "#include not allowed"
 	case ecIncludeDepthLimit:
 		return "#include depth limit reached"
+	case ecPragmaForkInIncludeFile:
+		return "#pragma fork cannot be used in #include'd files"
+	case ecPragmaForkConflict:
+		return "duplicate '#pragma fork ...' directive"
 	default:
 		return fmt.Sprintf("invalid error %d", e)
 	}

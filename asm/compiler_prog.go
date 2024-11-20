@@ -29,6 +29,7 @@ import (
 type compilerProg struct {
 	toplevel *compilerSection
 	cur      *compilerSection
+	evm      *evm.InstructionSet
 }
 
 // compilerSection is a section of the output program.
@@ -160,15 +161,4 @@ func (inst *instruction) pushArg() ast.Expr {
 		return op.Arg
 	}
 	return nil
-}
-
-// opcode returns the EVM opcode of the instruction.
-func (inst *instruction) opcode() (evm.OpCode, bool) {
-	if isPush(inst.op) {
-		if inst.pushSize > 32 {
-			panic("BUG: pushSize > 32")
-		}
-		return evm.PUSH1 + evm.OpCode(inst.pushSize-1), true
-	}
-	return evm.OpByName(inst.op)
 }

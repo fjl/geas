@@ -167,6 +167,12 @@ type (
 		Src      *Document
 		Filename string
 	}
+
+	PragmaSt struct {
+		pos    Position
+		Option string
+		Value  string
+	}
 )
 
 // definitions
@@ -240,6 +246,14 @@ func (inst *AssembleSt) Position() Position {
 
 func (inst *AssembleSt) Description() string {
 	return fmt.Sprintf("#assemble %q", inst.Filename)
+}
+
+func (inst *PragmaSt) Position() Position {
+	return inst.pos
+}
+
+func (inst *PragmaSt) Description() string {
+	return fmt.Sprintf("#pragma %s %q", inst.Option, inst.Value)
 }
 
 func (inst *OpcodeSt) Position() Position {

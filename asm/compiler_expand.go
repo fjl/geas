@@ -85,7 +85,7 @@ func (op opcodeStatement) expand(c *Compiler, doc *ast.Document, prog *compilerP
 		}
 
 	default:
-		if _, ok := inst.opcode(); !ok {
+		if prog.evm.OpByName(inst.op) == nil {
 			return fmt.Errorf("%w %s", ecUnknownOpcode, inst.op)
 		}
 		if op.Arg != nil {
