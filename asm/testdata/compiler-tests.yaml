@@ -333,7 +333,7 @@ include-pragma-fork-disallowed:
       #include "a.evm"
     files:
       a.evm: |
-        #pragma fork = "berlin"
+        #pragma fork "berlin"
   output:
     errors:
       - "a.evm:1: #pragma fork cannot be used in #include'd files"
@@ -542,7 +542,7 @@ instr-macro-variable-shadow:
 opcode-unknown-in-fork:
   input:
     code: |
-      #pragma fork = "berlin"
+      #pragma fork "berlin"
       basefee
   output:
     errors:
@@ -551,7 +551,7 @@ opcode-unknown-in-fork:
 opcode-removed-in-fork:
   input:
     code: |
-      #pragma fork = "shanghai"
+      #pragma fork "shanghai"
       difficulty
   output:
     errors:
@@ -560,7 +560,7 @@ opcode-removed-in-fork:
 opcode-unknown-with-args:
   input:
     code: |
-      #pragma fork = "cancun"
+      #pragma fork "cancun"
       myop(foo)
   output:
     errors:
@@ -725,7 +725,7 @@ push0-implicit:
 push0-implicit-not-in-fork:
   input:
     code: |
-      #pragma fork = "frontier"
+      #pragma fork "frontier"
       push 0
   output:
     bytecode: "6000"
@@ -733,7 +733,7 @@ push0-implicit-not-in-fork:
 push0-explicit-not-in-fork:
   input:
     code: |
-      #pragma fork = "berlin"
+      #pragma fork "berlin"
       push0
   output:
     errors:
@@ -750,8 +750,8 @@ unicode-ident:
 pragma-fork-dup:
   input:
     code: |
-      #pragma fork = "berlin"
-      #pragma fork = "berlin"
+      #pragma fork "berlin"
+      #pragma fork "berlin"
   output:
     errors:
       - ":2: duplicate '#pragma fork ...' directive"
@@ -759,8 +759,8 @@ pragma-fork-dup:
 pragma-fork-dup-2:
   input:
     code: |
-      #pragma fork = "berlin"
-      #pragma fork = "cancun"
+      #pragma fork "berlin"
+      #pragma fork "cancun"
   output:
     errors:
       - ":2: duplicate '#pragma fork ...' directive"
@@ -768,9 +768,17 @@ pragma-fork-dup-2:
 pragma-fork-bad-syntax:
   input:
     code: |
-      #pragma fork "berlin"
-      #pragma fork = cancun
+      #pragma fork = "berlin"
+      #pragma fork cancun
   output:
     errors:
-      - ":1: expected = after #pragma fork"
+      - ":1: unexpected = after #pragma fork"
       - ":2: #pragma option value must be string or number literal"
+
+pragma-unknown:
+  input:
+    code: |
+      #pragma something 1
+  output:
+    errors:
+      - ':1: unknown #pragma something'

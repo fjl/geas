@@ -320,12 +320,11 @@ func parsePragma(p *Parser, d token) {
 	switch tok := p.next(); tok.typ {
 	case identifier:
 		instr.Option = tok.text
-		if eq := p.next(); eq.typ != equals {
-			p.throwError(eq, "expected = after #pragma %s", instr.Option)
-		}
 		switch v := p.next(); v.typ {
 		case stringLiteral, numberLiteral:
 			instr.Value = v.text
+		case equals:
+			p.throwError(tok, "unexpected = after #pragma %s", instr.Option)
 		default:
 			p.throwError(tok, "#pragma option value must be string or number literal")
 		}
