@@ -546,7 +546,16 @@ opcode-unknown-in-fork:
       basefee
   output:
     errors:
-      - ':2: unknown opcode BASEFEE (in fork "berlin")'
+      - ':2: unknown opcode BASEFEE (fork target = "berlin")'
+
+opcode-removed-in-fork:
+  input:
+    code: |
+      #pragma fork = "shanghai"
+      difficulty
+  output:
+    errors:
+      - ':2: unknown opcode DIFFICULTY (removed in fork "paris", target = "shanghai")'
 
 opcode-unknown-with-args:
   input:
@@ -555,7 +564,7 @@ opcode-unknown-with-args:
       myop(foo)
   output:
     errors:
-      - ':2: unknown opcode MYOP (in fork "cancun")'
+      - ':2: unknown opcode MYOP (fork target = "cancun")'
 
 opcode-known-with-args:
   input:
@@ -728,7 +737,7 @@ push0-explicit-not-in-fork:
       push0
   output:
     errors:
-      - ':2: unknown opcode PUSH0 (in fork "berlin")'
+      - ':2: unknown opcode PUSH0 (fork target = "berlin")'
 
 unicode-ident:
   input:

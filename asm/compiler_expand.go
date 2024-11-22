@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"github.com/fjl/geas/internal/ast"
+	"github.com/fjl/geas/internal/evm"
 )
 
 // expand appends a list of AST instructions to the program.
@@ -63,22 +64,16 @@ func (op opcodeStatement) expand(c *Compiler, doc *ast.Document, prog *compilerP
 	inst := newInstruction(op, opcode)
 
 	switch {
-	case isPush(opcode):
-		if opcode == "PUSH0" {
-			if op.Arg != nil {
-				return ecPushzeroWithArgument
-			}
-			if !prog.evm.SupportsPush0() {
-				return fmt.Errorf("%w %s (in fork %q)", ecUnknownOpcode, opcode, prog.evm.Name())
-			}
-			break
-		}
+	case isPush(opcode) && opcode != "PUSH0":
 		if op.Arg == nil {
 			return ecPushWithoutArgument
 		}
 
 	case isJump(opcode):
 		if err := c.validateJumpArg(doc, op.Arg); err != nil {
+			return err
+		}
+		if _, err := prog.resolveOp(opcode); err != nil {
 			return err
 		}
 		// 'JUMP @label' instructions turn into 'PUSH @label' + 'JUMP'.
@@ -88,16 +83,30 @@ func (op opcodeStatement) expand(c *Compiler, doc *ast.Document, prog *compilerP
 		}
 
 	default:
-		if prog.evm.OpByName(inst.op) == nil {
-			return fmt.Errorf("%w %s (in fork %q)", ecUnknownOpcode, inst.op, prog.evm.Name())
+		if _, err := prog.resolveOp(opcode); err != nil {
+			return err
 		}
 		if op.Arg != nil {
+			if opcode == "PUSH0" {
+				return ecPushzeroWithArgument
+			}
 			return ecUnexpectedArgument
 		}
 	}
 
 	prog.addInstruction(inst)
 	return nil
+}
+
+// resolveOp resolves an opcode name.
+func (prog *compilerProg) resolveOp(op string) (*evm.Op, error) {
+	if op := prog.evm.OpByName(op); op != nil {
+		return op, nil
+	}
+	if remFork := prog.evm.ForkWhereOpRemoved(op); remFork != "" {
+		return nil, fmt.Errorf("%w %s (removed in fork %q, target = %q)", ecUnknownOpcode, op, remFork, prog.evm.Name())
+	}
+	return nil, fmt.Errorf("%w %s (fork target = %q)", ecUnknownOpcode, op, prog.evm.Name())
 }
 
 // validateJumpArg checks that argument to JUMP is a defined label.
