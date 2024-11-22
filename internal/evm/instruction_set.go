@@ -18,6 +18,7 @@ package evm
 
 import (
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 )
@@ -37,11 +38,13 @@ func (def *InstructionSetDef) Name() string {
 
 // InstructionSet is an EVM instruction set.
 type InstructionSet struct {
-	name   string
-	byName map[string]*Op
-	byCode map[byte]*Op
+	name      string
+	byName    map[string]*Op
+	byCode    map[byte]*Op
+	opRemoved map[string]string // forks where op was last removed
 }
 
+// FindInstructionSet resolves a fork name to a set of opcodes.
 func FindInstructionSet(name string) *InstructionSet {
 	name = strings.ToLower(name)
 	def, ok := ireg[name]
@@ -49,9 +52,10 @@ func FindInstructionSet(name string) *InstructionSet {
 		return nil
 	}
 	is := &InstructionSet{
-		name:   def.Name(),
-		byName: make(map[string]*Op),
-		byCode: make(map[byte]*Op),
+		name:      def.Name(),
+		byName:    make(map[string]*Op),
+		byCode:    make(map[byte]*Op),
+		opRemoved: make(map[string]string),
 	}
 	if err := is.resolveDefs(def); err != nil {
 		panic(err)
@@ -70,13 +74,25 @@ func (is *InstructionSet) SupportsPush0() bool {
 }
 
 // OpByName resolves an opcode by its name.
-func (is *InstructionSet) OpByName(name string) *Op {
-	return is.byName[name]
+// Name has to be all uppercase.
+func (is *InstructionSet) OpByName(opname string) *Op {
+	return is.byName[opname]
 }
 
 // OpByCode resolves an opcode by its code.
 func (is *InstructionSet) OpByCode(code byte) *Op {
 	return is.byCode[code]
+}
+
+// ForkWhereOpRemoved returns the fork where a given op was removed from the instruction
+// set. This is intended to be called when op is known to not exist. Note this will return
+// an empty string in several cases:
+//
+//   - op is invalid
+//   - op is valid, but does not appear in lineage of instruction set
+//   - op is valid and exists in instruction set
+func (is *InstructionSet) ForkWhereOpRemoved(op string) string {
+	return is.opRemoved[op]
 }
 
 // lineage computes the definition chain of an instruction set.
@@ -103,11 +119,13 @@ func (def *InstructionSetDef) lineage() ([]*InstructionSetDef, error) {
 	return lin, nil
 }
 
+// resolveDefs computes the full opcode set of a fork from its lineage.
 func (is *InstructionSet) resolveDefs(toplevel *InstructionSetDef) error {
 	lineage, err := toplevel.lineage()
 	if err != nil {
 		return err
 	}
+
 	for _, def := range lineage {
 		for _, op := range def.Removed {
 			if _, ok := is.byName[op.Name]; !ok {
@@ -118,6 +136,7 @@ func (is *InstructionSet) resolveDefs(toplevel *InstructionSetDef) error {
 			}
 			delete(is.byName, op.Name)
 			delete(is.byCode, op.Code)
+			is.opRemoved[op.Name] = def.Name()
 		}
 		for _, op := range def.Added {
 			_, nameDefined := is.byName[op.Name]
@@ -130,6 +149,7 @@ func (is *InstructionSet) resolveDefs(toplevel *InstructionSetDef) error {
 				return fmt.Errorf("opcode %v added multiple times (adding %s, existing def %s)", op.Code, op.Name, is.byCode[op.Code].Name)
 			}
 			is.byCode[op.Code] = op
+			delete(is.opRemoved, op.Name)
 		}
 	}
 	return nil
@@ -144,4 +164,8 @@ func (s set[X]) add(k X) {
 func (s set[X]) includes(k X) bool {
 	_, ok := s[k]
 	return ok
+}
+
+func (s set[X]) members() []X {
+	return slices.Collect(maps.Keys(s))
 }
