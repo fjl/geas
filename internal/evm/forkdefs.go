@@ -239,4 +239,9 @@ var ireg = map[string]*InstructionSetDef{
 			&SELFDESTRUCT,
 		},
 	},
+
+	"prague": {
+		Names:  []string{"prague"},
+		Parent: "cancun",
+	},
 }
