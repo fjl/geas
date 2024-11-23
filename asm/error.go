@@ -82,7 +82,7 @@ func (e compilerError) Error() string {
 	case ecJumpToUndefinedLabel:
 		return "JUMP to undefined label"
 	case ecUnknownOpcode:
-		return "unknown opcode"
+		return "unknown op"
 	case ecUndefinedVariable:
 		return "undefined macro parameter"
 	case ecUndefinedMacro:

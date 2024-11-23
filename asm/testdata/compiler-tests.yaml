@@ -59,7 +59,7 @@ assemble-directive-fork-inherit:
         random
   output:
     errors:
-      - 'file.eas:1: unknown opcode RANDOM (fork target = "berlin")'
+      - 'file.eas:1: unknown op RANDOM (target = "berlin"; added in fork "paris")'
 
 assemble-directive-fork-override:
   input:
@@ -572,7 +572,7 @@ opcode-unknown-in-fork:
       basefee
   output:
     errors:
-      - ':2: unknown opcode BASEFEE (fork target = "berlin")'
+      - ':2: unknown op BASEFEE (target = "berlin"; added in fork "london")'
 
 opcode-removed-in-fork:
   input:
@@ -581,7 +581,7 @@ opcode-removed-in-fork:
       difficulty
   output:
     errors:
-      - ':2: unknown opcode DIFFICULTY (removed in fork "paris", target = "shanghai")'
+      - ':2: unknown op DIFFICULTY (target = "shanghai"; removed in fork "paris")'
 
 opcode-unknown-with-args:
   input:
@@ -590,7 +590,7 @@ opcode-unknown-with-args:
       myop(foo)
   output:
     errors:
-      - ':2: unknown opcode MYOP (fork target = "cancun")'
+      - ':2: unknown op MYOP (fork target = "cancun")'
 
 opcode-known-with-args:
   input:
@@ -763,7 +763,7 @@ push0-explicit-not-in-fork:
       push0
   output:
     errors:
-      - ':2: unknown opcode PUSH0 (fork target = "berlin")'
+      - ':2: unknown op PUSH0 (target = "berlin"; added in fork "shanghai")'
 
 unicode-ident:
   input:

@@ -103,8 +103,18 @@ func (prog *compilerProg) resolveOp(op string) (*evm.Op, error) {
 	if op := prog.evm.OpByName(op); op != nil {
 		return op, nil
 	}
-	if remFork := prog.evm.ForkWhereOpRemoved(op); remFork != "" {
-		return nil, fmt.Errorf("%w %s (removed in fork %q, target = %q)", ecUnknownOpcode, op, remFork, prog.evm.Name())
+	remFork := prog.evm.ForkWhereOpRemoved(op)
+	if remFork != "" {
+		return nil, fmt.Errorf("%w %s (target = %q; removed in fork %q)", ecUnknownOpcode, op, prog.evm.Name(), remFork)
+	}
+	addedForks := evm.ForksWhereOpAdded(op)
+	if len(addedForks) > 0 {
+		list := strings.Join(addedForks, ", ")
+		fork := "fork"
+		if len(addedForks) > 1 {
+			fork += "s"
+		}
+		return nil, fmt.Errorf("%w %s (target = %q; added in %s %q)", ecUnknownOpcode, op, prog.evm.Name(), fork, list)
 	}
 	return nil, fmt.Errorf("%w %s (fork target = %q)", ecUnknownOpcode, op, prog.evm.Name())
 }
