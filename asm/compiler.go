@@ -38,11 +38,11 @@ type Compiler struct {
 	maxErrors   int
 	defaultFork string
 
-	globals    *globalScope
-	errors     []error
-	errorCount int // count of true errors (warnings excluded)
-	macroStack map[*ast.InstructionMacroDef]struct{}
-	includes   map[*ast.IncludeSt]*ast.Document
+	globals         *globalScope
+	errorCount      int // count of true errors (warnings excluded)
+	errsAndWarnings []error
+	macroStack      map[*ast.InstructionMacroDef]struct{}
+	includes        map[*ast.IncludeSt]*ast.Document
 }
 
 // NewCompiler creates a compiler. The passed file system is used to resolve import file names.
@@ -93,60 +93,62 @@ func (c *Compiler) CompileString(input string) []byte {
 func (c *Compiler) CompileFile(filename string) []byte {
 	content, err := fs.ReadFile(c.fsys, filename)
 	if err != nil {
-		c.errors = append(c.errors, err)
+		c.errsAndWarnings = append(c.errsAndWarnings, err)
 		return nil
 	}
 	return c.compileSource(filename, content)
 }
 
-func (c *Compiler) compileSource(filename string, input []byte) []byte {
-	p := ast.NewParser(filename, input, c.lexDebug)
-	doc, errs := p.Parse()
-	for _, err := range errs {
-		c.errors = append(c.errors, err)
-	}
-	if len(errs) > 0 {
-		return nil
-	}
-	return c.compile(doc)
-}
-
 // Errors returns errors that have accumulated during compilation.
 func (c *Compiler) Errors() []error {
 	s := make([]error, 0, c.errorCount)
-	for _, err := range c.errors {
+	for _, err := range c.errsAndWarnings {
 		if !IsWarning(err) {
 			s = append(s, err)
 		}
 	}
-	return c.errors
+	return s
+}
+
+// Warnings returns all warnings that have accumulated during compilation.
+func (c *Compiler) Warnings() []error {
+	var s []error
+	for _, err := range c.errsAndWarnings {
+		if IsWarning(err) {
+			s = append(s, err)
+		}
+	}
+	return s
+}
+
+// Failed reports whether compilation has failed.
+func (c *Compiler) Failed() bool {
+	return c.errorCount > 0
 }
 
 // ErrorsAndWarnings returns all errors and warnings which have accumulated during compilation.
 func (c *Compiler) ErrorsAndWarnings() []error {
-	return c.errors
+	return c.errsAndWarnings
 }
 
-// addError pushes an error to the compiler error list.
-func (c *Compiler) addError(inst ast.Statement, err error) {
-	c.errors = append(c.errors, &astError{inst: inst, err: err})
-	if len(c.errors) > c.maxErrors {
+// errorAt pushes an error to the compiler error list.
+func (c *Compiler) errorAt(inst ast.Statement, err error) {
+	c.addError(&astError{inst: inst, err: err})
+}
+
+// addErrors adds multiple errors to the compiler error list.
+// This aborts compilation when the error list grows too large.
+func (c *Compiler) addError(err error) {
+	c.errsAndWarnings = append(c.errsAndWarnings, err)
+	if !IsWarning(err) {
+		c.errorCount++
+	}
+	if c.errorCount > c.maxErrors {
 		panic(errCancelCompilation)
 	}
 }
 
-// addErrors adds multiple errors to the compiler error list.
-func (c *Compiler) addErrors(errs []error) {
-	for _, err := range errs {
-		c.errors = append(c.errors, err)
-		if len(c.errors) > c.maxErrors {
-			panic(errCancelCompilation)
-		}
-	}
-}
-
-// compile is the toplevel entry point into the compiler.
-func (c *Compiler) compile(doc *ast.Document) (output []byte) {
+func (c *Compiler) compileSource(filename string, input []byte) []byte {
 	defer func() {
 		panicking := recover()
 		if panicking != nil && panicking != errCancelCompilation {
@@ -154,6 +156,19 @@ func (c *Compiler) compile(doc *ast.Document) (output []byte) {
 		}
 	}()
 
+	p := ast.NewParser(filename, input, c.lexDebug)
+	doc, errs := p.Parse()
+	for _, err := range errs {
+		c.addError(err)
+	}
+	if c.errorCount > 0 {
+		return nil // abort compilation due to failed parse
+	}
+	return c.compileDocument(doc)
+}
+
+// compileDocument creates bytecode from the AST.
+func (c *Compiler) compileDocument(doc *ast.Document) (output []byte) {
 	c.globals = newGlobalScope()
 	prog := newCompilerProg(doc)
 
@@ -189,7 +204,7 @@ func (c *Compiler) compile(doc *ast.Document) (output []byte) {
 				failedInst.pushSize += 1
 				continue // try again
 			} else if err != nil {
-				c.addError(failedInst.ast, err)
+				c.errorAt(failedInst.ast, err)
 				break // there was some other error
 			}
 		}
@@ -202,7 +217,9 @@ func (c *Compiler) compile(doc *ast.Document) (output []byte) {
 // processIncludes reads all #included documents.
 func (c *Compiler) processIncludes(doc *ast.Document, prog *compilerProg, stack []ast.Statement) {
 	errs := c.globals.registerDefinitions(doc)
-	c.addErrors(errs)
+	for _, err := range errs {
+		c.addError(err)
+	}
 
 	var list []*ast.IncludeSt
 	for _, st := range doc.Statements {
@@ -210,7 +227,7 @@ func (c *Compiler) processIncludes(doc *ast.Document, prog *compilerProg, stack 
 		case *ast.IncludeSt:
 			file, err := resolveRelative(doc.File, st.Filename)
 			if err != nil {
-				c.addError(st, err)
+				c.errorAt(st, err)
 				continue
 			}
 			incdoc := c.parseIncludeFile(file, st, len(stack)+1)
@@ -223,17 +240,17 @@ func (c *Compiler) processIncludes(doc *ast.Document, prog *compilerProg, stack 
 			switch st.Option {
 			case "target":
 				if len(stack) != 0 {
-					c.addError(st, ecPragmaTargetInIncludeFile)
+					c.errorAt(st, ecPragmaTargetInIncludeFile)
 				}
 				if prog.evm != nil {
-					c.addError(st, ecPragmaTargetConflict)
+					c.errorAt(st, ecPragmaTargetConflict)
 				}
 				prog.evm = evm.FindInstructionSet(st.Value)
 				if prog.evm == nil {
-					c.addError(st, fmt.Errorf("%w %q", ecPragmaTargetUnknown, st.Value))
+					c.errorAt(st, fmt.Errorf("%w %q", ecPragmaTargetUnknown, st.Value))
 				}
 			default:
-				c.addError(st, fmt.Errorf("%w %s", ecUnknownPragma, st.Option))
+				c.errorAt(st, fmt.Errorf("%w %s", ecUnknownPragma, st.Option))
 			}
 		}
 	}
@@ -260,25 +277,25 @@ func resolveRelative(basepath string, filename string) (string, error) {
 
 func (c *Compiler) parseIncludeFile(file string, inst *ast.IncludeSt, depth int) *ast.Document {
 	if c.fsys == nil {
-		c.addError(inst, ecIncludeNoFS)
+		c.errorAt(inst, ecIncludeNoFS)
 		return nil
 	}
 	if depth > c.maxIncDepth {
-		c.addError(inst, ecIncludeDepthLimit)
+		c.errorAt(inst, ecIncludeDepthLimit)
 		return nil
 	}
 
 	content, err := fs.ReadFile(c.fsys, file)
 	if err != nil {
-		c.addError(inst, err)
+		c.errorAt(inst, err)
 		return nil
 	}
 	p := ast.NewParser(file, content, c.lexDebug)
 	doc, errors := p.Parse()
-	for _, e := range errors {
-		c.addError(inst, e)
+	for _, err := range errors {
+		c.errorAt(inst, err)
 	}
-	if len(errors) > 0 {
+	if c.errorCount > 0 {
 		return nil
 	}
 	// Note that included documents do NOT have the including document set as Parent.
@@ -292,7 +309,8 @@ func (c *Compiler) parseIncludeFile(file string, inst *ast.IncludeSt, depth int)
 
 // generateOutput creates the bytecode. This is also where instruction names get resolved.
 func (c *Compiler) generateOutput(prog *compilerProg) []byte {
-	if len(c.errors) > 0 {
+	if c.errorCount > 0 {
+		// Refuse to output if source had errors.
 		return nil
 	}
 
@@ -331,7 +349,7 @@ func (c *Compiler) generateOutput(prog *compilerProg) []byte {
 		case inst.op != "":
 			op := prog.evm.OpByName(inst.op)
 			if op == nil {
-				c.addError(inst.ast, fmt.Errorf("%w %s", ecUnknownOpcode, inst.op))
+				c.errorAt(inst.ast, fmt.Errorf("%w %s", ecUnknownOpcode, inst.op))
 			}
 			output = append(output, op.Code)
 		}
