@@ -30,17 +30,26 @@ func (p Position) String() string {
 
 // ParseError is an error that happened during parsing.
 type ParseError struct {
-	tok  token
-	file string
-	err  error
+	tok     token
+	file    string
+	err     error
+	warning bool
 }
 
 func (e *ParseError) Error() string {
-	return fmt.Sprintf("%s:%d: %v", e.file, e.tok.line, e.err)
+	warn := ""
+	if e.warning {
+		warn = "warning: "
+	}
+	return fmt.Sprintf("%s:%d: %s%v", e.file, e.tok.line, warn, e.err)
 }
 
 func (e *ParseError) Position() Position {
 	return Position{File: e.file, Line: e.tok.line}
+}
+
+func (e *ParseError) IsWarning() bool {
+	return e.warning
 }
 
 func (e *ParseError) Unwrap() error {
