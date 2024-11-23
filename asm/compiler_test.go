@@ -112,3 +112,58 @@ func TestCompiler(t *testing.T) {
 		})
 	}
 }
+
+func TestExamplePrograms(t *testing.T) {
+	exampleDir, err := filepath.Abs("../example")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	bytecodes := make(map[string]string)
+	t.Run("erc20", func(t *testing.T) {
+		bytecodes["erc20"] = compileExample(t, exampleDir, "erc20/erc20.eas")
+	})
+	t.Run("erc20_ctor", func(t *testing.T) {
+		bytecodes["erc20_ctor"] = compileExample(t, exampleDir, "erc20/erc20_ctor.eas")
+	})
+	t.Run("4788asm", func(t *testing.T) {
+		bytecodes["4788asm"] = compileExample(t, exampleDir, "4788asm.eas")
+	})
+	t.Run("4788asm_ctor", func(t *testing.T) {
+		bytecodes["4788asm_ctor"] = compileExample(t, exampleDir, "4788asm_ctor.eas")
+	})
+
+	if os.Getenv("WRITE_TEST_FILES") == "1" {
+		content, _ := yaml.Marshal(bytecodes)
+		os.WriteFile("testdata/known-bytecode.yaml", content, 0644)
+	}
+
+	// compare codes
+	var known map[string]string
+	data, err := os.ReadFile("testdata/known-bytecode.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := yaml.Unmarshal(data, &known); err != nil {
+		t.Fatal("YAML unmarshal failed:", err)
+	}
+	for name, code := range bytecodes {
+		if code != known[name] {
+			t.Errorf("bytecode mismatch for %s:", name)
+			t.Errorf("   compiled: %s", code)
+			t.Errorf("      known: %s", known[name])
+		}
+	}
+}
+
+func compileExample(t *testing.T, exampleDir string, file string) string {
+	c := NewCompiler(os.DirFS(exampleDir))
+	output := c.CompileFile(file)
+	if len(c.Errors()) > 0 {
+		t.Error("compilation failed:")
+		for _, err := range c.Errors() {
+			t.Error(err)
+		}
+	}
+	return hex.EncodeToString(output)
+}
