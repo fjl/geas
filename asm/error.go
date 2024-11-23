@@ -32,16 +32,16 @@ type PositionError interface {
 	Position() ast.Position
 }
 
-// Warning is implemented by errors which are warnings.
+// Warning is implemented by errors that could also be just a warning.
 type Warning interface {
 	error
-	Warning()
+	IsWarning() bool
 }
 
 // IsWarning reports whether an error is a warning.
 func IsWarning(err error) bool {
 	var w Warning
-	return errors.As(err, &w)
+	return errors.As(err, &w) && w.IsWarning()
 }
 
 // compilerErrorCode represents an error detected by the compiler.
