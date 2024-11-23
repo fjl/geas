@@ -136,10 +136,6 @@ func (c *Compiler) addErrors(errs []error) {
 
 // compile is the toplevel entry point into the compiler.
 func (c *Compiler) compile(doc *ast.Document) (output []byte) {
-	prevGlobals := c.globals
-	c.globals = newGlobalScope()
-	defer func() { c.globals = prevGlobals }()
-
 	defer func() {
 		panicking := recover()
 		if panicking != nil && panicking != errCancelCompilation {
@@ -147,6 +143,7 @@ func (c *Compiler) compile(doc *ast.Document) (output []byte) {
 		}
 	}()
 
+	c.globals = newGlobalScope()
 	prog := newCompilerProg(doc)
 
 	// First, load all #include files and register their definitions.

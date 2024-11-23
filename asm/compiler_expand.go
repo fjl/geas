@@ -228,13 +228,17 @@ func (inst assembleStatement) expand(c *Compiler, doc *ast.Document, prog *compi
 	subc := NewCompiler(c.fsys)
 	subc.SetIncludeDepthLimit(c.maxIncDepth)
 	subc.SetMaxErrors(math.MaxInt)
+	subc.SetDefaultFork(prog.evm.Name())
 
 	file, err := resolveRelative(doc.File, inst.Filename)
 	if err != nil {
 		return err
 	}
-	bytecode := c.CompileFile(file)
-	if len(c.Errors()) > 0 {
+	bytecode := subc.CompileFile(file)
+	errs := subc.Errors()
+	if len(errs) > 0 {
+		reportedErrs := errs[:min(max(c.maxErrors, 1), len(errs))]
+		c.errors = append(c.errors, reportedErrs...)
 		return nil
 	}
 	datainst := &instruction{data: bytecode}

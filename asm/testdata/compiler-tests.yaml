@@ -48,6 +48,32 @@ assemble-directive-globals-not-shared:
     errors:
       - "file.eas:1: undefined macro Global"
 
+assemble-directive-fork-inherit:
+  input:
+    code: |
+      #pragma fork "berlin"
+      push 1
+      #assemble "file.eas"
+    files:
+      file.eas:  |
+        random
+  output:
+    errors:
+      - 'file.eas:1: unknown opcode RANDOM (fork target = "berlin")'
+
+assemble-directive-fork-override:
+  input:
+    code: |
+      #pragma fork "berlin"
+      push 1
+      #assemble "file.eas"
+    files:
+      file.eas:  |
+        #pragma fork "paris"
+        random
+  output:
+    bytecode: '600144'
+
 comments-on-label:
   input:
     code: |
