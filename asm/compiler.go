@@ -301,12 +301,8 @@ func (c *Compiler) generateOutput(prog *compilerProg) []byte {
 
 			// resolve the op
 			var op *evm.Op
-			var size = inst.pushSize
 			if inst.op == "PUSH" {
-				if size == 0 && !prog.evm.SupportsPush0() {
-					size = 1
-				}
-				op = prog.evm.PushBySize(size)
+				op = prog.evm.PushBySize(inst.pushSize)
 			} else {
 				op = prog.evm.OpByName(inst.op)
 			}
@@ -316,8 +312,8 @@ func (c *Compiler) generateOutput(prog *compilerProg) []byte {
 
 			// Add opcode and data padding to output.
 			output = append(output, op.Code)
-			if len(inst.data) < size {
-				output = append(output, make([]byte, size-len(inst.data))...)
+			if len(inst.data) < inst.pushSize {
+				output = append(output, make([]byte, inst.pushSize-len(inst.data))...)
 			}
 
 		case inst.op != "":

@@ -48,7 +48,7 @@ func (c *Compiler) assignInitialPushSizes(e *evaluator, prog *compilerProg) {
 			c.addError(inst.ast, err)
 			continue
 		}
-		if err := c.assignPushArg(inst, v, true); err != nil {
+		if err := prog.assignPushArg(inst, v, true); err != nil {
 			c.addError(inst.ast, err)
 			continue
 		}
@@ -91,7 +91,7 @@ func (c *Compiler) assignArgs(e *evaluator, prog *compilerProg) (inst *instructi
 		if err != nil {
 			return inst, err
 		}
-		if err := c.assignPushArg(inst, v, false); err != nil {
+		if err := prog.assignPushArg(inst, v, false); err != nil {
 			return inst, err
 		}
 	}
@@ -103,7 +103,7 @@ func (c *Compiler) assignArgs(e *evaluator, prog *compilerProg) (inst *instructi
 //
 // If setSize is true, the pushSize of variable-size "PUSH" instructions will be assigned
 // based on the value.
-func (c *Compiler) assignPushArg(inst *instruction, v *big.Int, setSize bool) error {
+func (prog *compilerProg) assignPushArg(inst *instruction, v *big.Int, setSize bool) error {
 	if v.Sign() < 0 {
 		return ecNegativeResult
 	}
@@ -115,7 +115,7 @@ func (c *Compiler) assignPushArg(inst *instruction, v *big.Int, setSize bool) er
 
 	_, hasExplicitSize := inst.explicitPushSize()
 	if setSize && !hasExplicitSize {
-		inst.pushSize = c.autoPushSize(b)
+		inst.pushSize = prog.autoPushSize(b)
 	}
 	if len(b) > inst.pushSize {
 		if !hasExplicitSize {
@@ -130,9 +130,12 @@ func (c *Compiler) assignPushArg(inst *instruction, v *big.Int, setSize bool) er
 	return nil
 }
 
-func (c *Compiler) autoPushSize(value []byte) int {
+func (prog *compilerProg) autoPushSize(value []byte) int {
 	if len(value) > 32 {
 		panic("value too big")
+	}
+	if len(value) == 0 && !prog.evm.SupportsPush0() {
+		return 1
 	}
 	return len(value)
 }
