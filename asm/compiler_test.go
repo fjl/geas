@@ -164,11 +164,11 @@ func TestExamplePrograms(t *testing.T) {
 func compileExample(t *testing.T, exampleDir string, file string) string {
 	c := NewCompiler(os.DirFS(exampleDir))
 	output := c.CompileFile(file)
-	if len(c.Errors()) > 0 {
+	for _, err := range c.ErrorsAndWarnings() {
+		t.Log(err)
+	}
+	if c.Failed() {
 		t.Error("compilation failed:")
-		for _, err := range c.Errors() {
-			t.Error(err)
-		}
 	}
 	return hex.EncodeToString(output)
 }
