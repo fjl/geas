@@ -7,7 +7,7 @@
 ;;; balance(address)          => 0x000000000000000000000000 || address
 ;;; allowance(owner, spender) => keccak(owner || spender)
 
-#pragma fork "constantinople"
+#pragma target "constantinople"
 
 #define %match(candidate, label) { ; [selector]
     dup1             ; [selector, selector]

@@ -51,7 +51,7 @@ assemble-directive-globals-not-shared:
 assemble-directive-fork-inherit:
   input:
     code: |
-      #pragma fork "berlin"
+      #pragma target "berlin"
       push 1
       #assemble "file.eas"
     files:
@@ -64,12 +64,12 @@ assemble-directive-fork-inherit:
 assemble-directive-fork-override:
   input:
     code: |
-      #pragma fork "berlin"
+      #pragma target "berlin"
       push 1
       #assemble "file.eas"
     files:
       file.eas:  |
-        #pragma fork "paris"
+        #pragma target "paris"
         random
   output:
     bytecode: '600144'
@@ -359,10 +359,10 @@ include-pragma-fork-disallowed:
       #include "a.evm"
     files:
       a.evm: |
-        #pragma fork "berlin"
+        #pragma target "berlin"
   output:
     errors:
-      - "a.evm:1: #pragma fork cannot be used in #include'd files"
+      - "a.evm:1: #pragma target cannot be used in #include'd files"
 
 include-depth-limit:
   input:
@@ -568,7 +568,7 @@ instr-macro-variable-shadow:
 opcode-unknown-in-fork:
   input:
     code: |
-      #pragma fork "berlin"
+      #pragma target "berlin"
       basefee
   output:
     errors:
@@ -577,7 +577,7 @@ opcode-unknown-in-fork:
 opcode-removed-in-fork:
   input:
     code: |
-      #pragma fork "shanghai"
+      #pragma target "shanghai"
       difficulty
   output:
     errors:
@@ -586,7 +586,7 @@ opcode-removed-in-fork:
 opcode-unknown-with-args:
   input:
     code: |
-      #pragma fork "cancun"
+      #pragma target "cancun"
       myop(foo)
   output:
     errors:
@@ -751,7 +751,7 @@ push0-implicit:
 push0-implicit-not-in-fork:
   input:
     code: |
-      #pragma fork "frontier"
+      #pragma target "frontier"
       push 0
   output:
     bytecode: "6000"
@@ -759,7 +759,7 @@ push0-implicit-not-in-fork:
 push0-explicit-not-in-fork:
   input:
     code: |
-      #pragma fork "berlin"
+      #pragma target "berlin"
       push0
   output:
     errors:
@@ -776,29 +776,29 @@ unicode-ident:
 pragma-fork-dup:
   input:
     code: |
-      #pragma fork "berlin"
-      #pragma fork "berlin"
+      #pragma target "berlin"
+      #pragma target "berlin"
   output:
     errors:
-      - ":2: duplicate '#pragma fork ...' directive"
+      - ":2: duplicate '#pragma target ...' directive"
 
 pragma-fork-dup-2:
   input:
     code: |
-      #pragma fork "berlin"
-      #pragma fork "cancun"
+      #pragma target "berlin"
+      #pragma target "cancun"
   output:
     errors:
-      - ":2: duplicate '#pragma fork ...' directive"
+      - ":2: duplicate '#pragma target ...' directive"
 
 pragma-fork-bad-syntax:
   input:
     code: |
-      #pragma fork = "berlin"
-      #pragma fork cancun
+      #pragma target = "berlin"
+      #pragma target cancun
   output:
     errors:
-      - ":1: unexpected = after #pragma fork"
+      - ":1: unexpected = after #pragma target"
       - ":2: #pragma option value must be string or number literal"
 
 pragma-unknown:

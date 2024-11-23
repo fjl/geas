@@ -209,16 +209,16 @@ func (c *Compiler) processIncludes(doc *ast.Document, prog *compilerProg, stack 
 
 		case *ast.PragmaSt:
 			switch st.Option {
-			case "fork":
+			case "target":
 				if len(stack) != 0 {
-					c.addError(st, ecPragmaForkInIncludeFile)
+					c.addError(st, ecPragmaTargetInIncludeFile)
 				}
 				if prog.evm != nil {
-					c.addError(st, ecPragmaForkConflict)
+					c.addError(st, ecPragmaTargetConflict)
 				}
 				prog.evm = evm.FindInstructionSet(st.Value)
 				if prog.evm == nil {
-					c.addError(st, fmt.Errorf("%w %q", ecPragmaForkUnknown, st.Value))
+					c.addError(st, fmt.Errorf("%w %q", ecPragmaTargetUnknown, st.Value))
 				}
 			default:
 				c.addError(st, fmt.Errorf("%w %s", ecUnknownPragma, st.Option))

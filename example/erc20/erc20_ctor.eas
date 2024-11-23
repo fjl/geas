@@ -1,7 +1,7 @@
 ;;; ERC20 - constructor
 ;;;
 
-#pragma fork "constantinople"
+#pragma target "constantinople"
 
     pc                  ; [0]
 
