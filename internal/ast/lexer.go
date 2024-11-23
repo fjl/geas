@@ -46,31 +46,31 @@ func (t *token) String() string             { return fmt.Sprintf("%v %s (line %d
 // is able to parse and return.
 type tokenType byte
 
-//go:generate go run golang.org/x/tools/cmd/stringer@latest -type tokenType
+//go:generate go run golang.org/x/tools/cmd/stringer@latest -linecomment -type tokenType
 
 const (
 	eof                tokenType = iota // end of file
-	lineStart                           // emitted when a line starts
-	lineEnd                             // emitted when a line ends
-	invalidToken                        // any invalid statement
-	identifier                          // something
-	dottedIdentifier                    // .something
-	variableIdentifier                  // $something
-	labelRef                            // @label
-	dottedLabelRef                      // @.label
-	label                               // label:
-	dottedLabel                         // .label:
-	numberLiteral                       // number is emitted when a number is found
-	stringLiteral                       // stringValue is emitted when a string has been found
-	openParen                           // (
-	closeParen                          // )
-	comma                               // ,
-	directive                           // #define, #include, ...
-	instMacroIdent                      // %macro
-	openBrace                           // {
-	closeBrace                          // }
-	equals                              // =
-	arith                               // +, -, *, /, ... (see arith.go)
+	lineStart                           // beginning of line
+	lineEnd                             // end of line
+	invalidToken                        // invalid character
+	identifier                          // identifier
+	dottedIdentifier                    // dotted identifier
+	variableIdentifier                  // parameter reference
+	labelRef                            // label reference
+	dottedLabelRef                      // dotted label reference
+	label                               // label definition
+	dottedLabel                         // dotted label definition
+	numberLiteral                       // number literal
+	stringLiteral                       // string literal
+	openParen                           // open parenthesis
+	closeParen                          // close parenthesis
+	comma                               // comma
+	directive                           // directive
+	instMacroIdent                      // macro identifier
+	openBrace                           // open brace
+	closeBrace                          // closing brace
+	equals                              // equals sign
+	arith                               // arithmetic operation
 )
 
 const (
