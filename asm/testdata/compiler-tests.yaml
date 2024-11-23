@@ -590,7 +590,7 @@ opcode-unknown-with-args:
       myop(foo)
   output:
     errors:
-      - ':2: unknown op MYOP (fork target = "cancun")'
+      - ':2: unknown op MYOP'
 
 opcode-known-with-args:
   input:

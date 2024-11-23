@@ -116,7 +116,7 @@ func (prog *compilerProg) resolveOp(op string) (*evm.Op, error) {
 		}
 		return nil, fmt.Errorf("%w %s (target = %q; added in %s %q)", ecUnknownOpcode, op, prog.evm.Name(), fork, list)
 	}
-	return nil, fmt.Errorf("%w %s (fork target = %q)", ecUnknownOpcode, op, prog.evm.Name())
+	return nil, fmt.Errorf("%w %s", ecUnknownOpcode, op)
 }
 
 // validateJumpArg checks that argument to JUMP is a defined label.
