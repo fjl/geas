@@ -17,10 +17,10 @@ func TestOps(t *testing.T) {
 
 	// Check all ops are used in a fork.
 	// First compute set of used op names.
-	defnames := slices.Sorted(maps.Keys(ireg))
+	defnames := slices.Sorted(maps.Keys(forkReg))
 	used := make(set[string], len(oplist))
 	for _, name := range defnames {
-		for _, op := range ireg[name].Added {
+		for _, op := range forkReg[name].Added {
 			used.add(op.Name)
 		}
 	}
@@ -43,11 +43,11 @@ func TestOps(t *testing.T) {
 }
 
 func TestForkDefs(t *testing.T) {
-	defnames := slices.Sorted(maps.Keys(ireg))
+	defnames := slices.Sorted(maps.Keys(forkReg))
 
 	// Check canon name is listed first in def.Names.
 	for _, name := range defnames {
-		def := ireg[name]
+		def := forkReg[name]
 		if len(def.Names) == 0 {
 			t.Fatalf("instruction set %q has no Names", name)
 		}
@@ -58,7 +58,7 @@ func TestForkDefs(t *testing.T) {
 
 	// Check lineage works.
 	for _, name := range defnames {
-		def := ireg[name]
+		def := forkReg[name]
 		_, err := def.lineage()
 		if err != nil {
 			t.Errorf("problem in lineage() of %q: %v", name, err)
@@ -115,6 +115,13 @@ func TestForkOps(t *testing.T) {
 		if rf != "paris" {
 			t.Fatalf("ForkWhereOpRemoved(DIFFICULTY) -> %s != %s", rf, "paris")
 		}
+	}
+}
+
+func TestForksWhereOpAdded(t *testing.T) {
+	f := ForksWhereOpAdded("BASEFEE")
+	if !slices.Equal(f, []string{"london"}) {
+		t.Fatalf("wrong list for BASEFEE: %v", f)
 	}
 }
 

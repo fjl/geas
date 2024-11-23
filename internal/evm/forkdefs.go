@@ -2,7 +2,7 @@ package evm
 
 var LatestFork = "cancun"
 
-var ireg = map[string]*InstructionSetDef{
+var forkReg = map[string]*InstructionSetDef{
 	"frontier": {
 		Names: []string{"frontier"},
 		Added: []*Op{

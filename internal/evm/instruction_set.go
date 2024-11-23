@@ -47,7 +47,7 @@ type InstructionSet struct {
 // FindInstructionSet resolves a fork name to a set of opcodes.
 func FindInstructionSet(name string) *InstructionSet {
 	name = strings.ToLower(name)
-	def, ok := ireg[name]
+	def, ok := forkReg[name]
 	if !ok {
 		return nil
 	}
@@ -109,7 +109,7 @@ func (def *InstructionSetDef) lineage() ([]*InstructionSetDef, error) {
 		if def.Parent == "" {
 			break
 		}
-		parent, ok := ireg[def.Parent]
+		parent, ok := forkReg[def.Parent]
 		if !ok {
 			return nil, fmt.Errorf("instruction set %s has unknown parent %s", def.Name(), def.Parent)
 		}
@@ -155,6 +155,27 @@ func (is *InstructionSet) resolveDefs(toplevel *InstructionSetDef) error {
 	return nil
 }
 
+// opAddedInForkMap contains all ops and the forks they were added in.
+var opAddedInForkMap = computeOpAddedInFork()
+
+func computeOpAddedInFork() map[string][]string {
+	m := make(map[string][]string)
+	for _, def := range forkReg {
+		for _, op := range def.Added {
+			m[op.Name] = append(m[op.Name], def.Name())
+		}
+	}
+	return m
+}
+
+// ForksWhereOpAdded returns the fork names where a given op is added.
+// If this returns nil, op is invalid.
+func ForksWhereOpAdded(op string) []string {
+	return opAddedInForkMap[op]
+}
+
+// set is a wrapper over map.
+// I don't want to depend on a set library just for this.
 type set[X comparable] map[X]struct{}
 
 func (s set[X]) add(k X) {
