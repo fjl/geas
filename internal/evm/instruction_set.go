@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"strconv"
 	"strings"
 )
 
@@ -77,6 +78,13 @@ func (is *InstructionSet) SupportsPush0() bool {
 // Name has to be all uppercase.
 func (is *InstructionSet) OpByName(opname string) *Op {
 	return is.byName[opname]
+}
+
+// PushBySize resolves a push op by its size.
+func (is *InstructionSet) PushBySize(size int) *Op {
+	buf := []byte{'P', 'U', 'S', 'H', 0, 0}
+	name := strconv.AppendInt(buf[:4], int64(size), 10)
+	return is.byName[string(name)]
 }
 
 // OpByCode resolves an opcode by its code.

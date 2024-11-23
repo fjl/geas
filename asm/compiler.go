@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"io/fs"
 	"path"
-	"strconv"
 	"strings"
 
 	"github.com/fjl/geas/internal/ast"
@@ -285,7 +284,6 @@ func (c *Compiler) generateOutput(prog *compilerProg) []byte {
 		return nil
 	}
 
-	pushNameBuf := []byte{'P', 'U', 'S', 'H', 0, 0}
 	var output []byte
 	for _, inst := range prog.iterInstructions() {
 		if len(output) != inst.pc {
@@ -308,8 +306,7 @@ func (c *Compiler) generateOutput(prog *compilerProg) []byte {
 				if size == 0 && !prog.evm.SupportsPush0() {
 					size = 1
 				}
-				pushName := strconv.AppendInt(pushNameBuf[:4], int64(size), 10)
-				op = prog.evm.OpByName(string(pushName))
+				op = prog.evm.PushBySize(size)
 			} else {
 				op = prog.evm.OpByName(inst.op)
 			}
