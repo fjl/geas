@@ -1,6 +1,8 @@
 ;;; ERC20 - constructor
 ;;;
 
+#pragma fork "constantinople"
+
     pc                  ; [0]
 
     ;; give deployer initial supply
