@@ -293,7 +293,7 @@ func (c *Compiler) parseIncludeFile(file string, inst *ast.IncludeSt, depth int)
 	p := ast.NewParser(file, content, c.lexDebug)
 	doc, errors := p.Parse()
 	for _, err := range errors {
-		c.errorAt(inst, err)
+		c.addError(err)
 	}
 	if c.errorCount > 0 {
 		return nil
