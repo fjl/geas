@@ -242,10 +242,50 @@ main.eas:
         push 2
         %StoreSum  ;; calling global macro defined in lib.evm
 
+### Configuring the target instruction set
+
+The EVM is a changing environment. Opcodes may be added (and sometimes removed) as new
+versions of the EVM are released in protocol forks. Geas is aware of EVM forks and their
+respective instruction sets.
+
+Geas always operates on a specific EVM instruction set. It targets the latest known eth
+mainnet fork by default, i.e. all opcodes available in that fork can be used, and opcodes
+that have been removed in any prior fork cannot.
+
+Use the `#pragma target` directive to change the target instruction set. The basic syntax is
+
+    #pragma target "name"
+
+where `name` is a lower-case execution-layer fork name like `homestead`, `berlin`, or `prague`.
+
+Here is an example. This contract uses the CHAINID instruction to check if it is running
+on mainnet, and destroys itself otherwise. CHAINID became available in the "istanbul"
+fork, and SELFDESTRUCT was removed in a later revision of the EVM, so this program is only
+applicable to a certain range of past EVM versions.
+
+    #pragma target "berlin"
+
+        chainid                ; [id]
+        push 1                 ; [1, id]
+        eq                     ; [id = 1]
+        jumpi @mainnet         ; []
+        push 0x0               ; [zeroaddr]
+        selfdestruct           ; []
+    mainnet:
+
+Note that declaring the target instruction set using `#pragma target` will not prevent the
+output bytecode from running on a different EVM version, since it is just a compiler
+setting. The example program above will start behaving differently from its intended
+version on EVM version "cancun", because SELFDESTRUCT was turned into SENDALL in that
+fork. It may even stop working entirely in a later fork.
+
+`#pragma target` can only appear in the program once. It cannot be placed in an include
+file. You have to put the directive in the main program file.
+
 ### #assemble
 
 When writing contract constructors and advanced CALL scenarios, it can be necessary to
-include subprogram bytecode as-is. The `#assemble` directive can do this for you.
+include subprogram bytecode as-is. The `#assemble` directive does this for you.
 
 Using `#assemble` runs the assembler on the specified file, and includes the resulting
 bytecode into the current program. Labels of the subprogram will start at offset zero.
@@ -261,5 +301,8 @@ Unlike with `#include`, global definitions of the subprogram are not imported.
     #assemble "subprogram.eas"
     .end
 
+If a target instruction set is configured with `#pragma target`, it will also be used for
+assembling the subprogram. However, the subprogram file can override the instruction set
+using its own `#pragma target` directive.
 
 [^1]: Under no circumstances must it be called the geth assembler.

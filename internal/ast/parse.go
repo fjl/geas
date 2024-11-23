@@ -189,13 +189,12 @@ func parseDirective(p *Parser, tok token) {
 			p.throwError(tok, "nested macro definitions are not allowed")
 		}
 		parseMacroDef(p)
-
 	case "#include":
 		parseInclude(p, tok)
-
 	case "#assemble":
 		parseAssemble(p, tok)
-
+	case "#pragma":
+		parsePragma(p, tok)
 	default:
 		p.throwError(tok, "unknown compiler directive %q", tok.text)
 	}
@@ -313,6 +312,25 @@ func parseAssemble(p *Parser, d token) {
 		p.doc.Statements = append(p.doc.Statements, instr)
 	default:
 		p.throwError(tok, "expected filename following #assemble")
+	}
+}
+
+func parsePragma(p *Parser, d token) {
+	instr := &PragmaSt{pos: Position{p.doc.File, d.line}}
+	switch tok := p.next(); tok.typ {
+	case identifier:
+		instr.Option = tok.text
+		switch v := p.next(); v.typ {
+		case stringLiteral, numberLiteral:
+			instr.Value = v.text
+		case equals:
+			p.throwError(tok, "unexpected = after #pragma %s", instr.Option)
+		default:
+			p.throwError(tok, "#pragma option value must be string or number literal")
+		}
+		p.doc.Statements = append(p.doc.Statements, instr)
+	default:
+		p.throwError(tok, "expected option name following #pragma")
 	}
 }
 

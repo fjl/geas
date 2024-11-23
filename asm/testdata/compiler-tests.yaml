@@ -48,6 +48,32 @@ assemble-directive-globals-not-shared:
     errors:
       - "file.eas:1: undefined macro Global"
 
+assemble-directive-fork-inherit:
+  input:
+    code: |
+      #pragma target "berlin"
+      push 1
+      #assemble "file.eas"
+    files:
+      file.eas:  |
+        random
+  output:
+    errors:
+      - 'file.eas:1: unknown op RANDOM (target = "berlin"; added in fork "paris")'
+
+assemble-directive-fork-override:
+  input:
+    code: |
+      #pragma target "berlin"
+      push 1
+      #assemble "file.eas"
+    files:
+      file.eas:  |
+        #pragma target "paris"
+        random
+  output:
+    bytecode: '600144'
+
 comments-on-label:
   input:
     code: |
@@ -327,6 +353,17 @@ include-basic:
   output:
     bytecode: "6001 6001 01 6002 00"
 
+include-pragma-fork-disallowed:
+  input:
+    code: |
+      #include "a.evm"
+    files:
+      a.evm: |
+        #pragma target "berlin"
+  output:
+    errors:
+      - "a.evm:1: #pragma target cannot be used in #include'd files"
+
 include-depth-limit:
   input:
     code: '#include "a.evm"'
@@ -528,13 +565,32 @@ instr-macro-variable-shadow:
   output:
     bytecode: "6001 6002"
 
-opcode-bad-with-args:
+opcode-unknown-in-fork:
   input:
     code: |
+      #pragma target "berlin"
+      basefee
+  output:
+    errors:
+      - ':2: unknown op BASEFEE (target = "berlin"; added in fork "london")'
+
+opcode-removed-in-fork:
+  input:
+    code: |
+      #pragma target "shanghai"
+      difficulty
+  output:
+    errors:
+      - ':2: unknown op DIFFICULTY (target = "shanghai"; removed in fork "paris")'
+
+opcode-unknown-with-args:
+  input:
+    code: |
+      #pragma target "cancun"
       myop(foo)
   output:
     errors:
-      - ':1: unknown opcode MYOP'
+      - ':2: unknown op MYOP'
 
 opcode-known-with-args:
   input:
@@ -691,6 +747,24 @@ push0-implicit:
   output:
     bytecode: "5f"
 
+# this checks that the compiler won't emit PUSH0 if the fork doesn't support it.
+push0-implicit-not-in-fork:
+  input:
+    code: |
+      #pragma target "frontier"
+      push 0
+  output:
+    bytecode: "6000"
+
+push0-explicit-not-in-fork:
+  input:
+    code: |
+      #pragma target "berlin"
+      push0
+  output:
+    errors:
+      - ':2: unknown op PUSH0 (target = "berlin"; added in fork "shanghai")'
+
 unicode-ident:
   input:
     code: |
@@ -698,3 +772,39 @@ unicode-ident:
         PUSH @läbel
   output:
     bytecode: '5b6000'
+
+pragma-fork-dup:
+  input:
+    code: |
+      #pragma target "berlin"
+      #pragma target "berlin"
+  output:
+    errors:
+      - ":2: duplicate '#pragma target ...' directive"
+
+pragma-fork-dup-2:
+  input:
+    code: |
+      #pragma target "berlin"
+      #pragma target "cancun"
+  output:
+    errors:
+      - ":2: duplicate '#pragma target ...' directive"
+
+pragma-fork-bad-syntax:
+  input:
+    code: |
+      #pragma target = "berlin"
+      #pragma target cancun
+  output:
+    errors:
+      - ":1: unexpected = after #pragma target"
+      - ":2: #pragma option value must be string or number literal"
+
+pragma-unknown:
+  input:
+    code: |
+      #pragma something 1
+  output:
+    errors:
+      - ':1: unknown #pragma something'

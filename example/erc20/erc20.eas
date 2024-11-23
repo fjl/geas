@@ -7,6 +7,8 @@
 ;;; balance(address)          => 0x000000000000000000000000 || address
 ;;; allowance(owner, spender) => keccak(owner || spender)
 
+#pragma target "constantinople"
+
 #define %match(candidate, label) { ; [selector]
     dup1             ; [selector, selector]
     push $candidate  ; [candidate, selector, selector]

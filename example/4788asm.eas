@@ -22,6 +22,7 @@
 ;;; buflen to the timestamp's index in the first ring buffer. The sum will be
 ;;; the storage slot in the second ring buffer where it is stored.
 
+#pragma target "cancun"
 
 ;;; -----------------------------------------------------------------------------
 ;;; MACROS ----------------------------------------------------------------------

@@ -55,6 +55,10 @@ const (
 	ecNegativeResult
 	ecIncludeNoFS
 	ecIncludeDepthLimit
+	ecUnknownPragma
+	ecPragmaTargetInIncludeFile
+	ecPragmaTargetConflict
+	ecPragmaTargetUnknown
 )
 
 func (e compilerError) Error() string {
@@ -78,7 +82,7 @@ func (e compilerError) Error() string {
 	case ecJumpToUndefinedLabel:
 		return "JUMP to undefined label"
 	case ecUnknownOpcode:
-		return "unknown opcode"
+		return "unknown op"
 	case ecUndefinedVariable:
 		return "undefined macro parameter"
 	case ecUndefinedMacro:
@@ -97,6 +101,14 @@ func (e compilerError) Error() string {
 		return "#include not allowed"
 	case ecIncludeDepthLimit:
 		return "#include depth limit reached"
+	case ecUnknownPragma:
+		return "unknown #pragma"
+	case ecPragmaTargetInIncludeFile:
+		return "#pragma target cannot be used in #include'd files"
+	case ecPragmaTargetConflict:
+		return "duplicate '#pragma target ...' directive"
+	case ecPragmaTargetUnknown:
+		return "unknown #pragma target"
 	default:
 		return fmt.Sprintf("invalid error %d", e)
 	}

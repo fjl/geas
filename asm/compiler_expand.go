@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"github.com/fjl/geas/internal/ast"
+	"github.com/fjl/geas/internal/evm"
 )
 
 // expand appends a list of AST instructions to the program.
@@ -63,19 +64,16 @@ func (op opcodeStatement) expand(c *Compiler, doc *ast.Document, prog *compilerP
 	inst := newInstruction(op, opcode)
 
 	switch {
-	case isPush(opcode):
-		if opcode == "PUSH0" {
-			if op.Arg != nil {
-				return ecPushzeroWithArgument
-			}
-			break
-		}
+	case isPush(opcode) && opcode != "PUSH0":
 		if op.Arg == nil {
 			return ecPushWithoutArgument
 		}
 
 	case isJump(opcode):
 		if err := c.validateJumpArg(doc, op.Arg); err != nil {
+			return err
+		}
+		if _, err := prog.resolveOp(opcode); err != nil {
 			return err
 		}
 		// 'JUMP @label' instructions turn into 'PUSH @label' + 'JUMP'.
@@ -85,16 +83,40 @@ func (op opcodeStatement) expand(c *Compiler, doc *ast.Document, prog *compilerP
 		}
 
 	default:
-		if _, ok := inst.opcode(); !ok {
-			return fmt.Errorf("%w %s", ecUnknownOpcode, inst.op)
+		if _, err := prog.resolveOp(opcode); err != nil {
+			return err
 		}
 		if op.Arg != nil {
+			if opcode == "PUSH0" {
+				return ecPushzeroWithArgument
+			}
 			return ecUnexpectedArgument
 		}
 	}
 
 	prog.addInstruction(inst)
 	return nil
+}
+
+// resolveOp resolves an opcode name.
+func (prog *compilerProg) resolveOp(op string) (*evm.Op, error) {
+	if op := prog.evm.OpByName(op); op != nil {
+		return op, nil
+	}
+	remFork := prog.evm.ForkWhereOpRemoved(op)
+	if remFork != "" {
+		return nil, fmt.Errorf("%w %s (target = %q; removed in fork %q)", ecUnknownOpcode, op, prog.evm.Name(), remFork)
+	}
+	addedForks := evm.ForksWhereOpAdded(op)
+	if len(addedForks) > 0 {
+		list := strings.Join(addedForks, ", ")
+		fork := "fork"
+		if len(addedForks) > 1 {
+			fork += "s"
+		}
+		return nil, fmt.Errorf("%w %s (target = %q; added in %s %q)", ecUnknownOpcode, op, prog.evm.Name(), fork, list)
+	}
+	return nil, fmt.Errorf("%w %s", ecUnknownOpcode, op)
 }
 
 // validateJumpArg checks that argument to JUMP is a defined label.
@@ -216,13 +238,17 @@ func (inst assembleStatement) expand(c *Compiler, doc *ast.Document, prog *compi
 	subc := NewCompiler(c.fsys)
 	subc.SetIncludeDepthLimit(c.maxIncDepth)
 	subc.SetMaxErrors(math.MaxInt)
+	subc.SetDefaultFork(prog.evm.Name())
 
 	file, err := resolveRelative(doc.File, inst.Filename)
 	if err != nil {
 		return err
 	}
-	bytecode := c.CompileFile(file)
-	if len(c.Errors()) > 0 {
+	bytecode := subc.CompileFile(file)
+	errs := subc.Errors()
+	if len(errs) > 0 {
+		reportedErrs := errs[:min(max(c.maxErrors, 1), len(errs))]
+		c.errors = append(c.errors, reportedErrs...)
 		return nil
 	}
 	datainst := &instruction{data: bytecode}

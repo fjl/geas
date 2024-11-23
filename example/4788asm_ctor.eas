@@ -5,7 +5,9 @@
 ;;;   /_/  /_/\____/\____/\__,_/____/_/ /_/ /_/
 ;;;
 ;;; constructor code
-    
+
+#pragma target "cancun"
+
     push @.end - @.start  ; [size]
     dup1                  ; [size, size] 
     push @.start          ; [start, size, size]

@@ -27,6 +27,7 @@ import (
 	"strings"
 
 	"github.com/fjl/geas/internal/ast"
+	"github.com/fjl/geas/internal/evm"
 )
 
 // Compiler performs the assembling.
@@ -35,7 +36,7 @@ type Compiler struct {
 	lexDebug    bool
 	maxIncDepth int
 	maxErrors   int
-	usePush0    bool
+	defaultFork string
 
 	globals    *globalScope
 	errors     []error
@@ -51,7 +52,7 @@ func NewCompiler(fsys fs.FS) *Compiler {
 		includes:    make(map[*ast.IncludeSt]*ast.Document),
 		maxIncDepth: 128,
 		maxErrors:   10,
-		usePush0:    true,
+		defaultFork: evm.LatestFork,
 	}
 }
 
@@ -60,10 +61,9 @@ func (c *Compiler) SetDebugLexer(on bool) {
 	c.lexDebug = on
 }
 
-// SetUsePush0 enables/disables use of the PUSH0 instruction.
-// It's on by default.
-func (c *Compiler) SetUsePush0(on bool) {
-	c.usePush0 = on
+// SetDefaultFork sets the EVM instruction set used by default.
+func (c *Compiler) SetDefaultFork(f string) {
+	c.defaultFork = f
 }
 
 // SetDebugLexer enables/disables printing of the token stream to stdout.
@@ -135,10 +135,6 @@ func (c *Compiler) addErrors(errs []error) {
 
 // compile is the toplevel entry point into the compiler.
 func (c *Compiler) compile(doc *ast.Document) (output []byte) {
-	prevGlobals := c.globals
-	c.globals = newGlobalScope()
-	defer func() { c.globals = prevGlobals }()
-
 	defer func() {
 		panicking := recover()
 		if panicking != nil && panicking != errCancelCompilation {
@@ -146,11 +142,19 @@ func (c *Compiler) compile(doc *ast.Document) (output []byte) {
 		}
 	}()
 
+	c.globals = newGlobalScope()
+	prog := newCompilerProg(doc)
+
 	// First, load all #include files and register their definitions.
-	c.processIncludes(doc, nil)
+	// This also configures the instruction set if specified by a #pragma.
+	c.processIncludes(doc, prog, nil)
+
+	// Choose latest eth mainnet instruction set if not configured.
+	if prog.evm == nil {
+		prog.evm = evm.FindInstructionSet(c.defaultFork)
+	}
 
 	// Next, the AST document tree is expanded into a flat list of instructions.
-	prog := newCompilerProg(doc)
 	c.expand(doc, prog)
 	if prog.cur != prog.toplevel {
 		panic("section stack was not unwound by expansion")
@@ -184,38 +188,53 @@ func (c *Compiler) compile(doc *ast.Document) (output []byte) {
 }
 
 // processIncludes reads all #included documents.
-func (c *Compiler) processIncludes(doc *ast.Document, stack []ast.Statement) {
+func (c *Compiler) processIncludes(doc *ast.Document, prog *compilerProg, stack []ast.Statement) {
 	errs := c.globals.registerDefinitions(doc)
 	c.addErrors(errs)
 
 	var list []*ast.IncludeSt
-	for _, inst := range doc.Statements {
-		inc, ok := inst.(*ast.IncludeSt)
-		if !ok {
-			continue
+	for _, st := range doc.Statements {
+		switch st := st.(type) {
+		case *ast.IncludeSt:
+			file, err := resolveRelative(doc.File, st.Filename)
+			if err != nil {
+				c.addError(st, err)
+				continue
+			}
+			incdoc := c.parseIncludeFile(file, st, len(stack)+1)
+			if incdoc != nil {
+				c.includes[st] = incdoc
+				list = append(list, st)
+			}
+
+		case *ast.PragmaSt:
+			switch st.Option {
+			case "target":
+				if len(stack) != 0 {
+					c.addError(st, ecPragmaTargetInIncludeFile)
+				}
+				if prog.evm != nil {
+					c.addError(st, ecPragmaTargetConflict)
+				}
+				prog.evm = evm.FindInstructionSet(st.Value)
+				if prog.evm == nil {
+					c.addError(st, fmt.Errorf("%w %q", ecPragmaTargetUnknown, st.Value))
+				}
+			default:
+				c.addError(st, fmt.Errorf("%w %s", ecUnknownPragma, st.Option))
+			}
 		}
-		file, err := resolveRelative(doc.File, inc.Filename)
-		if err != nil {
-			c.addError(inst, err)
-			continue
-		}
-		incdoc := c.parseIncludeFile(file, inc, len(stack)+1)
-		if incdoc == nil {
-			continue // there were parse errors
-		}
-		c.includes[inc] = incdoc
-		list = append(list, inc)
 	}
 
 	// Process includes in macros.
 	for _, m := range doc.InstrMacros() {
-		c.processIncludes(m.Body, append(stack, m))
+		c.processIncludes(m.Body, prog, append(stack, m))
 	}
 
 	// Recurse.
 	for _, inst := range list {
 		incdoc := c.includes[inst]
-		c.processIncludes(incdoc, append(stack, inst))
+		c.processIncludes(incdoc, prog, append(stack, inst))
 	}
 }
 
@@ -264,19 +283,48 @@ func (c *Compiler) generateOutput(prog *compilerProg) []byte {
 	if len(c.errors) > 0 {
 		return nil
 	}
+
 	var output []byte
 	for _, inst := range prog.iterInstructions() {
 		if len(output) != inst.pc {
 			panic(fmt.Sprintf("BUG: instruction pc=%d, but output has size %d", inst.pc, len(output)))
 		}
-		if inst.op != "" {
-			opcode, ok := inst.opcode()
-			if !ok {
-				c.addError(inst.ast, fmt.Errorf("%w %s", ecUnknownOpcode, inst.op))
-				continue
+
+		switch {
+		case isPush(inst.op):
+			if inst.pushSize > 32 {
+				panic("BUG: pushSize > 32")
 			}
-			output = append(output, byte(opcode))
+			if len(inst.data) > inst.pushSize {
+				panic(fmt.Sprintf("BUG: push inst.data %d > inst.pushSize %d", len(inst.data), inst.pushSize))
+			}
+
+			// resolve the op
+			var op *evm.Op
+			if inst.op == "PUSH" {
+				op = prog.evm.PushBySize(inst.pushSize)
+			} else {
+				op = prog.evm.OpByName(inst.op)
+			}
+			if op == nil {
+				panic(fmt.Sprintf("BUG: opcode for %q (size %d) not found", inst.op, inst.pushSize))
+			}
+
+			// Add opcode and data padding to output.
+			output = append(output, op.Code)
+			if len(inst.data) < inst.pushSize {
+				output = append(output, make([]byte, inst.pushSize-len(inst.data))...)
+			}
+
+		case inst.op != "":
+			op := prog.evm.OpByName(inst.op)
+			if op == nil {
+				c.addError(inst.ast, fmt.Errorf("%w %s", ecUnknownOpcode, inst.op))
+			}
+			output = append(output, op.Code)
 		}
+
+		// Instruction data is always added to output.
 		output = append(output, inst.data...)
 	}
 	return output
