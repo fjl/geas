@@ -253,7 +253,7 @@ loop:
 		p.errors = append(p.errors, &ParseError{
 			tok:     bodyTok,
 			file:    p.doc.File,
-			err:     fmt.Errorf("legacy macro definition, please add '=' before expression"),
+			err:     fmt.Errorf("legacy definition syntax, missing '=' before expression"),
 			warning: true,
 		})
 	}
