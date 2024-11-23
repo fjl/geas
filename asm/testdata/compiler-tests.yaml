@@ -169,6 +169,20 @@ expr-macro-variable-binding-nested:
     errors:
       - ':3: undefined macro parameter $b'
 
+expr-macro-legacy-syntax:
+  input:
+    code: |
+      #define macro1 1
+      #define macro2() 2
+      #define macro3(a, b) ($a+$b)
+      PUSH macro3(macro1, macro2)
+  output:
+    bytecode: "6003"
+    warnings:
+      - ":1: warning: legacy definition syntax, missing '=' before expression"
+      - ":2: warning: legacy definition syntax, missing '=' before expression"
+      - ":3: warning: legacy definition syntax, missing '=' before expression"
+
 global-macros:
   input:
     code: |
