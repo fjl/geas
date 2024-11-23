@@ -40,6 +40,7 @@ type Compiler struct {
 
 	globals    *globalScope
 	errors     []error
+	errorCount int // count of true errors (warnings excluded)
 	macroStack map[*ast.InstructionMacroDef]struct{}
 	includes   map[*ast.IncludeSt]*ast.Document
 }
@@ -112,6 +113,17 @@ func (c *Compiler) compileSource(filename string, input []byte) []byte {
 
 // Errors returns errors that have accumulated during compilation.
 func (c *Compiler) Errors() []error {
+	s := make([]error, 0, c.errorCount)
+	for _, err := range c.errors {
+		if !IsWarning(err) {
+			s = append(s, err)
+		}
+	}
+	return c.errors
+}
+
+// ErrorsAndWarnings returns all errors and warnings which have accumulated during compilation.
+func (c *Compiler) ErrorsAndWarnings() []error {
 	return c.errors
 }
 

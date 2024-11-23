@@ -32,6 +32,18 @@ type PositionError interface {
 	Position() ast.Position
 }
 
+// Warning is implemented by errors which are warnings.
+type Warning interface {
+	error
+	Warning()
+}
+
+// IsWarning reports whether an error is a warning.
+func IsWarning(err error) bool {
+	var w Warning
+	return errors.As(err, &w)
+}
+
 // compilerErrorCode represents an error detected by the compiler.
 type compilerError int
 
