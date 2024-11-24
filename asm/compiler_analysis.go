@@ -18,25 +18,38 @@ package asm
 
 import (
 	"github.com/fjl/geas/internal/ast"
+	"github.com/fjl/geas/internal/set"
 )
 
 // checkLabelsUsed warns about label definitions that were not hit by the evaluator.
-func (c *Compiler) checkLabelsUsed(doc *ast.Document, e *evaluator) {
-	stack := []*ast.Document{doc}
-	for len(stack) > 0 {
-		top := stack[len(stack)-1]
-		for _, st := range top.Statements {
+func (c *Compiler) checkLabelsUsed(prog *compilerProg, e *evaluator) {
+	// Gather documents referenced by program.
+	var docs []*ast.Document
+	docset := make(set.Set[*ast.Document])
+	macroset := make(set.Set[*ast.InstructionMacroDef])
+	for section := range prog.iterSections() {
+		// Ensure to walk macroexpansions only once.
+		if section.macroArgs != nil {
+			if macroset.Includes(section.macroArgs.def) {
+				continue
+			}
+			macroset.Add(section.macroArgs.def)
+		}
+		if !docset.Includes(section.doc) {
+			docset.Add(section.doc)
+			docs = append(docs, section.doc)
+		}
+	}
+
+	// Check against evaluator.
+	for _, doc := range docs {
+		for _, st := range doc.Statements {
 			switch st := st.(type) {
 			case *ast.LabelDefSt:
 				if !e.isLabelUsed(st) {
 					c.warnf(st, "label %s unused in program", st)
 				}
-			case *ast.IncludeSt:
-				if incdoc := c.includes[st]; incdoc != nil {
-					stack = append(stack, incdoc)
-				}
 			}
 		}
-		stack = stack[1:]
 	}
 }

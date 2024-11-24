@@ -192,7 +192,7 @@ func (c *Compiler) compileDocument(doc *ast.Document) (output []byte) {
 
 	// Run analysis. Note this is also disabled if there are errors because there could
 	// be lots of useless warnings otherwise.
-	c.checkLabelsUsed(doc, e)
+	c.checkLabelsUsed(prog, e)
 
 	// Create the bytecode.
 	return c.generateOutput(prog)

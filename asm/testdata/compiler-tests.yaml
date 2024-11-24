@@ -859,3 +859,17 @@ unused-label-in-include:
     bytecode: "5b600160020160035b600056"
     warnings:
       - 'label.evm:2: warning: label @label unused in program'
+
+unused-label-in-macroexpansion:
+  input:
+    code: |
+      #define %mac {
+      loop:
+        push 1
+      }
+      %mac
+      %mac ;; should only warn once
+  output:
+    bytecode: "5b60015b6001"
+    warnings:
+      - ':2: warning: label @loop unused in program'

@@ -18,6 +18,7 @@ package asm
 
 import (
 	"iter"
+	"slices"
 	"strings"
 
 	"github.com/fjl/geas/internal/ast"
@@ -113,6 +114,25 @@ func (p *compilerProg) iterInstructions() iter.Seq2[*compilerSection, *instructi
 				}
 			}
 			stack = stack[:len(stack)-1]
+		}
+	}
+}
+
+// iterSections returns an iterator over all sections in the program.
+func (p *compilerProg) iterSections() iter.Seq[*compilerSection] {
+	stack := []*compilerSection{p.toplevel}
+	return func(yield func(*compilerSection) bool) {
+		for len(stack) > 0 {
+			section := stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
+			if !yield(section) {
+				return
+			}
+			for _, cld := range slices.Backward(section.children) {
+				if clds, ok := cld.(*compilerSection); ok {
+					stack = append(stack, clds)
+				}
+			}
 		}
 	}
 }
