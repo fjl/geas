@@ -41,9 +41,8 @@
 }
 
 ;;; -----------------------------------------------------------------------------
-;;; MACROS END ------------------------------------------------------------------
+;;; PROGRAM START----------------------------------------------------------------
 
-.start:
     ;; Protect the submit routine by verifying the caller is equal to sysaddr.
     caller           ; [caller]
     push sysaddr     ; [sysaddr, caller]
