@@ -436,11 +436,11 @@ instr-macro-def-with-params:
         add
       }
 
-      stop
+      div
       %myInstrMacro(1, 2)
       mul
   output:
-    bytecode: "00 6002 6004 01 02"
+    bytecode: "04 6002 6004 01 02"
 
 instr-macro-def-missing-percent:
   input:
@@ -464,11 +464,11 @@ instr-macro-def-without-params:
         add
       }
 
-      stop
+      div
       %myInstrMacro
       mul
   output:
-    bytecode: "00 6001 6002 01 02"
+    bytecode: "04 6001 6002 01 02"
 
 instr-macro-include:
   input:
@@ -489,31 +489,32 @@ instr-macro-inner-label:
   input:
     code: |
       #define %hasInnerLabel() {
-        jump @theLabel
+        jumpi @theLabel
         push 2
       theLabel:
       }
 
+      push 1
       %hasInnerLabel()
       push 1
       theLabel: stop
   output:
-    bytecode: "6005 56 6002 5b 6001 5b 00"
+    bytecode: "6001 6007 57 6002 5b 6001 5b 00"
     warnings:
-      - ':9: warning: label @theLabel unused in program'
+      - ':10: warning: label @theLabel unused in program'
 
 instr-macro-outer-label:
   input:
     code: |
       #define %jumpToOuter() {
-        jump @outer
+        jumpi @outer
       }
-      stop
-      %jumpToOuter()
       push 1
+      %jumpToOuter()
+      push 2
       outer: stop
   output:
-    bytecode: "00 6006 56 6001 5b 00"
+    bytecode: "6001 6007 57 6002 5b 00"
 
 instr-macro-global-ref-local:
   input:
@@ -870,6 +871,49 @@ unused-label-in-macroexpansion:
       %mac
       %mac ;; should only warn once
   output:
-    bytecode: "5b60015b6001"
+    bytecode: "5b 6001 5b 6001"
     warnings:
       - ':2: warning: label @loop unused in program'
+
+unreachable-code-stop:
+  input:
+    code: |
+      push 1
+      push 2
+      stop
+      add
+  output:
+    bytecode: "6001 6002 00 01"
+    warnings:
+      - ":4: warning: unreachable code (previous instruction is STOP at :3)"
+
+unreachable-code-jump:
+  input:
+    code: |
+      push 1
+      push 2
+      jump @label
+      add
+      label:
+  output:
+    bytecode: "6001 6002 6008 56 01 5b"
+    warnings:
+      - ":4: warning: unreachable code (previous instruction is JUMP at :3)"
+
+unreachable-code-warning-in-macro:
+  input:
+    code: |
+      #define %mac {
+      #include "foo.eas"
+          push 1
+          push 2
+          add
+      }
+      %mac
+    files:
+      foo.eas: |
+        stop
+  output:
+    bytecode: "00 6001 6002 01"
+    warnings:
+      - ":3: warning: unreachable code (previous instruction is STOP at foo.eas:1)"

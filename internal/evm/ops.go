@@ -20,11 +20,15 @@ package evm
 type Op struct {
 	Name string
 	Code byte
+
+	// Flags:
+	// - Term is set for instructions that end execution.
+	Term, UnconditionalJump bool
 }
 
 // This is the list of all opcodes.
 var oplist = []*Op{
-	{Name: "STOP", Code: 0x0},
+	{Name: "STOP", Code: 0x0, Term: true},
 	{Name: "ADD", Code: 0x1},
 	{Name: "MUL", Code: 0x2},
 	{Name: "SUB", Code: 0x3},
@@ -84,7 +88,7 @@ var oplist = []*Op{
 	{Name: "MSTORE8", Code: 0x53},
 	{Name: "SLOAD", Code: 0x54},
 	{Name: "SSTORE", Code: 0x55},
-	{Name: "JUMP", Code: 0x56},
+	{Name: "JUMP", Code: 0x56, UnconditionalJump: true},
 	{Name: "JUMPI", Code: 0x57},
 	{Name: "PC", Code: 0x58},
 	{Name: "MSIZE", Code: 0x59},
@@ -166,13 +170,13 @@ var oplist = []*Op{
 	{Name: "CREATE", Code: 0xf0},
 	{Name: "CALL", Code: 0xf1},
 	{Name: "CALLCODE", Code: 0xf2},
-	{Name: "RETURN", Code: 0xf3},
+	{Name: "RETURN", Code: 0xf3, Term: true},
 	{Name: "DELEGATECALL", Code: 0xf4},
 	{Name: "CREATE2", Code: 0xf5},
 	{Name: "STATICCALL", Code: 0xfa},
-	{Name: "REVERT", Code: 0xfd},
-	{Name: "SELFDESTRUCT", Code: 0xff},
-	{Name: "SENDALL", Code: 0xff},
+	{Name: "REVERT", Code: 0xfd, Term: true},
+	{Name: "SELFDESTRUCT", Code: 0xff, Term: true},
+	{Name: "SENDALL", Code: 0xff, Term: true},
 }
 
 var opm = computeOpsMap()

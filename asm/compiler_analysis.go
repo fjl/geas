@@ -18,6 +18,7 @@ package asm
 
 import (
 	"github.com/fjl/geas/internal/ast"
+	"github.com/fjl/geas/internal/evm"
 	"github.com/fjl/geas/internal/set"
 )
 
@@ -52,4 +53,24 @@ func (c *Compiler) checkLabelsUsed(prog *compilerProg, e *evaluator) {
 			}
 		}
 	}
+}
+
+// unreachableCodeCheck finds instructions that cannot be reached by execution.
+// In the EVM, all jump targets must be marked by JUMPDEST. For terminal instructions
+// such as STOP, if the next instruction isn't JUMPDEST, it can never be reached.
+type unreachableCodeCheck struct {
+	prevSt        ast.Statement
+	prevOp        *evm.Op
+	inUnreachable bool
+}
+
+func (chk *unreachableCodeCheck) check(c *Compiler, st ast.Statement, op *evm.Op) {
+	if chk.inUnreachable && op.Name == "JUMPDEST" {
+		chk.inUnreachable = false
+	}
+	if chk.prevOp != nil && (chk.prevOp.Term || chk.prevOp.UnconditionalJump) && op.Name != "JUMPDEST" {
+		c.warnf(st, "unreachable code (previous instruction is %s at %v)", chk.prevOp.Name, chk.prevSt.Position())
+		chk.inUnreachable = true
+	}
+	chk.prevSt, chk.prevOp = st, op
 }

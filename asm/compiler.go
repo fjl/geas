@@ -288,6 +288,7 @@ func (c *Compiler) parseIncludeFile(file string, inst *ast.IncludeSt, depth int)
 
 // generateOutput creates the bytecode. This is also where instruction names get resolved.
 func (c *Compiler) generateOutput(prog *compilerProg) []byte {
+	var unreachable unreachableCodeCheck
 	var output []byte
 	for _, inst := range prog.iterInstructions() {
 		if len(output) != inst.pc {
@@ -314,6 +315,11 @@ func (c *Compiler) generateOutput(prog *compilerProg) []byte {
 				panic(fmt.Sprintf("BUG: opcode for %q (size %d) not found", inst.op, inst.pushSize))
 			}
 
+			// Unreachable code check.
+			if !c.errors.hasError() {
+				unreachable.check(c, inst.ast, op)
+			}
+
 			// Add opcode and data padding to output.
 			output = append(output, op.Code)
 			if len(inst.data) < inst.pushSize {
@@ -324,6 +330,10 @@ func (c *Compiler) generateOutput(prog *compilerProg) []byte {
 			op := prog.evm.OpByName(inst.op)
 			if op == nil {
 				c.errorAt(inst.ast, fmt.Errorf("%w %s", ecUnknownOpcode, inst.op))
+			}
+			// Unreachable code check.
+			if !c.errors.hasError() {
+				unreachable.check(c, inst.ast, op)
 			}
 			output = append(output, op.Code)
 		}
