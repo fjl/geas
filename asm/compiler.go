@@ -35,14 +35,12 @@ type Compiler struct {
 	fsys        fs.FS
 	lexDebug    bool
 	maxIncDepth int
-	maxErrors   int
 	defaultFork string
 
-	globals         *globalScope
-	errorCount      int // count of true errors (warnings excluded)
-	errsAndWarnings []error
-	macroStack      map[*ast.InstructionMacroDef]struct{}
-	includes        map[*ast.IncludeSt]*ast.Document
+	globals    *globalScope
+	macroStack map[*ast.InstructionMacroDef]struct{}
+	includes   map[*ast.IncludeSt]*ast.Document
+	errors     errorList
 }
 
 // NewCompiler creates a compiler. The passed file system is used to resolve import file names.
@@ -52,8 +50,8 @@ func NewCompiler(fsys fs.FS) *Compiler {
 		macroStack:  make(map[*ast.InstructionMacroDef]struct{}),
 		includes:    make(map[*ast.IncludeSt]*ast.Document),
 		maxIncDepth: 128,
-		maxErrors:   10,
 		defaultFork: evm.LatestFork,
+		errors:      errorList{maxErrors: 10},
 	}
 }
 
@@ -77,13 +75,15 @@ func (c *Compiler) SetMaxErrors(limit int) {
 	if limit < 1 {
 		limit = 1
 	}
-	c.maxErrors = limit
+	c.errors.maxErrors = limit
 }
 
 // CompileString compiles the given program text and returns the corresponding bytecode.
 // If compilation fails, the returned slice is nil. Use the Errors method to get
 // parsing/compilation errors.
 func (c *Compiler) CompileString(input string) []byte {
+	defer c.errors.catchAbort()
+
 	return c.compileSource("", []byte(input))
 }
 
@@ -91,9 +91,11 @@ func (c *Compiler) CompileString(input string) []byte {
 // If compilation fails, the returned slice is nil. Use the Errors method to get
 // parsing/compilation errors.
 func (c *Compiler) CompileFile(filename string) []byte {
+	defer c.errors.catchAbort()
+
 	content, err := fs.ReadFile(c.fsys, filename)
 	if err != nil {
-		c.errsAndWarnings = append(c.errsAndWarnings, err)
+		c.errors.add(err)
 		return nil
 	}
 	return c.compileSource(filename, content)
@@ -101,67 +103,36 @@ func (c *Compiler) CompileFile(filename string) []byte {
 
 // Errors returns errors that have accumulated during compilation.
 func (c *Compiler) Errors() []error {
-	s := make([]error, 0, c.errorCount)
-	for _, err := range c.errsAndWarnings {
-		if !IsWarning(err) {
-			s = append(s, err)
-		}
-	}
-	return s
+	return c.errors.errors()
 }
 
 // Warnings returns all warnings that have accumulated during compilation.
 func (c *Compiler) Warnings() []error {
-	var s []error
-	for _, err := range c.errsAndWarnings {
-		if IsWarning(err) {
-			s = append(s, err)
-		}
-	}
-	return s
+	return c.errors.warnings()
 }
 
 // Failed reports whether compilation has failed.
 func (c *Compiler) Failed() bool {
-	return c.errorCount > 0
+	return c.errors.numErrors > 0
 }
 
 // ErrorsAndWarnings returns all errors and warnings which have accumulated during compilation.
 func (c *Compiler) ErrorsAndWarnings() []error {
-	return c.errsAndWarnings
+	return c.errors.list
 }
 
 // errorAt pushes an error to the compiler error list.
 func (c *Compiler) errorAt(inst ast.Statement, err error) {
-	c.addError(&astError{inst: inst, err: err})
-}
-
-// addErrors adds multiple errors to the compiler error list.
-// This aborts compilation when the error list grows too large.
-func (c *Compiler) addError(err error) {
-	c.errsAndWarnings = append(c.errsAndWarnings, err)
-	if !IsWarning(err) {
-		c.errorCount++
+	if err == nil {
+		panic("BUG: errorAt(st, nil)")
 	}
-	if c.errorCount > c.maxErrors {
-		panic(errCancelCompilation)
-	}
+	c.errors.add(&astError{inst: inst, err: err})
 }
 
 func (c *Compiler) compileSource(filename string, input []byte) []byte {
-	defer func() {
-		panicking := recover()
-		if panicking != nil && panicking != errCancelCompilation {
-			panic(panicking)
-		}
-	}()
-
 	p := ast.NewParser(filename, input, c.lexDebug)
 	doc, errs := p.Parse()
-	for _, err := range errs {
-		c.addError(err)
-	}
-	if c.errorCount > 0 {
+	if c.errors.addParseErrors(errs) {
 		return nil // abort compilation due to failed parse
 	}
 	return c.compileDocument(doc)
@@ -203,10 +174,9 @@ func (c *Compiler) compileDocument(doc *ast.Document) (output []byte) {
 			if errors.Is(err, ecVariablePushOverflow) {
 				failedInst.pushSize += 1
 				continue // try again
-			} else if err != nil {
-				c.errorAt(failedInst.ast, err)
-				break // there was some other error
 			}
+			c.errorAt(failedInst.ast, err)
+			break // there was some other error
 		}
 		break
 	}
@@ -217,9 +187,7 @@ func (c *Compiler) compileDocument(doc *ast.Document) (output []byte) {
 // processIncludes reads all #included documents.
 func (c *Compiler) processIncludes(doc *ast.Document, prog *compilerProg, stack []ast.Statement) {
 	errs := c.globals.registerDefinitions(doc)
-	for _, err := range errs {
-		c.addError(err)
-	}
+	c.errors.add(errs...)
 
 	var list []*ast.IncludeSt
 	for _, st := range doc.Statements {
@@ -292,10 +260,7 @@ func (c *Compiler) parseIncludeFile(file string, inst *ast.IncludeSt, depth int)
 	}
 	p := ast.NewParser(file, content, c.lexDebug)
 	doc, errors := p.Parse()
-	for _, err := range errors {
-		c.addError(err)
-	}
-	if c.errorCount > 0 {
+	if c.errors.addParseErrors(errors) {
 		return nil
 	}
 	// Note that included documents do NOT have the including document set as Parent.
@@ -309,7 +274,7 @@ func (c *Compiler) parseIncludeFile(file string, inst *ast.IncludeSt, depth int)
 
 // generateOutput creates the bytecode. This is also where instruction names get resolved.
 func (c *Compiler) generateOutput(prog *compilerProg) []byte {
-	if c.errorCount > 0 {
+	if c.errors.hasError() {
 		// Refuse to output if source had errors.
 		return nil
 	}

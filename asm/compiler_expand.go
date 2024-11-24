@@ -245,9 +245,7 @@ func (inst assembleStatement) expand(c *Compiler, doc *ast.Document, prog *compi
 		return err
 	}
 	bytecode := subc.CompileFile(file)
-	for _, err := range subc.ErrorsAndWarnings() {
-		c.addError(err)
-	}
+	c.errors.add(subc.ErrorsAndWarnings()...)
 	if len(bytecode) > 0 {
 		datainst := &instruction{data: bytecode}
 		prog.addInstruction(datainst)
