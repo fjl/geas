@@ -5,6 +5,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/fjl/geas/internal/set"
 )
 
 func TestOps(t *testing.T) {
@@ -18,13 +20,13 @@ func TestOps(t *testing.T) {
 	// Check all ops are used in a fork.
 	// First compute set of used op names.
 	defnames := slices.Sorted(maps.Keys(forkReg))
-	used := make(set[string], len(oplist))
+	used := make(set.Set[string], len(oplist))
 	for _, name := range defnames {
 		for _, op := range forkReg[name].Added {
-			used.add(op.Name)
+			used.Add(op.Name)
 		}
 	}
-	usedopnames := used.members()
+	usedopnames := used.Members()
 	slices.Sort(usedopnames)
 	// Now compute sorted list of all ops.
 	allopnames := make([]string, len(oplist))
@@ -33,7 +35,7 @@ func TestOps(t *testing.T) {
 	}
 	slices.Sort(allopnames)
 	// Compare.
-	d := diff(allopnames, usedopnames)
+	d := set.Diff(allopnames, usedopnames)
 	if len(d) > 0 {
 		t.Error("unused ops:", d)
 	}
@@ -123,19 +125,4 @@ func TestForksWhereOpAdded(t *testing.T) {
 	if !slices.Equal(f, []string{"london"}) {
 		t.Fatalf("wrong list for BASEFEE: %v", f)
 	}
-}
-
-// diff returns the elements of a which are not in b.
-func diff[X comparable](a, b []X) []X {
-	set := make(set[X], len(b))
-	for _, x := range b {
-		set.add(x)
-	}
-	var diff []X
-	for _, x := range a {
-		if !set.includes(x) {
-			diff = append(diff, x)
-		}
-	}
-	return diff
 }

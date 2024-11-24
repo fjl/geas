@@ -18,10 +18,11 @@ package evm
 
 import (
 	"fmt"
-	"maps"
 	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/fjl/geas/internal/set"
 )
 
 // InstructionSetDef is the definition of an EVM instruction set.
@@ -105,13 +106,13 @@ func (is *InstructionSet) ForkWhereOpRemoved(op string) string {
 
 // lineage computes the definition chain of an instruction set.
 func (def *InstructionSetDef) lineage() ([]*InstructionSetDef, error) {
-	var visited = make(set[*InstructionSetDef])
+	var visited = make(set.Set[*InstructionSetDef])
 	var lin []*InstructionSetDef
 	for {
-		if visited.includes(def) {
+		if visited.Includes(def) {
 			return nil, fmt.Errorf("instruction set parent cycle: %s <- %s", lin[len(lin)-1].Name(), def.Name())
 		}
-		visited.add(def)
+		visited.Add(def)
 		lin = append(lin, def)
 
 		if def.Parent == "" {
@@ -180,21 +181,4 @@ func computeOpAddedInFork() map[string][]string {
 // If this returns nil, op is invalid.
 func ForksWhereOpAdded(op string) []string {
 	return opAddedInForkMap[op]
-}
-
-// set is a wrapper over map.
-// I don't want to depend on a set library just for this.
-type set[X comparable] map[X]struct{}
-
-func (s set[X]) add(k X) {
-	s[k] = struct{}{}
-}
-
-func (s set[X]) includes(k X) bool {
-	_, ok := s[k]
-	return ok
-}
-
-func (s set[X]) members() []X {
-	return slices.Collect(maps.Keys(s))
 }
