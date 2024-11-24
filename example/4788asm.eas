@@ -28,10 +28,10 @@
 ;;; MACROS ----------------------------------------------------------------------
 
 ;;; aka. HISTORY_BUFFER_LENGTH as defined in the EIP.
-#define buflen 93600
+#define buflen = 93600
 
 ;;; sysaddr is the address which calls the contract to submit a new root.
-#define sysaddr .address(0xfffffffffffffffffffffffffffffffffffffffe)
+#define sysaddr = .address(0xfffffffffffffffffffffffffffffffffffffffe)
 
 ;;; %do_revert sets up and then executes a revert(0,0) operation.
 #define %do_revert {
