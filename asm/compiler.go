@@ -126,7 +126,12 @@ func (c *Compiler) errorAt(inst ast.Statement, err error) {
 	if err == nil {
 		panic("BUG: errorAt(st, nil)")
 	}
-	c.errors.add(&astError{inst: inst, err: err})
+	c.errors.add(&statementError{inst: inst, err: err})
+}
+
+// warnf pushes a warning to the error list.
+func (c *Compiler) warnf(inst ast.Statement, format string, args ...any) {
+	c.errors.add(&simpleWarning{pos: inst.Position(), str: fmt.Sprintf(format, args...)})
 }
 
 func (c *Compiler) compileSource(filename string, input []byte) []byte {
@@ -181,6 +186,15 @@ func (c *Compiler) compileDocument(doc *ast.Document) (output []byte) {
 		break
 	}
 
+	if c.errors.hasError() {
+		return nil // no output if source has errors
+	}
+
+	// Run analysis. Note this is also disabled if there are errors because there could
+	// be lots of useless warnings otherwise.
+	c.checkLabelsUsed(doc, e)
+
+	// Create the bytecode.
 	return c.generateOutput(prog)
 }
 
@@ -274,11 +288,6 @@ func (c *Compiler) parseIncludeFile(file string, inst *ast.IncludeSt, depth int)
 
 // generateOutput creates the bytecode. This is also where instruction names get resolved.
 func (c *Compiler) generateOutput(prog *compilerProg) []byte {
-	if c.errors.hasError() {
-		// Refuse to output if source had errors.
-		return nil
-	}
-
 	var output []byte
 	for _, inst := range prog.iterInstructions() {
 		if len(output) != inst.pc {

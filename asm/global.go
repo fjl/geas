@@ -78,7 +78,7 @@ func (gs *globalScope) registerLabel(def *ast.LabelDefSt, doc *ast.Document) {
 func (gs *globalScope) registerInstrMacro(name string, def globalDef[*ast.InstructionMacroDef]) error {
 	firstDef, found := gs.instrMacro[name]
 	if found {
-		return &astError{
+		return &statementError{
 			inst: def.def,
 			err:  fmt.Errorf("macro %%%s already defined%s", name, firstDef.doc.CreationString()),
 		}
@@ -91,7 +91,7 @@ func (gs *globalScope) registerInstrMacro(name string, def globalDef[*ast.Instru
 func (gs *globalScope) registerExprMacro(name string, def globalDef[*ast.ExpressionMacroDef]) error {
 	firstDef, found := gs.exprMacro[name]
 	if found {
-		return &astError{
+		return &statementError{
 			inst: def.def,
 			err:  fmt.Errorf("macro %s already defined%s", name, firstDef.doc.CreationString()),
 		}

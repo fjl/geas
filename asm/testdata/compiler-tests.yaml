@@ -499,6 +499,8 @@ instr-macro-inner-label:
       theLabel: stop
   output:
     bytecode: "6005 56 6002 5b 6001 5b 00"
+    warnings:
+      - ':9: warning: label @theLabel unused in program'
 
 instr-macro-outer-label:
   input:
@@ -686,34 +688,37 @@ macro-call:
   input:
     code: |
       #define myMacro(a, b) = (100 + $a) / $b
-      start: PUSH myMacro(4, 2)
+      ADD
+      PUSH myMacro(4, 2)
   output:
-    bytecode: "5b 6034"
+    bytecode: "01 6034"
 
 macro-ref:
   input:
     code: |
       #define myMacro = 100
-      start:
+      ADD
       PUSH myMacro
   output:
-    bytecode: "5b 60 64"
+    bytecode: "01 60 64"
 
 macro-ref-call-empty:
   input:
     code: |
       #define myMacro() = 100
-      start: PUSH myMacro
+      ADD
+      PUSH myMacro
   output:
-    bytecode: "5b 6064"
+    bytecode: "01 6064"
 
 macro-ref-call-empty-2:
   input:
     code: |
       #define myMacro = 100
-      start: PUSH myMacro()
+      ADD
+      PUSH myMacro()
   output:
-    bytecode: 5b 6064
+    bytecode: 01 6064
 
 push-expression:
   input:
@@ -822,3 +827,35 @@ pragma-unknown:
   output:
     errors:
       - ':1: unknown #pragma something'
+
+unused-label-warning:
+  input:
+    code: |
+      top:
+        push 1
+        push 2
+        add
+        jump @top
+      end:
+  output:
+    bytecode: "5b60016002016000565b"
+    warnings:
+      - ':6: warning: label @end unused in program'
+
+unused-label-in-include:
+  input:
+    code: |
+      top:
+        push 1
+        push 2
+        add
+      #include "label.evm"
+        jump @top
+    files:
+      label.evm: |
+        push 3
+        label:
+  output:
+    bytecode: "5b600160020160035b600056"
+    warnings:
+      - 'label.evm:2: warning: label @label unused in program'

@@ -28,9 +28,10 @@ import (
 
 // evaluator is for evaluating expressions.
 type evaluator struct {
-	inStack map[*ast.ExpressionMacroDef]struct{}
-	labelPC map[evalLabelKey]int
-	globals *globalScope
+	inStack    map[*ast.ExpressionMacroDef]struct{}
+	labelPC    map[evalLabelKey]int
+	usedLabels map[*ast.LabelDefSt]struct{}
+	globals    *globalScope
 }
 
 type evalLabelKey struct {
@@ -46,9 +47,10 @@ type evalEnvironment struct {
 
 func newEvaluator(gs *globalScope) *evaluator {
 	return &evaluator{
-		inStack: make(map[*ast.ExpressionMacroDef]struct{}),
-		labelPC: make(map[evalLabelKey]int),
-		globals: gs,
+		inStack:    make(map[*ast.ExpressionMacroDef]struct{}),
+		labelPC:    make(map[evalLabelKey]int),
+		usedLabels: make(map[*ast.LabelDefSt]struct{}),
+		globals:    gs,
 	}
 }
 
@@ -95,7 +97,15 @@ func (e *evaluator) lookupLabel(doc *ast.Document, lref *ast.LabelRefExpr) (pc i
 	if li.Dotted != lref.Dotted {
 		return 0, false, fmt.Errorf("undefined label %v (but %v exists)", lref, li)
 	}
+	// mark label used (for unused label analysis)
+	e.usedLabels[li] = struct{}{}
 	return pc, pcValid, nil
+}
+
+// isLabelUsed reports whether the given label definition was used during expression evaluation.
+func (e *evaluator) isLabelUsed(li *ast.LabelDefSt) bool {
+	_, ok := e.usedLabels[li]
+	return ok
 }
 
 func (e *evaluator) eval(expr ast.Expr, env *evalEnvironment) (*big.Int, error) {

@@ -114,22 +114,36 @@ func (e compilerError) Error() string {
 	}
 }
 
-// astError is an error related to an assembler instruction.
-type astError struct {
+// statementError is an error related to an assembler instruction.
+type statementError struct {
 	inst ast.Statement
 	err  error
 }
 
-func (e *astError) Position() ast.Position {
+func (e *statementError) Position() ast.Position {
 	return e.inst.Position()
 }
 
-func (e *astError) Unwrap() error {
+func (e *statementError) Unwrap() error {
 	return e.err
 }
 
-func (e *astError) Error() string {
+func (e *statementError) Error() string {
 	return fmt.Sprintf("%v: %s", e.inst.Position(), e.err.Error())
+}
+
+// simpleWarning is a warning issued by the compiler.
+type simpleWarning struct {
+	pos ast.Position
+	str string
+}
+
+func (e *simpleWarning) Error() string {
+	return fmt.Sprintf("%v: warning: %s", e.pos, e.str)
+}
+
+func (e *simpleWarning) IsWarning() bool {
+	return true
 }
 
 // unassignedLabelError signals use of a label that doesn't have a valid PC.
