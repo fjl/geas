@@ -48,10 +48,10 @@ func main() {
 
 	c := asm.NewCompiler(os.DirFS("."))
 	bin := c.CompileFile(file)
-	if len(c.Errors()) > 0 {
-		for _, err := range c.Errors() {
-			fmt.Fprintln(os.Stderr, err)
-		}
+	for _, err := range c.ErrorsAndWarnings() {
+		fmt.Fprintln(os.Stderr, err)
+	}
+	if c.Failed() {
 		os.Exit(1)
 	}
 

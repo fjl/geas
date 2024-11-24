@@ -93,8 +93,8 @@ label1:
 .label2:
 Label3:
 .Label4:
-#define macro3() 3
-#define macroFunc(a) $a
+#define macro3() = 3
+#define macroFunc(a) = $a
 `
 	doc, errs := ast.NewParser("", []byte(source), false).Parse()
 	if len(errs) != 0 {

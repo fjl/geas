@@ -17,7 +17,7 @@ assemble-directive-and-globals:
   # this reproduces an issue where global definitions got destroyed by #assemble
   input:
     code: |
-      #define Global 1
+      #define Global = 1
       push 1
       push Global
       add
@@ -33,7 +33,7 @@ assemble-directive-and-globals:
 assemble-directive-globals-not-shared:
   input:
     code: |
-      #define Global 1
+      #define Global = 1
       push 1
       push Global
       add
@@ -105,7 +105,7 @@ dot-label-begin:
 expr-macro-passing-literal-to-builtin:
   input:
     code: |
-      #define customMacro(x) .address(x) + 2
+      #define customMacro(x) = .address(x) + 2
       PUSH customMacro(0x658bdf435d810c91414ec09147daa6db62406379)
   output:
     errors:
@@ -114,8 +114,8 @@ expr-macro-passing-literal-to-builtin:
 expr-macro-recursion:
   input:
     code: |
-      #define rec(a) rec(a+1) + 2
-      #define parent(x) rec(5)
+      #define rec(a) = rec(a+1) + 2
+      #define parent(x) = rec(5)
       PUSH parent(1)
   output:
     errors:
@@ -124,11 +124,11 @@ expr-macro-recursion:
 expr-macro-redefine-builtin:
   input:
     code: |
-      #define .Address(x) x*2
+      #define .Address(x) = x*2
       PUSH .Address(0x2)
   output:
     errors:
-      - ':1: unexpected dottedIdentifier Address'
+      - ':1: attempt to redefine builtin macro .Address'
 
 expr-macro-undefined:
   input:
@@ -162,12 +162,26 @@ expr-macro-undefined-in-label-expr2:
 expr-macro-variable-binding-nested:
   input:
     code: |
-      #define leaf(a) $b+1
-      #define parent(a, b) leaf(10)
+      #define leaf(a) = $b+1
+      #define parent(a, b) = leaf(10)
       PUSH parent(1, 2)
   output:
     errors:
       - ':3: undefined macro parameter $b'
+
+expr-macro-legacy-syntax:
+  input:
+    code: |
+      #define macro1 1
+      #define macro2() 2
+      #define macro3(a, b) ($a+$b)
+      PUSH macro3(macro1, macro2)
+  output:
+    bytecode: "6003"
+    warnings:
+      - ":1: warning: legacy definition syntax, missing '=' before expression"
+      - ":2: warning: legacy definition syntax, missing '=' before expression"
+      - ":3: warning: legacy definition syntax, missing '=' before expression"
 
 global-macros:
   input:
@@ -181,7 +195,7 @@ global-macros:
         #define %DoPush(x) {
           push $x
         }
-        #define Calculate(x) $x*10
+        #define Calculate(x) = $x*10
   output:
     bytecode: "60646004"
 
@@ -208,7 +222,7 @@ global-macros-include-after:
         #define %DoPush(x) {
           push $x
         }
-        #define Calculate(x) $x*10
+        #define Calculate(x) = $x*10
   output:
     bytecode: "60646004"
 
@@ -333,7 +347,7 @@ global-macro-redefine:
           add
         }
       expr.evm: |
-        #define EMAC 12
+        #define EMAC = 12
   output:
     errors:
       - 'instr.evm:1: macro %IMAC already defined by #include "instr.evm" at :1'
@@ -383,14 +397,14 @@ include-macro-private:
       #include "b.evm"
     files:
       a.evm: |
-        #define em(x) 1
+        #define em(x) = 1
         #define %im(x) {
           push em(5)
           add
         }
         %im(5)
       b.evm: |
-        #define em(x) 2
+        #define em(x) = 2
         #define %im(x) {
           push em(5)
           sub
@@ -439,7 +453,7 @@ instr-macro-def-missing-percent:
   output:
     errors:
       - ':1: unexpected { in expression macro definition'
-      - ':5: unexpected closeBrace }'
+      - ':5: unexpected closing brace }'
 
 instr-macro-def-without-params:
   input:
@@ -536,7 +550,7 @@ instr-macro-redefine-builtin:
       %address(0x2)
   output:
     errors:
-      - ':1: unexpected dottedIdentifier address'
+      - ':1: attempt to redefine builtin macro .address'
 
 instr-macro-use-multiple-times:
   input:
@@ -671,7 +685,7 @@ label-same-line-as-inst:
 macro-call:
   input:
     code: |
-      #define myMacro(a, b) (100 + $a) / $b
+      #define myMacro(a, b) = (100 + $a) / $b
       start: PUSH myMacro(4, 2)
   output:
     bytecode: "5b 6034"
@@ -679,7 +693,7 @@ macro-call:
 macro-ref:
   input:
     code: |
-      #define myMacro 100
+      #define myMacro = 100
       start:
       PUSH myMacro
   output:
@@ -688,7 +702,7 @@ macro-ref:
 macro-ref-call-empty:
   input:
     code: |
-      #define myMacro() 100
+      #define myMacro() = 100
       start: PUSH myMacro
   output:
     bytecode: "5b 6064"
@@ -696,7 +710,7 @@ macro-ref-call-empty:
 macro-ref-call-empty-2:
   input:
     code: |
-      #define myMacro 100
+      #define myMacro = 100
       start: PUSH myMacro()
   output:
     bytecode: 5b 6064

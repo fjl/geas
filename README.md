@@ -105,8 +105,8 @@ PUSH argument expressions.
 Macros can have parameters. Refer to parameter values using the dollar sign ($) prefix
 within the macro.
 
-    #define z 0x8823
-    #define myexpr(x, y)  ($x + $y) * z
+    #define z = 0x8823
+    #define myexpr(x, y) = ($x + $y) * z
 
         push myexpr(1, 2)
 
@@ -132,7 +132,7 @@ and builtin macros cannot be redefined. Available builtins include:
 `.address()` for declaring contract addresses. The checksum and byte length of the address
 are verified.
 
-    #define otherContract .address(0x658bdf435d810c91414ec09147daa6db62406379)
+    #define otherContract = .address(0x658bdf435d810c91414ec09147daa6db62406379)
 
 ### Instruction Macros
 
@@ -227,7 +227,7 @@ redefinition errors.
 
 lib.eas:
 
-    #define result 128
+    #define result = 128
     #define StoreSum {
         add
         push result

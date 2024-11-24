@@ -34,7 +34,7 @@ func (c *Compiler) expand(doc *ast.Document, prog *compilerProg) {
 		}
 		err := st.expand(c, doc, prog)
 		if err != nil {
-			c.addError(astSt, err)
+			c.errorAt(astSt, err)
 			continue
 		}
 	}
@@ -245,13 +245,10 @@ func (inst assembleStatement) expand(c *Compiler, doc *ast.Document, prog *compi
 		return err
 	}
 	bytecode := subc.CompileFile(file)
-	errs := subc.Errors()
-	if len(errs) > 0 {
-		reportedErrs := errs[:min(max(c.maxErrors, 1), len(errs))]
-		c.errors = append(c.errors, reportedErrs...)
-		return nil
+	c.errors.add(subc.ErrorsAndWarnings()...)
+	if len(bytecode) > 0 {
+		datainst := &instruction{data: bytecode}
+		prog.addInstruction(datainst)
 	}
-	datainst := &instruction{data: bytecode}
-	prog.addInstruction(datainst)
 	return nil
 }

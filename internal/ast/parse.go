@@ -203,22 +203,27 @@ func parseDirective(p *Parser, tok token) {
 func parseMacroDef(p *Parser) {
 	name := p.next()
 	switch name.typ {
-	case identifier:
+	case dottedIdentifier:
+		p.throwError(name, "attempt to redefine builtin macro .%s", name.text)
 	case instMacroIdent:
 		parseInstructionMacroDef(p, name)
 		return
 	default:
 		p.unexpected(name)
+	case identifier:
 	}
 
 	// Parse parameters and body.
-	pos := Position{File: p.doc.File, Line: name.line}
-	def := &ExpressionMacroDef{Name: name.text, pos: pos}
-	var didParams bool
+	var (
+		pos          = Position{File: p.doc.File, Line: name.line}
+		def          = &ExpressionMacroDef{Name: name.text, pos: pos}
+		bodyTok      token
+		didParams    bool
+		legacySyntax bool
+	)
 loop:
 	for {
-		tok := p.next()
-		switch tok.typ {
+		switch tok := p.next(); tok.typ {
 		case lineEnd, eof:
 			p.throwError(tok, "incomplete macro definition")
 
@@ -226,17 +231,33 @@ loop:
 			p.throwError(tok, "unexpected { in expression macro definition")
 
 		case openParen:
-			if !didParams {
+			if didParams {
+				bodyTok, legacySyntax = tok, true
+				break loop
+			} else {
 				def.Params = parseParameterList(p)
 				didParams = true
-				continue
 			}
-			fallthrough
+
+		case equals:
+			bodyTok = p.next()
+			break loop
+
 		default:
-			def.Body = parseExpr(p, tok)
+			bodyTok, legacySyntax = tok, true
 			break loop
 		}
 	}
+
+	if legacySyntax {
+		p.errors = append(p.errors, &ParseError{
+			tok:     bodyTok,
+			file:    p.doc.File,
+			err:     fmt.Errorf("legacy definition syntax, missing '=' before expression"),
+			warning: true,
+		})
+	}
+	def.Body = parseExpr(p, bodyTok)
 
 	// Register the macro.
 	checkDuplicateMacro(p, name)
@@ -251,17 +272,16 @@ paramLoop:
 		switch tok := p.next(); tok.typ {
 		case lineEnd, eof:
 			p.throwError(tok, "incomplete macro definition")
-
 		case openBrace:
-			// start of body
-			break paramLoop
-
+			break paramLoop // start of body
 		case openParen:
 			if !didParams {
 				params = parseParameterList(p)
 				didParams = true
 				continue paramLoop
 			}
+		default:
+			p.unexpected(tok)
 		}
 	}
 

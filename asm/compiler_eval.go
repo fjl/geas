@@ -45,11 +45,11 @@ func (c *Compiler) assignInitialPushSizes(e *evaluator, prog *compilerProg) {
 		}
 		inst.argNoLabels = true
 		if err != nil {
-			c.addError(inst.ast, err)
+			c.errorAt(inst.ast, err)
 			continue
 		}
 		if err := prog.assignPushArg(inst, v, true); err != nil {
-			c.addError(inst.ast, err)
+			c.errorAt(inst.ast, err)
 			continue
 		}
 	}

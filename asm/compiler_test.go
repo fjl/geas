@@ -39,6 +39,7 @@ type compilerTestInput struct {
 type compilerTestOutput struct {
 	Bytecode string   `yaml:"bytecode"`
 	Errors   []string `yaml:"errors,omitempty"`
+	Warnings []string `yaml:"warnings,omitempty"`
 }
 
 type compilerTestYAML struct {
@@ -78,30 +79,19 @@ func TestCompiler(t *testing.T) {
 				if output != nil {
 					t.Error("expected nil output")
 				}
-				errlist := c.Errors()
-				t.Log("errors:", errlist)
-				if len(errlist) != len(test.Output.Errors) {
-					t.Errorf("got %d errors, expected %d", len(errlist), len(test.Output.Errors))
-					for i := range errlist {
-						t.Errorf("error %d: %v", i, errlist[i])
-					}
-					return
-				}
-				for i := range errlist {
-					if errlist[i].Error() != test.Output.Errors[i] {
-						t.Errorf("wrong error %d: %v\n    want: %s", i, errlist[i], test.Output.Errors[i])
-					}
-				}
+				checkErrors(t, "errors", c.Errors(), test.Output.Errors)
+				checkErrors(t, "warnings", c.Warnings(), test.Output.Warnings)
 				return
 			}
 
 			// Test expects no errors, compilation should succeed.
-			if len(c.Errors()) > 0 {
+			if c.Failed() {
 				for _, err := range c.Errors() {
 					t.Error(err)
 				}
 				t.Fatal("compilation failed")
 			}
+			checkErrors(t, "warnings", c.Warnings(), test.Output.Warnings)
 			expectedOutput, err := hex.DecodeString(strings.Replace(test.Output.Bytecode, " ", "", -1))
 			if err != nil {
 				t.Fatalf("invalid hex: %v", err)
@@ -110,6 +100,21 @@ func TestCompiler(t *testing.T) {
 				t.Errorf("incorrect output\ngot:  %x\nwant: %x\n", output, expectedOutput)
 			}
 		})
+	}
+}
+
+func checkErrors(t *testing.T, kind string, errlist []error, expected []string) {
+	if len(errlist) != len(expected) {
+		t.Errorf("got %d %s, expected %d", len(errlist), kind, len(expected))
+		for i := range errlist {
+			t.Errorf("  [%d] %v", i, errlist[i])
+		}
+		return
+	}
+	for i := range errlist {
+		if errlist[i].Error() != expected[i] {
+			t.Errorf("wrong error %d: %v\n    want: %s", i, errlist[i], expected[i])
+		}
 	}
 }
 
@@ -159,11 +164,11 @@ func TestExamplePrograms(t *testing.T) {
 func compileExample(t *testing.T, exampleDir string, file string) string {
 	c := NewCompiler(os.DirFS(exampleDir))
 	output := c.CompileFile(file)
-	if len(c.Errors()) > 0 {
+	for _, err := range c.ErrorsAndWarnings() {
+		t.Log(err)
+	}
+	if c.Failed() {
 		t.Error("compilation failed:")
-		for _, err := range c.Errors() {
-			t.Error(err)
-		}
 	}
 	return hex.EncodeToString(output)
 }

@@ -140,3 +140,90 @@ type unassignedLabelError struct {
 func (e unassignedLabelError) Error() string {
 	return fmt.Sprintf("%v not instantiated in program", e.lref)
 }
+
+// Warning is implemented by errors that could also be just a warning.
+type Warning interface {
+	error
+	IsWarning() bool
+}
+
+// IsWarning reports whether an error is a warning.
+func IsWarning(err error) bool {
+	var w Warning
+	return errors.As(err, &w) && w.IsWarning()
+}
+
+// errorList maintains a list of errors and warnings. It also implements the mechanism
+// that aborts compilation when too many errors have accumulated.
+type errorList struct {
+	list        []error
+	numErrors   int
+	numWarnings int
+	maxErrors   int
+}
+
+// catchAbort traps the panic condition that gets thrown when too many errors have accumulated.
+// A call to catchAbort must be deferred around any code that uses [errorList.add].
+func (e *errorList) catchAbort() {
+	ok := recover()
+	if ok != nil && ok != errCancelCompilation {
+		panic(ok)
+	}
+}
+
+// add puts errors into the list.
+// This returns true if there were any actual errors in the arguments.
+func (e *errorList) add(errs ...error) (anyRealError bool) {
+	for _, err := range errs {
+		if err == nil {
+			continue
+		}
+		e.list = append(e.list, err)
+		if IsWarning(err) {
+			e.numWarnings++
+		} else {
+			e.numErrors++
+			anyRealError = true
+		}
+		if e.numErrors > e.maxErrors {
+			panic(errCancelCompilation)
+		}
+	}
+	return
+}
+
+// addParseErrors is like add, but for errors from the parser.
+func (e *errorList) addParseErrors(errs []*ast.ParseError) bool {
+	conv := make([]error, len(errs))
+	for i := range errs {
+		conv[i] = errs[i]
+	}
+	return e.add(conv...)
+}
+
+// warnings returns the current warning list.
+func (e *errorList) warnings() []error {
+	s := make([]error, 0, e.numWarnings)
+	for _, err := range e.list {
+		if IsWarning(err) {
+			s = append(s, err)
+		}
+	}
+	return s
+}
+
+// warnings returns the current error list.
+func (e *errorList) errors() []error {
+	s := make([]error, 0, e.numErrors)
+	for _, err := range e.list {
+		if !IsWarning(err) {
+			s = append(s, err)
+		}
+	}
+	return s
+}
+
+// hasError reports whether there were any actual errors.
+func (e *errorList) hasError() bool {
+	return e.numErrors > 0
+}
