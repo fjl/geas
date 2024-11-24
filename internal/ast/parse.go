@@ -402,31 +402,91 @@ func parseInstructionMacroCall(p *Parser, nameTok token) {
 	}
 }
 
+// parseExpr parses an expression.
 func parseExpr(p *Parser, tok token) Expr {
+	left := parsePrimaryExpr(p, tok)
+	return parseArith(p, left, p.next(), 0)
+}
+
+// parseArith parses an arithmetic expression.
+func parseArith(p *Parser, left Expr, tok token, minPrecedence int) Expr {
+	for ; ; tok = p.next() {
+		// Check for (another) arithmetic op.
+		var op ArithOp
+		switch tok.typ {
+		case arith:
+			op = tokenArithOp(tok)
+			if precedence[op] < minPrecedence {
+				break
+			}
+		default:
+			// End of binary expression.
+			p.unread(tok)
+			return left
+		}
+
+		// Parse right operand.
+		var right Expr
+		switch tok = p.next(); tok.typ {
+		case comma, closeParen, closeBrace, lineEnd, eof:
+			p.throwError(tok, "expected right operand in arithmetic expression")
+		default:
+			right = parsePrimaryExpr(p, tok)
+		}
+
+		// Check for next op of higher precedence.
+		right = parseArithInner(p, right, precedence[op])
+
+		// Combine into binary expression.
+		left = &ArithExpr{Op: op, Left: left, Right: right}
+	}
+}
+
+func parseArithInner(p *Parser, right Expr, curPrecedence int) Expr {
+	for {
+		switch tok := p.next(); tok.typ {
+		case arith:
+			nextop := tokenArithOp(tok)
+			if precedence[nextop] <= curPrecedence {
+				p.unread(tok)
+				return right
+			}
+			right = parseArith(p, right, tok, curPrecedence+1)
+
+		default:
+			p.unread(tok)
+			return right
+		}
+	}
+}
+
+func parsePrimaryExpr(p *Parser, tok token) Expr {
 	switch tok.typ {
 	case identifier, dottedIdentifier:
-		arg := &MacroCallExpr{Ident: tok.text, Builtin: tok.typ == dottedIdentifier}
-		return parseExprTail(p, arg)
+		call := &MacroCallExpr{Ident: tok.text, Builtin: tok.typ == dottedIdentifier}
+		switch tok := p.next(); tok.typ {
+		case openParen:
+			call.Args = parseCallArguments(p)
+		default:
+			p.unread(tok)
+		}
+		return call
 
 	case variableIdentifier:
-		arg := &VariableExpr{Ident: tok.text}
-		return parseExprTail(p, arg)
+		return &VariableExpr{Ident: tok.text}
 
 	case labelRef, dottedLabelRef:
-		arg := &LabelRefExpr{
+		return &LabelRefExpr{
 			Ident:  tok.text,
 			Dotted: tok.typ == dottedLabelRef,
 			Global: IsGlobal(tok.text),
 		}
-		return parseExprTail(p, arg)
 
 	case numberLiteral, stringLiteral:
-		arg := &LiteralExpr{tok: tok}
-		return parseExprTail(p, arg)
+		return &LiteralExpr{tok: tok}
 
 	case openParen:
-		e := parseParenExpr(p)
-		return parseExprTail(p, e)
+		return parseParenExpr(p)
 
 	default:
 		p.unexpected(tok)
@@ -450,33 +510,6 @@ func parseParenExpr(p *Parser) Expr {
 			return expr
 		case lineStart, lineEnd:
 			continue
-		default:
-			p.unexpected(tok)
-		}
-	}
-}
-
-// parseExprTail parses the end of an expression. Here we check whether the expression
-// is a binary arithmetic operation.
-func parseExprTail(p *Parser, arg Expr) Expr {
-	for {
-		tok := p.next()
-		switch {
-		case tok.is(closeParen, lineEnd, comma, closeBrace, eof):
-			p.unread(tok)
-			return arg
-
-		case tok.is(openParen):
-			call, ok := arg.(*MacroCallExpr)
-			if !ok {
-				p.unexpected(tok)
-			}
-			call.Args = parseCallArguments(p)
-			arg = call // continue parsing for arith binop after call
-
-		case tok.typ == arith:
-			return parseArith(p, arg, tok)
-
 		default:
 			p.unexpected(tok)
 		}
@@ -533,16 +566,4 @@ func parseListEnd(p *Parser) bool {
 			p.unexpected(tok)
 		}
 	}
-}
-
-func parseArith(p *Parser, arg Expr, opToken token) Expr {
-	expr := &ArithExpr{Op: tokenArithOp(opToken), Left: arg}
-	tok := p.next()
-	switch tok.typ {
-	case lineEnd, eof, closeParen:
-		p.throwError(tok, "expected right operand in arithmetic expression")
-	default:
-		expr.Right = parseExpr(p, tok)
-	}
-	return expr
 }

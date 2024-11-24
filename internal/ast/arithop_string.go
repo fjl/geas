@@ -17,7 +17,7 @@ func _() {
 	_ = x[ArithRshift-7]
 	_ = x[ArithAnd-8]
 	_ = x[ArithOr-9]
-	_ = x[ArithNot-10]
+	_ = x[ArithXor-10]
 }
 
 const _ArithOp_name = "ArithPlusArithMinusArithMulArithDivArithModArithLshiftArithRshiftArithAndArithOrArithNot"

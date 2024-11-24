@@ -306,11 +306,11 @@ func (l *LabelDefSt) Name() string {
 }
 
 func (e *LiteralExpr) IsString() bool {
-	return e.tok.is(stringLiteral)
+	return e.tok.typ == stringLiteral
 }
 
 func (e *LiteralExpr) IsNumber() bool {
-	return e.tok.is(numberLiteral)
+	return e.tok.typ == numberLiteral
 }
 
 func (e *LiteralExpr) Text() string {

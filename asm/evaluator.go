@@ -204,7 +204,7 @@ func (e *evaluator) evalArith(expr *ast.ArithExpr, env *evalEnvironment) (*big.I
 	case ast.ArithOr:
 		v = new(big.Int).Or(left, right)
 
-	case ast.ArithNot:
+	case ast.ArithXor:
 		v = new(big.Int).Xor(left, right)
 
 	case ast.ArithLshift:

@@ -19,7 +19,6 @@ package ast
 import (
 	"fmt"
 	"os"
-	"slices"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -39,8 +38,9 @@ type token struct {
 	typ  tokenType
 }
 
-func (t *token) is(types ...tokenType) bool { return slices.Contains(types, t.typ) }
-func (t *token) String() string             { return fmt.Sprintf("%v %s (line %d)", t.typ, t.text, t.line) }
+func (t *token) String() string {
+	return fmt.Sprintf("%v %s (line %d)", t.typ, t.text, t.line)
+}
 
 // tokenType are the different types the lexer
 // is able to parse and return.

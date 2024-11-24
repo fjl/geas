@@ -38,8 +38,7 @@ var evalTests = []evalTest{
 	// arithmetic
 	{expr: `1`, result: "1"},
 	{expr: `1 + 4`, result: "5"},
-	{expr: `(2 * 3) + 4`, result: "10"},
-	{expr: `(1024 * 1024 * 1024 * 1024) + 1`, result: "1099511627777"},
+	{expr: `1 + 1 + 4`, result: "6"},
 	{expr: `1 << 48`, result: "281474976710656"},
 	{expr: `32 >> 1`, result: "16"},
 	{expr: `0xf1 & 0xe1`, result: "0xe1"},
@@ -47,7 +46,21 @@ var evalTests = []evalTest{
 	{expr: `0x0f | 0xf0`, result: "0xff"},
 	{expr: `0xf ^ 0xf`, result: "0x00"},
 	{expr: `0x0 ^ 0xf`, result: "0xf"},
-
+	// arithmetic precedence rules
+	{expr: `(2 * 3) + 4`, result: "10"},
+	{expr: `2 * 3 + 4`, result: "10"},
+	{expr: `4 + 2 * 3`, result: "10"},
+	{expr: `10 / 5 + 2`, result: "4"},
+	{expr: `1024 * 1024 * 1024 * 1024 + 1`, result: "1099511627777"},
+	// -- division and multiplication have same precedence
+	{expr: `12 / 6 * 3`, result: "6"},
+	{expr: `12 / 6 * 3`, result: "6"},
+	// -- and binds more strongly than or
+	{expr: `0xff00 | 0xff & 0x0f`, result: "0xff0f"},
+	{expr: `0xff & 0x0f	| 0xff00`, result: "0xff0f"},
+	{expr: `0xff & (0x0f | 0xff00)`, result: "0x0f"},
+	// -- shift binds more strongly than and/or
+	{expr: `0xff >> 4 & 0x05`, result: "0x05"},
 	// macro and label references
 	{expr: `@label1`, result: "1"},
 	{expr: `@label1 + 2`, result: "3"},
