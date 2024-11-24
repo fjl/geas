@@ -5,7 +5,7 @@
 ;;; | selector (4 bytes) | zeros (12 bytes) | address (20 bytes) |
 ;;; +--------------------+------------------+--------------------+
 
-#define S_balanceOf .selector("balanceOf(address)")
+#define S_balanceOf = .selector("balanceOf(address)")
 
 BalanceOf:
     ;; prepare return parameters

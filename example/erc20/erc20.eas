@@ -66,7 +66,7 @@ FAIL:
 
 ;;; View functions for token metadata, these just return zero.
 
-#define S_decimals .selector("decimals()")
-#define S_totalSupply .selector("totalSupply()")
+#define S_decimals = .selector("decimals()")
+#define S_totalSupply = .selector("totalSupply()")
 
 Return0:

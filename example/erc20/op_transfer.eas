@@ -5,8 +5,8 @@
 ;;; | selector (4 bytes) | zeros (12 bytes) | to (20 bytes) | amount (32 bytes) |
 ;;; +--------------------+------------------+---------------+-------------------+
 
-#define S_transfer .selector("transfer(address,uint256)")
-#define logtopic .keccak256("Transfer(address,address,uint256)")
+#define S_transfer = .selector("transfer(address,uint256)")
+#define logtopic = .keccak256("Transfer(address,address,uint256)")
 
 Transfer:
     caller           ; [from]

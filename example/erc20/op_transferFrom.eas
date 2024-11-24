@@ -5,8 +5,8 @@
 ;;; | selector (4 bytes) | from (32 bytes) | to (32 bytes) | amount (32 bytes) |
 ;;; +--------------------+-----------------+---------------+-------------------+
 
-#define S_transferFrom .selector("transferFrom(address,address,uint256)")
-#define logtopic .keccak256("Transfer(address,address,uint256)")
+#define S_transferFrom = .selector("transferFrom(address,address,uint256)")
+#define logtopic = .keccak256("Transfer(address,address,uint256)")
 
 TransferFrom:
     push 64          ; [len]
