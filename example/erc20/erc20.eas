@@ -17,7 +17,8 @@
     jumpi            ; [selector]
 }
 
-.start:
+;;; Program start.
+    
     ;; Read the calldata into memory.
     calldatasize     ; [calldatasize]
     push 0           ; [0, calldatasize]
