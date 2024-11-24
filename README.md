@@ -87,15 +87,13 @@ Simple math expressions and label references can be used within the argument:
     add_it:
         add
 
-At this time, there is no precedence in expressions. Use parentheses to indicate precedence.
-
 Supported arithmetic operations include addition (+), subtraction (-), multiplication (*),
 division (/), and modulo (%). There is also support for bit-shifts (<<, >>), bitwise AND
 (&), OR (|), XOR (^).
 
 All arithmetic is performed with arbitrary precision integers. The result of calculations
 must fit into 256 bits in order to be valid as a PUSH argument. For sized push, the result
-must fit into the declared push size. Negative results are not allowed right now.
+must fit into the declared push size. Negative results are not allowed.
 
 ### Expression Macros
 
