@@ -91,7 +91,7 @@ func (d *Disassembler) Disassemble(bytecode []byte, outW io.Writer) error {
 		} else {
 			d.printPrefix(out, pc)
 			d.printOp(out, op)
-			if op.Push {
+			if op.Push && op.Name != "PUSH0" {
 				size := op.PushSize()
 				if len(bytecode)-1-pc < size {
 					d.newline(out, op, nil)
