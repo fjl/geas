@@ -7,16 +7,26 @@ For real contracts, you should use a well-tested language compiler like Solidity
 The purpose of geas is mostly creating specialty programs and tinkering with the EVM
 at a low level.
 
-### Installation and Usage
+### Installation
 
-To build the tool, clone the repository and then run
+You can use the `go` tool to install the latest released version.
+This creates a `geas` binary in the current directory:
 
-    go build ./cmd/geas
+    env "GOBIN=$PWD" go install github.com/fjl/geas@latest
 
-This creates the `geas` binary in the current directory. To create bytecode, run the tool
-with a filename as argument.
+For development of geas, clone the repository and then run `go build ./cmd/geas`.
+
+### Usage
+
+To create bytecode from an assembly file, run the tool with a filename as argument.
 
     ./geas file.eas
+
+There is also a disassembler. To disassemble hex bytecode from standard input, run:
+
+    ./geas -d -
+
+To see all supported flags, run `geas` with no arguments.
 
 ### Editor Support
 
