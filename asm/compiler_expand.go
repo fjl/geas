@@ -235,7 +235,7 @@ func (inst includeStatement) expand(c *Compiler, doc *ast.Document, prog *compil
 
 // expand of #assemble performs compilation of the given assembly file.
 func (inst assembleStatement) expand(c *Compiler, doc *ast.Document, prog *compilerProg) error {
-	subc := NewCompiler(c.fsys)
+	subc := New(c.fsys)
 	subc.SetIncludeDepthLimit(c.maxIncDepth)
 	subc.SetMaxErrors(math.MaxInt)
 	subc.SetDefaultFork(prog.evm.Name())

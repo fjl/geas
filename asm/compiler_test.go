@@ -19,7 +19,6 @@ package asm
 import (
 	"bytes"
 	"encoding/hex"
-	"io/fs"
 	"maps"
 	"os"
 	"path/filepath"
@@ -63,15 +62,14 @@ func TestCompiler(t *testing.T) {
 	for _, name := range names {
 		test := tests[name]
 		t.Run(name, func(t *testing.T) {
-			var fsys fs.FS
+			c := New(nil)
 			if len(test.Input.Files) > 0 {
 				fm := make(fstest.MapFS, len(test.Input.Files))
 				for name, content := range test.Input.Files {
 					fm[name] = &fstest.MapFile{Data: []byte(content)}
 				}
-				fsys = fm
+				c.SetFilesystem(fm)
 			}
-			c := NewCompiler(fsys)
 			output := c.CompileString(test.Input.Code)
 
 			if len(test.Output.Errors) > 0 {
@@ -162,7 +160,7 @@ func TestExamplePrograms(t *testing.T) {
 }
 
 func compileExample(t *testing.T, exampleDir string, file string) string {
-	c := NewCompiler(os.DirFS(exampleDir))
+	c := New(os.DirFS(exampleDir))
 	output := c.CompileFile(file)
 	for _, err := range c.ErrorsAndWarnings() {
 		t.Log(err)

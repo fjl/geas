@@ -30,7 +30,7 @@ import (
 	"github.com/fjl/geas/internal/evm"
 )
 
-// Compiler performs the assembling.
+// Compiler turns assembly source into bytecode.
 type Compiler struct {
 	fsys        fs.FS
 	lexDebug    bool
@@ -43,8 +43,16 @@ type Compiler struct {
 	errors     errorList
 }
 
-// NewCompiler creates a compiler. The passed file system is used to resolve import file names.
+// NewCompiler creates a compiler.
+// Deprecated: use New.
 func NewCompiler(fsys fs.FS) *Compiler {
+	return New(fsys)
+}
+
+// New creates a compiler.
+// The file system is used to resolve import file names. If a nil FS is given,
+// #import cannot be used.
+func New(fsys fs.FS) *Compiler {
 	return &Compiler{
 		fsys:        fsys,
 		macroStack:  make(map[*ast.InstructionMacroDef]struct{}),
@@ -53,6 +61,12 @@ func NewCompiler(fsys fs.FS) *Compiler {
 		defaultFork: evm.LatestFork,
 		errors:      errorList{maxErrors: 10},
 	}
+}
+
+// SetFilesystem sets the file system used for resolving #include files.
+// Note: if set to a nil FS, #include is not allowed.
+func (c *Compiler) SetFilesystem(fsys fs.FS) {
+	c.fsys = fsys
 }
 
 // SetDebugLexer enables/disables printing of the token stream to stdout.
