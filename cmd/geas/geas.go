@@ -36,7 +36,7 @@ var t2s = strings.NewReplacer("\t", "  ")
 
 func usage() {
 	fmt.Fprint(os.Stderr, t2s.Replace(`
-Usage: geas {-a | -d | -i | -h} [options...] <file>
+Usage: geas {-a | -d | -i} [options...] <file>
 
  -a: ASSEMBLER (default)
 
