@@ -17,37 +17,113 @@
 package main
 
 import (
+	"bytes"
 	"encoding/hex"
 	"flag"
 	"fmt"
+	"io"
 	"os"
+	"path"
+	"path/filepath"
+	"strings"
 
 	"github.com/fjl/geas/asm"
+	"github.com/fjl/geas/disasm"
+	"github.com/fjl/geas/internal/evm"
 )
 
+var t2s = strings.NewReplacer("\t", "  ")
+
+func usage() {
+	fmt.Fprint(os.Stderr, t2s.Replace(`
+Usage: geas {-a | -d | -i | -h} [options...] <file>
+
+ -a: ASSEMBLER (default)
+
+	 -bin               output binary instead of hex
+	 -no-nl             skip newline at end of hex output
+	 -output <file>     output file name
+
+ -d: DISASSEMBLER
+
+	 -bin               input is binary bytecode
+	 -target <name>     configure instruction set
+	 -blocks            blank lines between logical blocks
+	 -pc                show program counter
+	 -uppercase         show instruction names as uppercase
+	 -output <file>     output file name
+
+ -i: INFORMATION
+
+	 -targets           show supported target fork names
+	 -ops <target>      show all opcodes in target
+	 -lineage <target>  show target fork chain
+
+ -h: HELP
+
+`))
+}
+
+type config struct {
+	Binary bool
+	NoNL   bool
+}
+
 func main() {
-	var (
-		binaryOutput = flag.Bool("bin", false, "binary output")
-		noNL         = flag.Bool("no-nl", false, "remove newline at end of output")
-		noPush0      = flag.Bool("no-push0", false, "disable use of PUSH0 instruction")
-	)
-	flag.Parse()
+	if len(os.Args) < 2 {
+		usage()
+		os.Exit(2)
+	}
 
-	var file string
-	switch flag.NArg() {
-	case 0:
-		exit(fmt.Errorf("need filename as argument"))
-	case 1:
-		file = flag.Arg(0)
+	mode := os.Args[1]
+	switch {
+	case mode == "-a":
+		assembler(os.Args[2:])
+
+	case mode == "-d":
+		disassembler(os.Args[2:])
+
+	case mode == "-i":
+		information(os.Args[2:])
+
+	case mode == "-h", mode == "-help", mode == "--help":
+		usage()
+		os.Exit(0)
+
 	default:
-		exit(fmt.Errorf("too many arguments"))
+		assembler(os.Args[1:])
 	}
-	if *noPush0 {
-		exit(fmt.Errorf("option -no-push0 is not supported anymore"))
+}
+
+const inputLimit = 10 * 1024 * 1024
+
+func assembler(args []string) {
+	var (
+		fs         = newFlagSet("-a")
+		outputFile = fs.String("o", "", "")
+		binary     = fs.Bool("bin", false, "")
+		noNL       = fs.Bool("no-nl", false, "")
+	)
+	parseFlags(fs, args)
+
+	// Assemble.
+	var c = asm.New(nil)
+	var bin []byte
+	file := fileArg(fs)
+	if file != "-" {
+		wd, _ := os.Getwd()
+		c.SetFilesystem(os.DirFS(wd))
+		fp := path.Clean(filepath.ToSlash(file))
+		bin = c.CompileFile(fp)
+	} else {
+		source, err := io.ReadAll(io.LimitReader(os.Stdin, inputLimit))
+		if err != nil {
+			exit(1, err)
+		}
+		bin = c.CompileString(string(source))
 	}
 
-	c := asm.NewCompiler(os.DirFS("."))
-	bin := c.CompileFile(file)
+	// Show errors.
 	for _, err := range c.ErrorsAndWarnings() {
 		fmt.Fprintln(os.Stderr, err)
 	}
@@ -55,20 +131,174 @@ func main() {
 		os.Exit(1)
 	}
 
-	if *binaryOutput {
-		os.Stdout.Write(bin)
-	} else {
-		os.Stdout.WriteString(hex.EncodeToString(bin))
-		if !*noNL {
-			os.Stdout.WriteString("\n")
+	// Write output.
+	var err error
+	output := os.Stdout
+	if *outputFile != "" {
+		output, err = os.OpenFile(*outputFile, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0644)
+		if err != nil {
+			exit(1, err)
 		}
+		defer output.Close()
+	}
+	if *binary {
+		_, err = output.Write(bin)
+	} else {
+		nl := "\n"
+		if *noNL {
+			nl = ""
+		}
+		_, err = fmt.Fprintf(output, "%x%s", bin, nl)
+	}
+	if err != nil {
+		exit(1, err)
 	}
 }
 
-func exit(err error) {
-	if err == nil {
+func disassembler(args []string) {
+	var (
+		fs         = newFlagSet("-d")
+		showPC     = fs.Bool("pc", false, "")
+		showBlocks = fs.Bool("blocks", true, "")
+		uppercase  = fs.Bool("uppercase", false, "")
+		binary     = fs.Bool("bin", false, "")
+		target     = fs.String("target", "", "")
+		outputFile = fs.String("output", "", "")
+	)
+	parseFlags(fs, args)
+
+	// Read input.
+	var err error
+	var infd io.ReadCloser
+	file := fileArg(fs)
+	if file == "-" {
+		infd = os.Stdin
+	} else {
+		infd, err = os.Open(file)
+		if err != nil {
+			exit(1, err)
+		}
+	}
+	bytecode, err := io.ReadAll(io.LimitReader(infd, inputLimit))
+	if err != nil {
+		exit(1, err)
+	}
+	infd.Close()
+
+	// Possibly convert from hex.
+	if !*binary {
+		dec := make([]byte, hex.DecodedLen(len(bytecode)))
+		l, err := hex.Decode(dec, bytes.TrimSpace(bytecode))
+		if err != nil {
+			exit(1, err)
+		}
+		bytecode = dec[:l]
+	}
+
+	output := os.Stdout
+	if *outputFile != "" {
+		output, err = os.OpenFile(*outputFile, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0644)
+		if err != nil {
+			exit(1, err)
+		}
+		defer output.Close()
+	}
+
+	// Disassemble.
+	d := disasm.New()
+	d.SetShowBlocks(*showBlocks)
+	d.SetShowPC(*showPC)
+	d.SetUppercase(*uppercase)
+	if *target != "" {
+		if err := d.SetTarget(*target); err != nil {
+			exit(2, err)
+		}
+	}
+	err = d.Disassemble(bytecode, output)
+	exit(1, err)
+}
+
+func information(args []string) {
+	var ran bool
+	checkRunOnce := func() {
+		if ran {
+			exit(2, fmt.Errorf("can't show more than one thing at once in -i mode"))
+		}
+		ran = true
+	}
+	showTargets := func(arg string) error {
+		checkRunOnce()
+		for _, name := range evm.AllForks() {
+			fmt.Println(name)
+		}
+		return nil
+	}
+	showOps := func(arg string) error {
+		checkRunOnce()
+		is := evm.FindInstructionSet(arg)
+		if is == nil {
+			return fmt.Errorf("Error: unknown fork %q", flag.Arg(0))
+		}
+		for _, op := range is.AllOps() {
+			fmt.Println(op.Name)
+		}
+		return nil
+	}
+	showParents := func(arg string) error {
+		checkRunOnce()
+		is := evm.FindInstructionSet(arg)
+		if is == nil {
+			return fmt.Errorf("Error: unknown fork %q", flag.Arg(0))
+		}
+		for _, f := range is.Parents() {
+			fmt.Println(f)
+		}
+		return nil
+	}
+
+	var fs = newFlagSet("-i")
+	fs.BoolFunc("targets", "", showTargets)
+	fs.Func("ops", "", showOps)
+	fs.Func("lineage", "", showParents)
+	parseFlags(fs, args)
+	if !ran {
+		usage()
+		exit(2, fmt.Errorf("please select information topic"))
+	}
+	if fs.NArg() > 0 {
+		exit(2, fmt.Errorf("too many arguments"))
+	}
+}
+
+func newFlagSet(mode string) *flag.FlagSet {
+	fs := flag.NewFlagSet("geas "+mode, flag.ContinueOnError)
+	fs.Usage = usage
+	fs.SetOutput(io.Discard)
+	return fs
+}
+
+func parseFlags(fs *flag.FlagSet, args []string) {
+	if err := fs.Parse(args); err != nil {
+		exit(2, err)
+	}
+}
+
+func fileArg(fs *flag.FlagSet) string {
+	switch fs.NArg() {
+	case 1:
+		return fs.Arg(0)
+	case 0:
+		exit(2, fmt.Errorf("need file name as argument"))
+	default:
+		exit(2, fmt.Errorf("too many arguments"))
+	}
+	return ""
+}
+
+func exit(code int, err error) {
+	if err == nil || err == flag.ErrHelp {
 		os.Exit(0)
 	}
-	fmt.Fprintln(os.Stderr, err)
-	os.Exit(1)
+	fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+	os.Exit(code)
 }
