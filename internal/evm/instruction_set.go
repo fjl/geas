@@ -19,6 +19,7 @@ package evm
 import (
 	"fmt"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -91,6 +92,27 @@ func (is *InstructionSet) PushBySize(size int) *Op {
 // OpByCode resolves an opcode by its code.
 func (is *InstructionSet) OpByCode(code byte) *Op {
 	return is.byCode[code]
+}
+
+// AllOps returns all operations.
+func (is *InstructionSet) AllOps() []*Op {
+	ops := make([]*Op, 0, len(is.byName))
+	for _, op := range is.byName {
+		ops = append(ops, op)
+	}
+	slices.SortFunc(ops, func(a, b *Op) int { return strings.Compare(a.Name, b.Name) })
+	return ops
+}
+
+// Parents returns the parent fork chain of the instruction set.
+func (is *InstructionSet) Parents() []string {
+	var chain []string
+	f := forkReg[is.name]
+	for f.Parent != "" {
+		f = forkReg[f.Parent]
+		chain = append(chain, f.Name())
+	}
+	return chain
 }
 
 // ForkWhereOpRemoved returns the fork where a given op was removed from the instruction
@@ -181,4 +203,12 @@ func computeOpAddedInFork() map[string][]string {
 // If this returns nil, op is invalid.
 func ForksWhereOpAdded(op string) []string {
 	return opAddedInForkMap[op]
+}
+
+func AllForks() (names []string) {
+	for _, def := range forkReg {
+		names = append(names, def.Names...)
+	}
+	sort.Strings(names)
+	return names
 }

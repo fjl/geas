@@ -16,14 +16,28 @@
 
 package evm
 
+import (
+	"strconv"
+	"strings"
+)
+
 // Op is an EVM opcode.
 type Op struct {
 	Name string
 	Code byte
 
 	// Flags:
-	// - Term is set for instructions that end execution.
-	Term, UnconditionalJump bool
+	// - Push is set for PUSHx
+	// - Term is set for instructions that end execution
+	// - Jump is set for all jumps
+	// - Unconditional is set for unconditional jumps
+	// - JumpDest is set for JUMPDEST
+	Push, Term, Jump, Unconditional, JumpDest bool
+}
+
+func (op Op) PushSize() int {
+	n, _ := strconv.Atoi(strings.TrimPrefix(op.Name, "PUSH"))
+	return n
 }
 
 // This is the list of all opcodes.
@@ -88,48 +102,48 @@ var oplist = []*Op{
 	{Name: "MSTORE8", Code: 0x53},
 	{Name: "SLOAD", Code: 0x54},
 	{Name: "SSTORE", Code: 0x55},
-	{Name: "JUMP", Code: 0x56, UnconditionalJump: true},
-	{Name: "JUMPI", Code: 0x57},
+	{Name: "JUMP", Code: 0x56, Jump: true, Unconditional: true},
+	{Name: "JUMPI", Code: 0x57, Jump: true},
 	{Name: "PC", Code: 0x58},
 	{Name: "MSIZE", Code: 0x59},
 	{Name: "GAS", Code: 0x5a},
-	{Name: "JUMPDEST", Code: 0x5b},
+	{Name: "JUMPDEST", Code: 0x5b, JumpDest: true},
 	{Name: "TLOAD", Code: 0x5c},
 	{Name: "TSTORE", Code: 0x5d},
 	{Name: "MCOPY", Code: 0x5e},
-	{Name: "PUSH0", Code: 0x5f},
-	{Name: "PUSH1", Code: 0x60},
-	{Name: "PUSH2", Code: 0x61},
-	{Name: "PUSH3", Code: 0x62},
-	{Name: "PUSH4", Code: 0x63},
-	{Name: "PUSH5", Code: 0x64},
-	{Name: "PUSH6", Code: 0x65},
-	{Name: "PUSH7", Code: 0x66},
-	{Name: "PUSH8", Code: 0x67},
-	{Name: "PUSH9", Code: 0x68},
-	{Name: "PUSH10", Code: 0x69},
-	{Name: "PUSH11", Code: 0x6a},
-	{Name: "PUSH12", Code: 0x6b},
-	{Name: "PUSH13", Code: 0x6c},
-	{Name: "PUSH14", Code: 0x6d},
-	{Name: "PUSH15", Code: 0x6e},
-	{Name: "PUSH16", Code: 0x6f},
-	{Name: "PUSH17", Code: 0x70},
-	{Name: "PUSH18", Code: 0x71},
-	{Name: "PUSH19", Code: 0x72},
-	{Name: "PUSH20", Code: 0x73},
-	{Name: "PUSH21", Code: 0x74},
-	{Name: "PUSH22", Code: 0x75},
-	{Name: "PUSH23", Code: 0x76},
-	{Name: "PUSH24", Code: 0x77},
-	{Name: "PUSH25", Code: 0x78},
-	{Name: "PUSH26", Code: 0x79},
-	{Name: "PUSH27", Code: 0x7a},
-	{Name: "PUSH28", Code: 0x7b},
-	{Name: "PUSH29", Code: 0x7c},
-	{Name: "PUSH30", Code: 0x7d},
-	{Name: "PUSH31", Code: 0x7e},
-	{Name: "PUSH32", Code: 0x7f},
+	{Name: "PUSH0", Code: 0x5f, Push: true},
+	{Name: "PUSH1", Code: 0x60, Push: true},
+	{Name: "PUSH2", Code: 0x61, Push: true},
+	{Name: "PUSH3", Code: 0x62, Push: true},
+	{Name: "PUSH4", Code: 0x63, Push: true},
+	{Name: "PUSH5", Code: 0x64, Push: true},
+	{Name: "PUSH6", Code: 0x65, Push: true},
+	{Name: "PUSH7", Code: 0x66, Push: true},
+	{Name: "PUSH8", Code: 0x67, Push: true},
+	{Name: "PUSH9", Code: 0x68, Push: true},
+	{Name: "PUSH10", Code: 0x69, Push: true},
+	{Name: "PUSH11", Code: 0x6a, Push: true},
+	{Name: "PUSH12", Code: 0x6b, Push: true},
+	{Name: "PUSH13", Code: 0x6c, Push: true},
+	{Name: "PUSH14", Code: 0x6d, Push: true},
+	{Name: "PUSH15", Code: 0x6e, Push: true},
+	{Name: "PUSH16", Code: 0x6f, Push: true},
+	{Name: "PUSH17", Code: 0x70, Push: true},
+	{Name: "PUSH18", Code: 0x71, Push: true},
+	{Name: "PUSH19", Code: 0x72, Push: true},
+	{Name: "PUSH20", Code: 0x73, Push: true},
+	{Name: "PUSH21", Code: 0x74, Push: true},
+	{Name: "PUSH22", Code: 0x75, Push: true},
+	{Name: "PUSH23", Code: 0x76, Push: true},
+	{Name: "PUSH24", Code: 0x77, Push: true},
+	{Name: "PUSH25", Code: 0x78, Push: true},
+	{Name: "PUSH26", Code: 0x79, Push: true},
+	{Name: "PUSH27", Code: 0x7a, Push: true},
+	{Name: "PUSH28", Code: 0x7b, Push: true},
+	{Name: "PUSH29", Code: 0x7c, Push: true},
+	{Name: "PUSH30", Code: 0x7d, Push: true},
+	{Name: "PUSH31", Code: 0x7e, Push: true},
+	{Name: "PUSH32", Code: 0x7f, Push: true},
 	{Name: "DUP1", Code: 0x80},
 	{Name: "DUP2", Code: 0x81},
 	{Name: "DUP3", Code: 0x82},
