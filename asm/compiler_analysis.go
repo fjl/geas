@@ -68,7 +68,7 @@ func (chk *unreachableCodeCheck) check(c *Compiler, st ast.Statement, op *evm.Op
 	if chk.inUnreachable && op.Name == "JUMPDEST" {
 		chk.inUnreachable = false
 	}
-	if chk.prevOp != nil && (chk.prevOp.Term || chk.prevOp.UnconditionalJump) && op.Name != "JUMPDEST" {
+	if chk.prevOp != nil && (chk.prevOp.Term || chk.prevOp.Unconditional) && !op.JumpDest {
 		c.warnf(st, "unreachable code (previous instruction is %s at %v)", chk.prevOp.Name, chk.prevSt.Position())
 		chk.inUnreachable = true
 	}
