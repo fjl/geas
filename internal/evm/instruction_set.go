@@ -50,8 +50,17 @@ type InstructionSet struct {
 // FindInstructionSet resolves a fork name to a set of opcodes.
 func FindInstructionSet(name string) *InstructionSet {
 	name = strings.ToLower(name)
-	def, ok := forkReg[name]
-	if !ok {
+	var def *InstructionSetDef
+	if def = forkReg[name]; def == nil {
+		// Might be non-canonical name.
+		for _, entry := range forkReg {
+			if slices.Contains(entry.Names, name) {
+				def = entry
+				break
+			}
+		}
+	}
+	if def == nil {
 		return nil
 	}
 	is := &InstructionSet{
