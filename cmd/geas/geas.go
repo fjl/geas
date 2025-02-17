@@ -25,6 +25,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"runtime/debug"
 	"slices"
 	"strings"
 
@@ -36,9 +37,12 @@ import (
 var t2s = strings.NewReplacer("\t", "  ")
 
 func usage() {
-	fmt.Fprint(os.Stderr, t2s.Replace(`
-Usage: geas {-a | -d | -i} [options...] <file>
-
+	vsn := version()
+	if len(vsn) > 0 {
+		fmt.Fprintln(os.Stderr, "Version:", vsn)
+	}
+	fmt.Fprint(os.Stderr, `Usage: geas {-a | -d | -i} [options...] <file>`+
+		t2s.Replace(`
  -a: ASSEMBLER (default)
 
 	 -o <file>          output file name
@@ -305,4 +309,33 @@ func exit(code int, err error) {
 	}
 	fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 	os.Exit(code)
+}
+
+func version() string {
+	info, _ := debug.ReadBuildInfo()
+	if info == nil {
+		return ""
+	}
+	if info.Main.Version != "(devel)" {
+		return info.Main.Version
+	}
+	gitVersion := ""
+	dirty := false
+	for _, s := range info.Settings {
+		switch s.Key {
+		case "vcs.revision":
+			gitVersion = s.Value[:16]
+		case "vcs.modified":
+			if s.Value == "true" {
+				dirty = true
+			}
+		}
+	}
+	if gitVersion == "" {
+		return ""
+	}
+	if dirty {
+		gitVersion += "-dirty"
+	}
+	return "git:" + gitVersion
 }
