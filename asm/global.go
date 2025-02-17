@@ -18,6 +18,7 @@ package asm
 
 import (
 	"fmt"
+	"math/big"
 
 	"github.com/fjl/geas/internal/ast"
 )
@@ -98,6 +99,17 @@ func (gs *globalScope) registerExprMacro(name string, def globalDef[*ast.Express
 	}
 	gs.exprMacro[name] = def
 	return nil
+}
+
+// overrideExprMacroValue sets a macro to the given value, overriding its definition.
+func (gs *globalScope) overrideExprMacroValue(name string, value *big.Int) {
+	gs.exprMacro[name] = globalDef[*ast.ExpressionMacroDef]{
+		doc: nil,
+		def: &ast.ExpressionMacroDef{
+			Name: name,
+			Body: &ast.LiteralExpr{Value: value},
+		},
+	}
 }
 
 func (gs *globalScope) lookupInstrMacro(name string) (*ast.InstructionMacroDef, *ast.Document) {

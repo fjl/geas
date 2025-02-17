@@ -23,6 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"math/big"
 	"path"
 	"strings"
 
@@ -32,11 +33,12 @@ import (
 
 // Compiler turns assembly source into bytecode.
 type Compiler struct {
-	fsys        fs.FS
-	lexDebug    bool
-	maxIncDepth int
-	maxErrors   int
-	defaultFork string
+	fsys           fs.FS
+	lexDebug       bool
+	maxIncDepth    int
+	maxErrors      int
+	defaultFork    string
+	macroOverrides map[string]*big.Int
 
 	globals    *globalScope
 	macroStack map[*ast.InstructionMacroDef]struct{}
@@ -55,10 +57,11 @@ func NewCompiler(fsys fs.FS) *Compiler {
 // #import cannot be used.
 func New(fsys fs.FS) *Compiler {
 	return &Compiler{
-		fsys:        fsys,
-		maxIncDepth: 128,
-		maxErrors:   10,
-		defaultFork: evm.LatestFork,
+		fsys:           fsys,
+		maxIncDepth:    128,
+		maxErrors:      10,
+		defaultFork:    evm.LatestFork,
+		macroOverrides: make(map[string]*big.Int),
 	}
 }
 
@@ -97,6 +100,24 @@ func (c *Compiler) SetMaxErrors(limit int) {
 		limit = 1
 	}
 	c.maxErrors = limit
+}
+
+// SetGlobal sets the value of a global expression macro.
+// Note the name must start with an uppercase letter to make it global.
+func (c *Compiler) SetGlobal(name string, value *big.Int) {
+	if !ast.IsGlobal(name) {
+		panic(fmt.Sprintf("override name %q is not global (uppercase)", name))
+	}
+	if value == nil {
+		delete(c.macroOverrides, name)
+	} else {
+		c.macroOverrides[name] = value
+	}
+}
+
+// ClearGlobals removes all definitions created by SetGlobal.
+func (c *Compiler) ClearGlobals() {
+	clear(c.macroOverrides)
 }
 
 // CompileString compiles the given program text and returns the corresponding bytecode.
@@ -172,6 +193,12 @@ func (c *Compiler) compileDocument(doc *ast.Document) (output []byte) {
 	// First, load all #include files and register their definitions.
 	// This also configures the instruction set if specified by a #pragma.
 	c.processIncludes(doc, prog, nil)
+
+	// Apply macro overrides. This happens after include processing because macros
+	// get their definitions assigned then.
+	for name, val := range c.macroOverrides {
+		c.globals.overrideExprMacroValue(name, val)
+	}
 
 	// Choose latest eth mainnet instruction set if not configured.
 	if prog.evm == nil {

@@ -239,6 +239,7 @@ func (inst assembleStatement) expand(c *Compiler, doc *ast.Document, prog *compi
 	subc.SetIncludeDepthLimit(c.maxIncDepth)
 	subc.SetMaxErrors(math.MaxInt)
 	subc.SetDefaultFork(prog.evm.Name())
+	subc.macroOverrides = c.macroOverrides
 
 	file, err := resolveRelative(doc.File, inst.Filename)
 	if err != nil {

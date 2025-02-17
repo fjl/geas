@@ -353,6 +353,25 @@ global-macro-redefine:
       - 'instr.evm:1: macro %IMAC already defined by #include "instr.evm" at :1'
       - 'expr.evm:1: macro EMAC already defined by #include "expr.evm" at :3'
 
+# this tests setting a global from outside the compiler
+global-external:
+  input:
+    code: |
+      push TEST_GLOBAL+1
+    globals:
+      TEST_GLOBAL: 10
+  output:
+    bytecode: "600b"
+
+global-external-params:
+  input:
+    code: |
+      push TEST_GLOBAL(1, 2, 3)
+    globals:
+      TEST_GLOBAL: 10
+  output:
+    bytecode: "600b"
+
 include-basic:
   input:
     code: |

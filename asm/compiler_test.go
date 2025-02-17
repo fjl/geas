@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"maps"
+	"math/big"
 	"os"
 	"path/filepath"
 	"slices"
@@ -31,8 +32,9 @@ import (
 )
 
 type compilerTestInput struct {
-	Code  string            `yaml:"code"`
-	Files map[string]string `yaml:"files,omitempty"`
+	Code    string              `yaml:"code"`
+	Files   map[string]string   `yaml:"files,omitempty"`
+	Globals map[string]*big.Int `yaml:"globals,omitempty"`
 }
 
 type compilerTestOutput struct {
@@ -69,6 +71,9 @@ func TestCompiler(t *testing.T) {
 					fm[name] = &fstest.MapFile{Data: []byte(content)}
 				}
 				c.SetFilesystem(fm)
+			}
+			for name, val := range test.Input.Globals {
+				c.SetGlobal(name, val)
 			}
 			output := c.CompileString(test.Input.Code)
 
