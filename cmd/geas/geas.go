@@ -238,7 +238,7 @@ func information(args []string) {
 		checkRunOnce()
 		is := evm.FindInstructionSet(arg)
 		if is == nil {
-			return fmt.Errorf("Error: unknown fork %q", flag.Arg(0))
+			return fmt.Errorf("Error: unknown fork %q", arg)
 		}
 		for _, op := range is.AllOps() {
 			fmt.Println(op.Name)
@@ -249,7 +249,7 @@ func information(args []string) {
 		checkRunOnce()
 		is := evm.FindInstructionSet(arg)
 		if is == nil {
-			return fmt.Errorf("Error: unknown fork %q", flag.Arg(0))
+			return fmt.Errorf("Error: unknown fork %q", arg)
 		}
 		for _, f := range is.Parents() {
 			fmt.Println(f)
