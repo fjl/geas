@@ -35,6 +35,7 @@ type Compiler struct {
 	fsys        fs.FS
 	lexDebug    bool
 	maxIncDepth int
+	maxErrors   int
 	defaultFork string
 
 	globals    *globalScope
@@ -55,12 +56,18 @@ func NewCompiler(fsys fs.FS) *Compiler {
 func New(fsys fs.FS) *Compiler {
 	return &Compiler{
 		fsys:        fsys,
-		macroStack:  make(map[*ast.InstructionMacroDef]struct{}),
-		includes:    make(map[*ast.IncludeSt]*ast.Document),
 		maxIncDepth: 128,
+		maxErrors:   10,
 		defaultFork: evm.LatestFork,
-		errors:      errorList{maxErrors: 10},
 	}
+}
+
+// reset prepares the compiler for the next run.
+func (c *Compiler) reset() {
+	c.globals = newGlobalScope()
+	c.macroStack = make(map[*ast.InstructionMacroDef]struct{})
+	c.includes = make(map[*ast.IncludeSt]*ast.Document)
+	c.errors = errorList{maxErrors: c.maxErrors}
 }
 
 // SetFilesystem sets the file system used for resolving #include files.
@@ -89,7 +96,7 @@ func (c *Compiler) SetMaxErrors(limit int) {
 	if limit < 1 {
 		limit = 1
 	}
-	c.errors.maxErrors = limit
+	c.maxErrors = limit
 }
 
 // CompileString compiles the given program text and returns the corresponding bytecode.
@@ -149,6 +156,7 @@ func (c *Compiler) warnf(inst ast.Statement, format string, args ...any) {
 }
 
 func (c *Compiler) compileSource(filename string, input []byte) []byte {
+	c.reset()
 	p := ast.NewParser(filename, input, c.lexDebug)
 	doc, errs := p.Parse()
 	if c.errors.addParseErrors(errs) {
@@ -159,7 +167,6 @@ func (c *Compiler) compileSource(filename string, input []byte) []byte {
 
 // compileDocument creates bytecode from the AST.
 func (c *Compiler) compileDocument(doc *ast.Document) (output []byte) {
-	c.globals = newGlobalScope()
 	prog := newCompilerProg(doc)
 
 	// First, load all #include files and register their definitions.
