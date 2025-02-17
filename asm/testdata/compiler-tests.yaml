@@ -370,7 +370,8 @@ global-external-params:
     globals:
       TEST_GLOBAL: 10
   output:
-    bytecode: "600b"
+    errors:
+      - ':1: invalid number of arguments, macro TEST_GLOBAL needs 0'
 
 include-basic:
   input:
