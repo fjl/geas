@@ -12,7 +12,7 @@ at a low level.
 You can use the `go` tool to install the latest released version.
 This creates a `geas` binary in the current directory:
 
-    env "GOBIN=$PWD" go install github.com/fjl/geas@latest
+    env "GOBIN=$PWD" go install github.com/fjl/geas/cmd/geas@latest
 
 For development of geas, clone the repository and then run `go build ./cmd/geas`.
 
