@@ -40,18 +40,18 @@ Usage: geas {-a | -d | -i} [options...] <file>
 
  -a: ASSEMBLER (default)
 
+	 -o <file>          output file name
 	 -bin               output binary instead of hex
 	 -no-nl             skip newline at end of hex output
-	 -output <file>     output file name
 
  -d: DISASSEMBLER
 
 	 -bin               input is binary bytecode
 	 -target <name>     configure instruction set
+	 -o <file>          output file name
 	 -blocks            blank lines between logical blocks
 	 -pc                show program counter
 	 -uppercase         show instruction names as uppercase
-	 -output <file>     output file name
 
  -i: INFORMATION
 
@@ -158,12 +158,12 @@ func assembler(args []string) {
 func disassembler(args []string) {
 	var (
 		fs         = newFlagSet("-d")
+		outputFile = fs.String("o", "", "")
 		showPC     = fs.Bool("pc", false, "")
 		showBlocks = fs.Bool("blocks", true, "")
 		uppercase  = fs.Bool("uppercase", false, "")
 		binary     = fs.Bool("bin", false, "")
 		target     = fs.String("target", "", "")
-		outputFile = fs.String("output", "", "")
 	)
 	parseFlags(fs, args)
 
