@@ -25,6 +25,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/fjl/geas/asm"
@@ -290,6 +291,9 @@ func fileArg(fs *flag.FlagSet) string {
 	case 0:
 		exit(2, fmt.Errorf("need file name as argument"))
 	default:
+		if slices.ContainsFunc(fs.Args(), func(s string) bool { return strings.HasPrefix(s, "-") }) {
+			exit(2, fmt.Errorf("too many arguments (flags must precede input filename)"))
+		}
 		exit(2, fmt.Errorf("too many arguments"))
 	}
 	return ""
