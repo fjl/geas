@@ -363,7 +363,7 @@ global-external:
   output:
     bytecode: "600b"
 
-global-external-params:
+global-external-call-with-params:
   input:
     code: |
       push TEST_GLOBAL(1, 2, 3)
@@ -372,6 +372,21 @@ global-external-params:
   output:
     errors:
       - ':1: invalid number of arguments, macro TEST_GLOBAL needs 0'
+
+global-override-macro-with-params-warning:
+  input:
+    code: |
+      #include "inc.evm"
+      push G
+    files:
+      inc.evm: |
+        #define G(x) = x+1
+    globals:
+      G: 5
+  output:
+    bytecode: '6005'
+    warnings:
+      - 'inc.evm:1: warning: overridden global macro G has parameters'
 
 include-basic:
   input:

@@ -197,6 +197,9 @@ func (c *Compiler) compileDocument(doc *ast.Document) (output []byte) {
 	// Apply macro overrides. This happens after include processing because macros
 	// get their definitions assigned then.
 	for name, val := range c.macroOverrides {
+		if def, _ := c.globals.lookupExprMacro(name); def != nil && len(def.Params) > 0 {
+			c.warnf(def, "overridden global macro %s has parameters", name)
+		}
 		c.globals.overrideExprMacroValue(name, val)
 	}
 
