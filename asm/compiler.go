@@ -216,7 +216,7 @@ func (c *Compiler) compileDocument(doc *ast.Document) (output []byte) {
 
 	// Expansion of is now done, and all further steps work on prog.
 	e := newEvaluator(c.globals)
-	c.assignInitialPushSizes(e, prog)
+	c.preEvaluateArgs(e, prog)
 
 	for {
 		c.computePC(e, prog)
@@ -225,7 +225,7 @@ func (c *Compiler) compileDocument(doc *ast.Document) (output []byte) {
 		// "PUSH" instructions: their pushSizes are initially set to one. If we get an
 		// overflow condition, the size of that PUSH increases by one and then we
 		// recalculate everything.
-		failedInst, err := c.assignArgs(e, prog)
+		failedInst, err := c.evaluateArgs(e, prog)
 		if err != nil {
 			if errors.Is(err, ecVariablePushOverflow) {
 				failedInst.pushSize += 1

@@ -173,6 +173,11 @@ type (
 		Option string
 		Value  string
 	}
+
+	BytesSt struct {
+		pos   Position
+		Value Expr
+	}
 )
 
 // definitions
@@ -254,6 +259,14 @@ func (inst *PragmaSt) Position() Position {
 
 func (inst *PragmaSt) Description() string {
 	return fmt.Sprintf("#pragma %s %q", inst.Option, inst.Value)
+}
+
+func (inst *BytesSt) Position() Position {
+	return inst.pos
+}
+
+func (inst *BytesSt) Description() string {
+	return "#bytes"
 }
 
 func (inst *OpcodeSt) Position() Position {

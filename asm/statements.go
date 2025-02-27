@@ -33,6 +33,7 @@ type (
 	macroCallStatement struct{ *ast.MacroCallSt }
 	includeStatement   struct{ *ast.IncludeSt }
 	assembleStatement  struct{ *ast.AssembleSt }
+	bytesStatement     struct{ *ast.BytesSt }
 )
 
 // statementFromAST converts AST statements into compiler statements. Note this function
@@ -49,6 +50,8 @@ func statementFromAST(st ast.Statement) statement {
 		return includeStatement{st}
 	case *ast.AssembleSt:
 		return assembleStatement{st}
+	case *ast.BytesSt:
+		return bytesStatement{st}
 	default:
 		return nil
 	}

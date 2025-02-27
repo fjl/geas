@@ -18,6 +18,7 @@ package asm
 
 import (
 	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
@@ -161,12 +162,20 @@ func isChecksumAddress(str string) bool {
 // For string literals, the bytes of the literal are used directly.
 func (e *evaluator) evalAsBytes(expr ast.Expr, env *evalEnvironment) ([]byte, error) {
 	lit, ok := expr.(*ast.LiteralExpr)
-	if ok && lit.IsString() {
-		return []byte(lit.Text()), nil
+	if ok {
+		txt := lit.Text()
+		if lit.IsString() {
+			return []byte(txt), nil
+		} else if strings.HasPrefix(txt, "0x") {
+			return hex.DecodeString(txt[2:])
+		}
 	}
 	v, err := e.eval(expr, env)
 	if err != nil {
 		return nil, err
+	}
+	if v.Sign() < 0 {
+		return nil, ecNegativeResult
 	}
 	return v.Bytes(), nil
 }

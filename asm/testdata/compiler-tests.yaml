@@ -74,6 +74,29 @@ assemble-directive-fork-override:
   output:
     bytecode: '600144'
 
+bytes-directive:
+  input:
+    code: |
+      #bytes 0x010203
+      push2 0x0405
+  output:
+    bytecode: '010203610405'
+
+bytes-directive-literal-padding:
+  input:
+    code: |
+      #bytes 0x00010203
+      #bytes 0x000405
+  output:
+    bytecode: '00010203000405'
+
+bytes-directive-string:
+  input:
+    code: |
+      #bytes "abc"
+  output:
+    bytecode: '616263'
+
 comments-on-label:
   input:
     code: |

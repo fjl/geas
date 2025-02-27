@@ -23,11 +23,28 @@ import (
 
 var zero = new(big.Int)
 
-// assignInitialPushSizes sets the pushSize of all PUSH and PUSH<n> instructions.
-// Arguments are pre-evaluated in this compilation step if they contain no label references.
-func (c *Compiler) assignInitialPushSizes(e *evaluator, prog *compilerProg) {
+// preEvaluateArgs computes the initial argument values of instructions.
+//
+// Here we assign the inst.pushSize of all PUSH and PUSH<n> instructions.
+// The argument value, inst.data, is assigned this compilation step if the arg expression
+// contains no label references.
+func (c *Compiler) preEvaluateArgs(e *evaluator, prog *compilerProg) {
 	for section, inst := range prog.iterInstructions() {
-		argument := inst.pushArg()
+		if inst.isBytes() {
+			// Handle #bytes.
+			v, err := e.evalAsBytes(inst.expr(), section.env)
+			var labelErr unassignedLabelError
+			if err != nil && !errors.As(err, &labelErr) {
+				c.errorAt(inst.ast, err)
+			} else {
+				inst.argNoLabels = true
+				inst.data = v
+			}
+			continue
+		}
+
+		// Handle PUSH.
+		argument := inst.expr()
 		if argument == nil {
 			continue
 		}
@@ -77,22 +94,33 @@ func (c *Compiler) computePC(e *evaluator, prog *compilerProg) {
 	}
 }
 
-// assignArgs computes the argument values of all push instructions.
-func (c *Compiler) assignArgs(e *evaluator, prog *compilerProg) (inst *instruction, err error) {
+// evaluateArgs computes the argument values of instructions.
+func (c *Compiler) evaluateArgs(e *evaluator, prog *compilerProg) (inst *instruction, err error) {
 	for section, inst := range prog.iterInstructions() {
 		if inst.argNoLabels {
 			continue // pre-calculated
 		}
-		argument := inst.pushArg()
-		if argument == nil {
-			continue // no arg
-		}
-		v, err := e.eval(argument, section.env)
-		if err != nil {
-			return inst, err
-		}
-		if err := prog.assignPushArg(inst, v, false); err != nil {
-			return inst, err
+
+		if inst.isBytes() {
+			// handle #bytes
+			v, err := e.evalAsBytes(inst.expr(), section.env)
+			if err != nil {
+				return inst, err
+			}
+			inst.data = v
+		} else {
+			// handle PUSH
+			argument := inst.expr()
+			if argument == nil {
+				continue // no arg
+			}
+			v, err := e.eval(argument, section.env)
+			if err != nil {
+				return inst, err
+			}
+			if err := prog.assignPushArg(inst, v, false); err != nil {
+				return inst, err
+			}
 		}
 	}
 	return nil, nil

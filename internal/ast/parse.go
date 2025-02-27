@@ -195,6 +195,8 @@ func parseDirective(p *Parser, tok token) {
 		parseAssemble(p, tok)
 	case "#pragma":
 		parsePragma(p, tok)
+	case "#bytes":
+		parseBytes(p, tok)
 	default:
 		p.throwError(tok, "unknown compiler directive %q", tok.text)
 	}
@@ -351,6 +353,17 @@ func parsePragma(p *Parser, d token) {
 		p.doc.Statements = append(p.doc.Statements, instr)
 	default:
 		p.throwError(tok, "expected option name following #pragma")
+	}
+}
+
+func parseBytes(p *Parser, d token) {
+	instr := &BytesSt{pos: Position{p.doc.File, d.line}}
+	switch tok := p.next(); tok.typ {
+	case lineEnd, eof:
+		p.throwError(d, "expected expression following #bytes")
+	default:
+		instr.Value = parseExpr(p, tok)
+		p.doc.Statements = append(p.doc.Statements, instr)
 	}
 }
 

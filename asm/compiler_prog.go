@@ -171,14 +171,22 @@ func (inst *instruction) explicitPushSize() (int, bool) {
 	return 0, false
 }
 
-// pushArg returns the instruction argument.
-func (inst *instruction) pushArg() ast.Expr {
-	if !isPush(inst.op) {
+// expr returns the instruction argument.
+func (inst *instruction) expr() ast.Expr {
+	if inst.op != "" && !isPush(inst.op) {
 		return nil
 	}
-	op, ok := inst.ast.(opcodeStatement)
-	if ok {
-		return op.Arg
+	switch st := inst.ast.(type) {
+	case opcodeStatement:
+		return st.Arg
+	case bytesStatement:
+		return st.Value
+	default:
+		return nil
 	}
-	return nil
+}
+
+func (inst *instruction) isBytes() bool {
+	_, ok := inst.ast.(bytesStatement)
+	return ok
 }

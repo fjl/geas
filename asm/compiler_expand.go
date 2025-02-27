@@ -253,3 +253,8 @@ func (inst assembleStatement) expand(c *Compiler, doc *ast.Document, prog *compi
 	}
 	return nil
 }
+
+func (inst bytesStatement) expand(c *Compiler, doc *ast.Document, prog *compilerProg) error {
+	prog.addInstruction(&instruction{ast: inst})
+	return nil
+}
