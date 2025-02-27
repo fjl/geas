@@ -33,10 +33,7 @@ func (c *Compiler) preEvaluateArgs(e *evaluator, prog *compilerProg) {
 		if inst.isBytes() {
 			// Handle #bytes.
 			v, err := e.evalAsBytes(inst.expr(), section.env)
-			var labelErr unassignedLabelError
-			if err != nil && !errors.As(err, &labelErr) {
-				c.errorAt(inst.ast, err)
-			} else {
+			if err == nil {
 				inst.argNoLabels = true
 				inst.data = v
 			}

@@ -167,6 +167,9 @@ func (e *evaluator) evalAsBytes(expr ast.Expr, env *evalEnvironment) ([]byte, er
 		if lit.IsString() {
 			return []byte(txt), nil
 		} else if strings.HasPrefix(txt, "0x") {
+			if len(txt)%2 == 1 {
+				return nil, ecOddLengthBytesLiteral
+			}
 			return hex.DecodeString(txt[2:])
 		}
 	}

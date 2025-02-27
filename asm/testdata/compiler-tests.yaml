@@ -90,6 +90,14 @@ bytes-directive-literal-padding:
   output:
     bytecode: '00010203000405'
 
+bytes-directive-literal-padding-odd-length:
+  input:
+    code: |
+      #bytes 0x0010203
+  output:
+    errors:
+      - ':1: odd-length hex in bytes context'
+
 bytes-directive-string:
   input:
     code: |
@@ -809,7 +817,7 @@ push-negative:
       PUSH 0 - 1
   output:
     errors:
-      - ':1: negative PUSH argument not supported'
+      - ':1: expression result is negative number'
 
 push0-explicit:
   input:

@@ -53,6 +53,7 @@ const (
 	ecRecursiveCall
 	ecInvalidArgumentCount
 	ecNegativeResult
+	ecOddLengthBytesLiteral
 	ecIncludeNoFS
 	ecIncludeDepthLimit
 	ecUnknownPragma
@@ -96,7 +97,9 @@ func (e compilerError) Error() string {
 	case ecInvalidArgumentCount:
 		return "invalid number of arguments"
 	case ecNegativeResult:
-		return "negative PUSH argument not supported"
+		return "expression result is negative number"
+	case ecOddLengthBytesLiteral:
+		return "odd-length hex in bytes context"
 	case ecIncludeNoFS:
 		return "#include not allowed"
 	case ecIncludeDepthLimit:
