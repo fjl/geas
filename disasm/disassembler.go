@@ -90,16 +90,11 @@ func (d *Disassembler) Disassemble(bytecode []byte, outW io.Writer) error {
 			d.printInvalid(out, bytecode[pc])
 		} else {
 			d.printPrefix(out, pc)
-			d.printOp(out, op)
-			if op.Push && op.Name != "PUSH0" {
-				size := op.PushSize()
-				if len(bytecode)-1-pc < size {
-					d.newline(out, op, nil)
-					return fmt.Errorf("bytecode truncated, ends within %s", op.Name)
-				}
-				data := bytecode[pc+1 : pc+size+1]
-				d.printPushData(out, data)
+			if op.Push {
+				size := d.printPush(out, op, bytecode[pc:])
 				pc += size
+			} else {
+				d.printOp(out, op)
 			}
 		}
 
@@ -120,7 +115,7 @@ func (d *Disassembler) printPrefix(out io.Writer, pc int) {
 }
 
 func (d *Disassembler) printInvalid(out io.Writer, b byte) {
-	fmt.Fprintf(out, "<invalid %x>\n", b)
+	fmt.Fprintf(out, "#bytes %#x\n", b)
 }
 
 func (d *Disassembler) printOp(out io.Writer, op *evm.Op) {
@@ -131,8 +126,21 @@ func (d *Disassembler) printOp(out io.Writer, op *evm.Op) {
 	fmt.Fprint(out, name)
 }
 
-func (d *Disassembler) printPushData(out io.Writer, data []byte) {
+func (d *Disassembler) printPush(out io.Writer, op *evm.Op, code []byte) (dataSize int) {
+	size := op.PushSize()
+	if size == 0 {
+		d.printOp(out, op)
+		return 0
+	}
+	if size > len(code)-1 {
+		// Handle truncated PUSH at end of code.
+		fmt.Fprintf(out, "#bytes %#x", code)
+		return len(code) - 1
+	}
+	d.printOp(out, op)
+	data := code[1 : size+1]
 	fmt.Fprintf(out, " %#x", data)
+	return len(data)
 }
 
 func (d *Disassembler) newline(out io.Writer, prevOp *evm.Op, nextOp *evm.Op) {
