@@ -106,7 +106,7 @@ func (d *Disassembler) Disassemble(bytecode []byte, outW io.Writer) error {
 
 func (d *Disassembler) printPrefix(out io.Writer, pc int) {
 	if d.showPC {
-		for i := 0; i < len(d.pcBuffer); i++ {
+		for i := range d.pcBuffer {
 			d.pcBuffer[len(d.pcBuffer)-1-i] = byte(pc >> (8 * i))
 		}
 		hex.Encode(d.pcHex, d.pcBuffer)
