@@ -21,8 +21,6 @@ import (
 	"math/big"
 )
 
-var zero = new(big.Int)
-
 // preEvaluateArgs computes the initial argument values of instructions.
 //
 // Here we assign the inst.pushSize of all PUSH and PUSH<n> instructions.
