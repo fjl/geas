@@ -430,7 +430,8 @@ func parseArith(p *Parser, left Expr, tok token, minPrecedence int) Expr {
 		case arith:
 			op = tokenArithOp(tok)
 			if precedence[op] < minPrecedence {
-				break
+				p.unread(tok)
+				return left
 			}
 		default:
 			// End of binary expression.

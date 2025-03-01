@@ -51,7 +51,10 @@ var evalTests = []evalTest{
 	{expr: `2 * 3 + 4`, result: "10"},
 	{expr: `4 + 2 * 3`, result: "10"},
 	{expr: `10 / 5 + 2`, result: "4"},
+	{expr: `1 + 1024 * 1024 * 1024`, result: "1073741825"},
 	{expr: `1024 * 1024 * 1024 * 1024 + 1`, result: "1099511627777"},
+	{expr: `1 + 1024 * 1024 * 1024 & 2 + 3`, result: "4"},
+	{expr: `(1 + ((1024 * 1024 * 1024) & 2)) + 3`, result: "4"},
 	// -- division and multiplication have same precedence
 	{expr: `12 / 6 * 3`, result: "6"},
 	{expr: `12 / 6 * 3`, result: "6"},
