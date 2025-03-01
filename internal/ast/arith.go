@@ -68,14 +68,14 @@ func tokenArithOp(tok token) ArithOp {
 }
 
 var precedence = [ArithMax + 1]int{
-	ArithPlus:   4,
-	ArithMinus:  4,
-	ArithMul:    5,
-	ArithDiv:    5,
-	ArithMod:    5,
-	ArithLshift: 3,
-	ArithRshift: 3,
+	ArithMul:    2,
+	ArithDiv:    2,
+	ArithMod:    2,
+	ArithLshift: 2,
+	ArithRshift: 2,
 	ArithAnd:    2,
-	ArithOr:     0,
+	ArithPlus:   1,
+	ArithMinus:  1,
+	ArithOr:     1,
 	ArithXor:    1,
 }
