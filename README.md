@@ -99,7 +99,7 @@ Simple math expressions and label references can be used within the argument:
 
 Supported arithmetic operations include addition (+), subtraction (-), multiplication (*),
 division (/), and modulo (%). There is also support for bit-shifts (<<, >>), bitwise AND
-(&), OR (|), XOR (^).
+(&), OR (|), XOR (^). Note operator precedence is same as Go.
 
 All arithmetic is performed with arbitrary precision integers. The result of calculations
 must fit into 256 bits in order to be valid as a PUSH argument. For sized push, the result
