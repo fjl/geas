@@ -210,9 +210,9 @@ func parseMacroDef(p *Parser) {
 	case instMacroIdent:
 		parseInstructionMacroDef(p, name)
 		return
+	case identifier:
 	default:
 		p.unexpected(name)
-	case identifier:
 	}
 
 	// Parse parameters and body.

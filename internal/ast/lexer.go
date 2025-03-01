@@ -73,13 +73,6 @@ const (
 	arith                               // arithmetic operation
 )
 
-const (
-	decimalNumbers = "1234567890"                                           // characters representing any decimal number
-	hexNumbers     = decimalNumbers + "aAbBcCdDeEfF"                        // characters representing any hexadecimal
-	alpha          = "abcdefghijklmnopqrstuwvxyzABCDEFGHIJKLMNOPQRSTUWVXYZ" // characters representing alphanumeric
-	identChars     = alpha + "_" + decimalNumbers
-)
-
 // lexer is the basic construct for parsing
 // source code and turning them in to tokens.
 // Tokens are interpreted by the compiler.
@@ -389,10 +382,6 @@ func lexIdentifier(l *lexer) stateFn {
 		}
 	}
 	return lexNext
-}
-
-func isLetter(t rune) bool {
-	return unicode.IsLetter(t)
 }
 
 func isSpace(t rune) bool {
