@@ -86,10 +86,10 @@ func (d *Disassembler) Disassemble(bytecode []byte, outW io.Writer) error {
 	for pc := 0; pc < len(bytecode); pc++ {
 		op := d.evm.OpByCode(bytecode[pc])
 		d.newline(out, prevOp, op)
+		d.printPrefix(out, pc)
 		if op == nil {
 			d.printInvalid(out, bytecode[pc])
 		} else {
-			d.printPrefix(out, pc)
 			if op.Push {
 				size := d.printPush(out, op, bytecode[pc:])
 				pc += size
