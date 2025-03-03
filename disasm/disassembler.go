@@ -151,7 +151,7 @@ func (d *Disassembler) newline(out io.Writer, prevOp *evm.Op, nextOp *evm.Op) {
 	if d.noBlanks || nextOp == nil {
 		return
 	}
-	if prevOp.Jump || nextOp.JumpDest {
+	if prevOp.Jump || nextOp.JumpDest || prevOp.Term {
 		out.Write([]byte{'\n'})
 	}
 }
