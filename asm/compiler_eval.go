@@ -134,7 +134,6 @@ func (prog *compilerProg) assignPushArg(inst *instruction, v *big.Int, setSize b
 	if len(b) > 32 {
 		return ecPushOverflow256
 	}
-	// TODO: also handle negative int
 
 	_, hasExplicitSize := inst.explicitPushSize()
 	if setSize && !hasExplicitSize {
