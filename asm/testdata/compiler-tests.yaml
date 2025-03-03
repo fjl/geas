@@ -55,7 +55,7 @@ assemble-directive-fork-inherit:
       push 1
       #assemble "file.eas"
     files:
-      file.eas:  |
+      file.eas: |
         random
   output:
     errors:
@@ -794,6 +794,13 @@ push-expression:
       label: STOP
   output:
     bytecode: "6209eaf2 5b 00"
+
+push-hex-leading-zero:
+  input:
+    code: |
+      PUSH 0x00000102
+  output:
+    bytecode: '610102'
 
 push-overflow-256bits:
   input:

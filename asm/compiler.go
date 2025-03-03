@@ -29,6 +29,7 @@ import (
 
 	"github.com/fjl/geas/internal/ast"
 	"github.com/fjl/geas/internal/evm"
+	"github.com/fjl/geas/internal/lzint"
 )
 
 // Compiler turns assembly source into bytecode.
@@ -38,7 +39,7 @@ type Compiler struct {
 	maxIncDepth    int
 	maxErrors      int
 	defaultFork    string
-	macroOverrides map[string]*big.Int
+	macroOverrides map[string]*lzint.Value
 
 	globals    *globalScope
 	macroStack map[*ast.InstructionMacroDef]struct{}
@@ -61,7 +62,7 @@ func New(fsys fs.FS) *Compiler {
 		maxIncDepth:    128,
 		maxErrors:      10,
 		defaultFork:    evm.LatestFork,
-		macroOverrides: make(map[string]*big.Int),
+		macroOverrides: make(map[string]*lzint.Value),
 	}
 }
 
@@ -104,14 +105,14 @@ func (c *Compiler) SetMaxErrors(limit int) {
 
 // SetGlobal sets the value of a global expression macro.
 // Note the name must start with an uppercase letter to make it global.
-func (c *Compiler) SetGlobal(name string, value *big.Int) {
+func (c *Compiler) SetGlobal(name string, v *big.Int) {
 	if !ast.IsGlobal(name) {
 		panic(fmt.Sprintf("override name %q is not global (uppercase)", name))
 	}
-	if value == nil {
+	if v == nil {
 		delete(c.macroOverrides, name)
 	} else {
-		c.macroOverrides[name] = value
+		c.macroOverrides[name] = lzint.FromInt(v)
 	}
 }
 

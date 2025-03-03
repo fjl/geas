@@ -60,7 +60,7 @@ func (c *Compiler) preEvaluateArgs(e *evaluator, prog *compilerProg) {
 			c.errorAt(inst.ast, err)
 			continue
 		}
-		if err := prog.assignPushArg(inst, v, true); err != nil {
+		if err := prog.assignPushArg(inst, v.Int(), true); err != nil {
 			c.errorAt(inst.ast, err)
 			continue
 		}
@@ -113,7 +113,7 @@ func (c *Compiler) evaluateArgs(e *evaluator, prog *compilerProg) (inst *instruc
 			if err != nil {
 				return inst, err
 			}
-			if err := prog.assignPushArg(inst, v, false); err != nil {
+			if err := prog.assignPushArg(inst, v.Int(), false); err != nil {
 				return inst, err
 			}
 		}

@@ -19,8 +19,9 @@ package ast
 import (
 	"fmt"
 	"maps"
-	"math/big"
 	"slices"
+
+	"github.com/fjl/geas/internal/lzint"
 )
 
 // Document is the toplevel of the AST. It represents a list of abstract instructions and
@@ -199,11 +200,11 @@ type (
 
 // expression types
 type (
-	Expr interface{}
+	Expr any
 
 	LiteralExpr struct {
 		tok   token
-		Value *big.Int
+		Value *lzint.Value // cached value
 	}
 
 	LabelRefExpr struct {

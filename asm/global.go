@@ -18,9 +18,9 @@ package asm
 
 import (
 	"fmt"
-	"math/big"
 
 	"github.com/fjl/geas/internal/ast"
+	"github.com/fjl/geas/internal/lzint"
 )
 
 // globalScope holds definitions across files.
@@ -102,12 +102,12 @@ func (gs *globalScope) registerExprMacro(name string, def globalDef[*ast.Express
 }
 
 // overrideExprMacroValue sets a macro to the given value, overriding its definition.
-func (gs *globalScope) overrideExprMacroValue(name string, value *big.Int) {
+func (gs *globalScope) overrideExprMacroValue(name string, val *lzint.Value) {
 	gs.exprMacro[name] = globalDef[*ast.ExpressionMacroDef]{
 		doc: nil,
 		def: &ast.ExpressionMacroDef{
 			Name: name,
-			Body: &ast.LiteralExpr{Value: value},
+			Body: &ast.LiteralExpr{Value: val},
 		},
 	}
 }

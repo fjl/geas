@@ -34,7 +34,7 @@ type evalErrorTest struct {
 	err  string
 }
 
-var evalTests = []evalTest{
+var evalIntTests = []evalTest{
 	// arithmetic
 	{expr: `1`, result: "1"},
 	{expr: `1 + 4`, result: "5"},
@@ -60,7 +60,7 @@ var evalTests = []evalTest{
 	{expr: `12 / 6 * 3`, result: "6"},
 	// -- and binds more strongly than or
 	{expr: `0xff00 | 0xff & 0x0f`, result: "0xff0f"},
-	{expr: `0xff & 0x0f	| 0xff00`, result: "0xff0f"},
+	{expr: `0xff & 0x0f | 0xff00`, result: "0xff0f"},
 	{expr: `0xff & (0x0f | 0xff00)`, result: "0x0f"},
 	// -- shift binds more strongly than and/or
 	{expr: `0xff >> 4 & 0x05`, result: "0x05"},
@@ -78,10 +78,14 @@ var evalTests = []evalTest{
 	// builtins
 	{expr: `.bitlen(0)`, result: "0"},
 	{expr: `.bitlen(0xff)`, result: "8"},
+	{expr: `.bitlen(0x1ff)`, result: "9"},
 	{expr: `.bitlen(0x01ff)`, result: "9"},
 	{expr: `.bytelen(0)`, result: "0"},
 	{expr: `.bytelen(0xff)`, result: "1"},
+	{expr: `.bytelen(0x1ff)`, result: "2"},
 	{expr: `.bytelen(0x01ff)`, result: "2"},
+	{expr: `.bytelen(0x0001ff)`, result: "3"},   // note: leading zero byte
+	{expr: `.bytelen(0x000001ff)`, result: "4"}, // two leading zero bytes
 	{expr: `.bytelen("foobar")`, result: "6"},
 	{expr: `.abs(0 - 10)`, result: "10"},
 	{expr: `.sha256("text")`, result: "68832153269555879243704685382415794081420120252170153643880971663484982053329"},
@@ -99,6 +103,7 @@ var evalErrorTests = []evalErrorTest{
 	// builtins
 	{expr: `.selector("transfer(,,uint256)")`, err: "invalid ABI selector"},
 	{expr: `.address(0x658bdf435d810c91414EC09147daa6db62406379)`, err: errAddressChecksum.Error()},
+	{expr: `.sha256(0x011)`, err: "odd-length hex in bytes context"},
 }
 
 var evalTestDoc *ast.Document
@@ -140,7 +145,7 @@ func evalEnvironmentForTesting() *evalEnvironment {
 }
 
 func TestExprEval(t *testing.T) {
-	for _, test := range evalTests {
+	for _, test := range evalIntTests {
 		expr, err := parseExprString(test.expr)
 		if err != nil {
 			t.Errorf("invalid expr %q: %v", test.expr, err)
@@ -154,7 +159,7 @@ func TestExprEval(t *testing.T) {
 			t.Errorf("eval error in %q: %v", test.expr, err)
 			continue
 		}
-		if result.Cmp(expectedResult) != 0 {
+		if result.Int().Cmp(expectedResult) != 0 {
 			t.Errorf("expr %q result %v, want %v", test.expr, result, expectedResult)
 			continue
 		}
@@ -172,7 +177,7 @@ func TestExprEvalErrors(t *testing.T) {
 		env := evalEnvironmentForTesting()
 		result, err := e.eval(expr, env)
 		if err == nil {
-			t.Errorf("expected error evaluating %q, got %d", test.expr, result)
+			t.Errorf("expected error evaluating %q, got %v", test.expr, result)
 			continue
 		}
 		if err.Error() != test.err {

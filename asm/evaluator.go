@@ -24,6 +24,7 @@ import (
 	"slices"
 
 	"github.com/fjl/geas/internal/ast"
+	"github.com/fjl/geas/internal/lzint"
 )
 
 // evaluator is for evaluating expressions.
@@ -42,7 +43,7 @@ type evalLabelKey struct {
 type evalEnvironment struct {
 	doc       *ast.Document
 	macroArgs *instrMacroArgs
-	variables map[string]*big.Int
+	variables map[string]*lzint.Value
 }
 
 func newEvaluator(gs *globalScope) *evaluator {
@@ -108,7 +109,7 @@ func (e *evaluator) isLabelUsed(li *ast.LabelDefSt) bool {
 	return ok
 }
 
-func (e *evaluator) eval(expr ast.Expr, env *evalEnvironment) (*big.Int, error) {
+func (e *evaluator) eval(expr ast.Expr, env *evalEnvironment) (*lzint.Value, error) {
 	switch expr := expr.(type) {
 	case *ast.LiteralExpr:
 		return e.evalLiteral(expr, env)
@@ -125,22 +126,31 @@ func (e *evaluator) eval(expr ast.Expr, env *evalEnvironment) (*big.Int, error) 
 	}
 }
 
-func (e *evaluator) evalLiteral(expr *ast.LiteralExpr, env *evalEnvironment) (*big.Int, error) {
+// evalAsBytes gives the byte value of an expression.
+func (e *evaluator) evalAsBytes(expr ast.Expr, env *evalEnvironment) ([]byte, error) {
+	v, err := e.eval(expr, env)
+	if err != nil {
+		return nil, err
+	}
+	return v.Bytes()
+}
+
+func (e *evaluator) evalLiteral(expr *ast.LiteralExpr, env *evalEnvironment) (*lzint.Value, error) {
 	if expr.Value != nil {
 		return expr.Value, nil
 	}
 
 	switch {
 	case expr.IsNumber():
-		val, ok := new(big.Int).SetString(expr.Text(), 0)
-		if !ok {
-			return nil, fmt.Errorf("invalid number %q", expr.Text())
+		val, err := lzint.ParseNumberLiteral(expr.Text())
+		if err != nil {
+			return nil, err
 		}
 		expr.Value = val
 		return val, nil
 
 	case expr.IsString():
-		val := new(big.Int).SetBytes([]byte(expr.Text()))
+		val := lzint.FromBytes([]byte(expr.Text()))
 		expr.Value = val
 		return val, nil
 
@@ -149,7 +159,7 @@ func (e *evaluator) evalLiteral(expr *ast.LiteralExpr, env *evalEnvironment) (*b
 	}
 }
 
-func (e *evaluator) evalLabelRef(expr *ast.LabelRefExpr, env *evalEnvironment) (*big.Int, error) {
+func (e *evaluator) evalLabelRef(expr *ast.LabelRefExpr, env *evalEnvironment) (*lzint.Value, error) {
 	pc, pcValid, err := e.lookupLabel(env.doc, expr)
 	if err != nil {
 		return nil, err
@@ -160,22 +170,22 @@ func (e *evaluator) evalLabelRef(expr *ast.LabelRefExpr, env *evalEnvironment) (
 		// this case.
 		return nil, unassignedLabelError{lref: expr}
 	}
-	val := big.NewInt(int64(pc))
-	return val, nil
+	return lzint.FromInt(big.NewInt(int64(pc))), nil
 }
 
 var bigMaxUint = new(big.Int).SetUint64(math.MaxUint)
 
-func (e *evaluator) evalArith(expr *ast.ArithExpr, env *evalEnvironment) (*big.Int, error) {
+func (e *evaluator) evalArith(expr *ast.ArithExpr, env *evalEnvironment) (*lzint.Value, error) {
 	// compute operands
-	left, err := e.eval(expr.Left, env)
+	leftVal, err := e.eval(expr.Left, env)
 	if err != nil {
 		return nil, err
 	}
-	right, err := e.eval(expr.Right, env)
+	rightVal, err := e.eval(expr.Right, env)
 	if err != nil {
 		return nil, err
 	}
+	left, right := leftVal.Int(), rightVal.Int()
 
 	// apply op
 	var v *big.Int
@@ -230,12 +240,13 @@ func (e *evaluator) evalArith(expr *ast.ArithExpr, env *evalEnvironment) (*big.I
 	default:
 		panic(fmt.Errorf("invalid arith op %v", expr.Op))
 	}
-	return v, nil
+
+	return lzint.FromInt(v), nil
 }
 
-func (e *evaluator) evalVariable(expr *ast.VariableExpr, env *evalEnvironment) (*big.Int, error) {
-	v := env.variables[expr.Ident]
-	if v != nil {
+func (e *evaluator) evalVariable(expr *ast.VariableExpr, env *evalEnvironment) (*lzint.Value, error) {
+	v, ok := env.variables[expr.Ident]
+	if ok {
 		return v, nil
 	}
 	// Check for instruction macro args.
@@ -251,7 +262,7 @@ func (e *evaluator) evalVariable(expr *ast.VariableExpr, env *evalEnvironment) (
 	return nil, fmt.Errorf("%w $%s", ecUndefinedVariable, expr.Ident)
 }
 
-func (e *evaluator) evalMacroCall(expr *ast.MacroCallExpr, env *evalEnvironment) (*big.Int, error) {
+func (e *evaluator) evalMacroCall(expr *ast.MacroCallExpr, env *evalEnvironment) (*lzint.Value, error) {
 	if expr.Builtin {
 		builtin, ok := builtinMacros[expr.Ident]
 		if ok {
@@ -272,7 +283,7 @@ func (e *evaluator) evalMacroCall(expr *ast.MacroCallExpr, env *evalEnvironment)
 
 	// Bind arguments.
 	macroEnv := &evalEnvironment{
-		variables: make(map[string]*big.Int, len(def.Params)),
+		variables: make(map[string]*lzint.Value, len(def.Params)),
 		doc:       defdoc,
 	}
 	if err := checkArgCount(expr, len(def.Params)); err != nil {
