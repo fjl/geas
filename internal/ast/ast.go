@@ -46,7 +46,7 @@ type Document struct {
 func (doc *Document) LookupLabel(lref *LabelRefExpr) (*LabelDefSt, *Document) {
 	for doc != nil {
 		li, ok := doc.labels[lref.Ident]
-		if ok && li.Dotted == lref.Dotted {
+		if ok {
 			return li, doc
 		}
 		doc = doc.Parent

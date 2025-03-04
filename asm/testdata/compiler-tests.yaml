@@ -122,6 +122,23 @@ dot-label-at-end:
   output:
     bytecode: "6002"
 
+dot-label-reference-1:
+  input:
+    code: |
+      PUSH @end
+      .end:
+  output:
+    bytecode: "6002"
+
+dot-label-reference-2:
+  input:
+    code: |
+      PUSH @.end
+      end:
+  output:
+    errors:
+      - ":1: can't use @.end to refer to label end:"
+
 dot-label-begin:
   input:
     code: |
@@ -699,6 +716,15 @@ jump-dotted-label:
   output:
     errors:
       - ':1: JUMP to dotted label @.wrong'
+
+jump-dotted-label-2:
+  input:
+    code: |
+      JUMP @wrong
+      .wrong: STOP
+  output:
+    errors:
+      - ':1: JUMP to dotted label @wrong'
 
 jump-undefined-label:
   input:

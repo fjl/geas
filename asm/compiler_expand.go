@@ -141,6 +141,9 @@ func (c *Compiler) validateJumpArg(doc *ast.Document, arg ast.Expr) error {
 	if li == nil {
 		return fmt.Errorf("%w %v", ecJumpToUndefinedLabel, lref)
 	}
+	if li.Dotted {
+		return fmt.Errorf("%w %v", ecJumpToDottedLabel, lref)
+	}
 	return nil
 }
 

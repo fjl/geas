@@ -95,8 +95,8 @@ func (e *evaluator) lookupLabel(doc *ast.Document, lref *ast.LabelRefExpr) (pc i
 	if li == nil {
 		return 0, false, fmt.Errorf("undefined label %v", lref)
 	}
-	if li.Dotted != lref.Dotted {
-		return 0, false, fmt.Errorf("undefined label %v (but %v exists)", lref, li)
+	if lref.Dotted && !li.Dotted {
+		return 0, false, fmt.Errorf("can't use %v to refer to label %s:", lref, li.Name())
 	}
 	// mark label used (for unused label analysis)
 	e.usedLabels[li] = struct{}{}
