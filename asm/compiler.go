@@ -204,7 +204,7 @@ func (c *Compiler) compileDocument(doc *ast.Document) (output []byte) {
 		c.globals.overrideExprMacroValue(name, val)
 	}
 
-	// Choose latest eth mainnet instruction set if not configured.
+	// Choose configured instruction set, but only if not configured by a pragma.
 	if prog.evm == nil {
 		prog.evm = evm.FindInstructionSet(c.defaultFork)
 	}
