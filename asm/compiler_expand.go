@@ -23,6 +23,7 @@ import (
 
 	"github.com/fjl/geas/internal/ast"
 	"github.com/fjl/geas/internal/evm"
+	"github.com/fjl/geas/internal/lzint"
 )
 
 // expand appends a list of AST instructions to the program.
@@ -49,12 +50,11 @@ func (li labelDefStatement) expand(c *Compiler, doc *ast.Document, prog *compile
 			return err
 		}
 	}
-
-	inst := newInstruction(li, "")
+	prog.addLabel(li.LabelDefSt, doc)
 	if !li.Dotted {
-		inst.op = "JUMPDEST"
+		inst := newInstruction(li, "JUMPDEST")
+		prog.addInstruction(inst)
 	}
-	prog.addInstruction(inst)
 	return nil
 }
 
@@ -250,14 +250,24 @@ func (inst assembleStatement) expand(c *Compiler, doc *ast.Document, prog *compi
 	}
 	bytecode := subc.CompileFile(file)
 	c.errors.add(subc.ErrorsAndWarnings()...)
-	if len(bytecode) > 0 {
-		datainst := &instruction{data: bytecode}
-		prog.addInstruction(datainst)
+	if !subc.Failed() && len(bytecode) == 0 {
+		c.warnf(inst, "empty bytecode output")
+		return nil
 	}
+	// Here we turn #assemble into a #bytes statement with a literal argument.
+	prog.addInstruction(&instruction{
+		op: "#bytes",
+		ast: bytesStatement{
+			&ast.BytesSt{
+				Value: ast.MakeNumber(lzint.FromBytes(bytecode)),
+			},
+		},
+	})
 	return nil
 }
 
+// expand of #bytes just adds a data instruction to the program.
 func (inst bytesStatement) expand(c *Compiler, doc *ast.Document, prog *compilerProg) error {
-	prog.addInstruction(&instruction{ast: inst})
+	prog.addInstruction(newInstruction(inst, "#bytes"))
 	return nil
 }

@@ -17,8 +17,8 @@
 package asm
 
 import (
+	"fmt"
 	"iter"
-	"slices"
 	"strings"
 
 	"github.com/fjl/geas/internal/ast"
@@ -28,23 +28,52 @@ import (
 // compilerProg is the output program of the compiler.
 // It contains sections of instructions.
 type compilerProg struct {
+	elems []any
+	evm   *evm.InstructionSet
+
+	// Toplevel is the topmost section.
 	toplevel *compilerSection
-	cur      *compilerSection
-	evm      *evm.InstructionSet
+
+	// This tracks the current section.
+	cur *compilerSection
+
+	// Labels contains all labels in the program.
+	labels []*compilerLabel
+
+	// This tracks the latest label definitions which haven't been assigned to an
+	// instruction yet. When the next instruction is added after a label, the
+	// instruction will be linked to the label.
+	currentLabels []*compilerLabel
 }
 
 // compilerSection is a section of the output program.
 type compilerSection struct {
-	doc *ast.Document
-	env *evalEnvironment
+	doc    *ast.Document
+	env    *evalEnvironment
+	parent *compilerSection
+
+	// Bounds of the section.
+	startPC int
+	endPC   int
 
 	// This tracks the arguments of instruction macro calls. When the compiler expands a
 	// macro, it creates a unique section for each call site. The arguments of the call
 	// are stored for use by the expression evaluator.
 	macroArgs *instrMacroArgs
+}
 
-	parent   *compilerSection
-	children []any
+type sectionStartElem struct {
+	section *compilerSection
+}
+
+type sectionEndElem struct {
+	section *compilerSection
+}
+
+type compilerLabel struct {
+	doc   *ast.Document
+	def   *ast.LabelDefSt
+	instr *instruction // pointed-to instruction
 }
 
 type instrMacroArgs struct {
@@ -59,14 +88,27 @@ func newCompilerProg(topdoc *ast.Document) *compilerProg {
 	return p
 }
 
+// finishExpansion is called after the Compiler is done with expansion. Here we add an empty
+// instruction at the program end, as a destination for labels.
+func (p *compilerProg) finishExpansion() {
+	if len(p.currentLabels) > 0 {
+		p.addInstruction(newInstruction(nil, ""))
+	}
+	if p.cur != p.toplevel {
+		panic("section stack was not unwound by expansion")
+	}
+	p.elems = append(p.elems, sectionEndElem{p.toplevel})
+}
+
 // pushSection creates a new section as a child of the current one.
 func (p *compilerProg) pushSection(doc *ast.Document, macroArgs *instrMacroArgs) *compilerSection {
 	s := &compilerSection{doc: doc, macroArgs: macroArgs}
 	s.env = newEvalEnvironment(s)
+
 	if p.cur != nil {
 		s.parent = p.cur
-		p.cur.children = append(p.cur.children, s)
 	}
+	p.elems = append(p.elems, sectionStartElem{s})
 	p.cur = s
 	return s
 }
@@ -76,6 +118,7 @@ func (p *compilerProg) popSection() {
 	if p.cur.parent == nil {
 		panic("too much pop")
 	}
+	p.elems = append(p.elems, sectionEndElem{p.cur})
 	p.cur = p.cur.parent
 }
 
@@ -84,55 +127,70 @@ func (p *compilerProg) currentSection() *compilerSection {
 	return p.cur
 }
 
+// addLabel appends a label definition to the program.
+func (p *compilerProg) addLabel(l *ast.LabelDefSt, doc *ast.Document) {
+	cl := &compilerLabel{doc: doc, def: l}
+	p.currentLabels = append(p.currentLabels, cl)
+	p.labels = append(p.labels, cl)
+}
+
 // addInstruction appends an instruction to the current section.
 func (p *compilerProg) addInstruction(inst *instruction) {
-	p.cur.children = append(p.cur.children, inst)
+	p.elems = append(p.elems, inst)
+	for _, cl := range p.currentLabels {
+		cl.instr = inst
+	}
+	p.currentLabels = p.currentLabels[:0]
 }
 
 // iterInstructions returns an iterator over all instructions in the program.
 func (p *compilerProg) iterInstructions() iter.Seq2[*compilerSection, *instruction] {
-	type stackElem struct {
-		s *compilerSection
-		i int
-	}
-	stack := []stackElem{{p.toplevel, 0}}
 	return func(yield func(*compilerSection, *instruction) bool) {
-	outer:
-		for len(stack) > 0 {
-			e := &stack[len(stack)-1]
-			for e.i < len(e.s.children) {
-				cld := e.s.children[e.i]
-				e.i++
-				switch cld := cld.(type) {
-				case *instruction:
-					if !yield(e.s, cld) {
-						return
-					}
-				case *compilerSection:
-					stack = append(stack, stackElem{cld, 0})
-					continue outer
+		var s = p.toplevel
+		for _, elem := range p.elems {
+			switch elem := elem.(type) {
+			case *instruction:
+				if !yield(s, elem) {
+					return
 				}
+			case sectionStartElem:
+				s = elem.section
+			case sectionEndElem:
+				s = elem.section.parent
+			default:
+				panic(fmt.Sprintf("BUG: unhandled section type %T", elem))
 			}
-			stack = stack[:len(stack)-1]
 		}
 	}
 }
 
 // iterSections returns an iterator over all sections in the program.
 func (p *compilerProg) iterSections() iter.Seq[*compilerSection] {
-	stack := []*compilerSection{p.toplevel}
 	return func(yield func(*compilerSection) bool) {
-		for len(stack) > 0 {
-			section := stack[len(stack)-1]
-			stack = stack[:len(stack)-1]
-			if !yield(section) {
-				return
-			}
-			for _, cld := range slices.Backward(section.children) {
-				if clds, ok := cld.(*compilerSection); ok {
-					stack = append(stack, clds)
+		for _, elem := range p.elems {
+			if elem, ok := elem.(sectionStartElem); ok {
+				if !yield(elem.section) {
+					return
 				}
 			}
+		}
+	}
+}
+
+// computePC assigns the PC values of all instructions and labels.
+func (p *compilerProg) computePC() {
+	var pc int
+	for _, elem := range p.elems {
+		switch elem := elem.(type) {
+		case *instruction:
+			elem.pc = pc
+			pc += elem.encodedSize()
+		case sectionStartElem:
+			elem.section.startPC = pc
+		case sectionEndElem:
+			elem.section.endPC = pc
+		default:
+			panic(fmt.Sprintf("BUG: unhandled section type %T", elem))
 		}
 	}
 }
@@ -158,6 +216,10 @@ func isPush(op string) bool {
 	return strings.HasPrefix(op, "PUSH")
 }
 
+func isBytes(op string) bool {
+	return op == "#bytes"
+}
+
 func isJump(op string) bool {
 	return strings.HasPrefix(op, "JUMP")
 }
@@ -173,9 +235,6 @@ func (inst *instruction) explicitPushSize() (int, bool) {
 
 // expr returns the instruction argument.
 func (inst *instruction) expr() ast.Expr {
-	if inst.op != "" && !isPush(inst.op) {
-		return nil
-	}
 	switch st := inst.ast.(type) {
 	case opcodeStatement:
 		return st.Arg
@@ -186,7 +245,19 @@ func (inst *instruction) expr() ast.Expr {
 	}
 }
 
-func (inst *instruction) isBytes() bool {
-	_, ok := inst.ast.(bytesStatement)
-	return ok
+// dataSize gives the size of the encoded argument.
+func (inst *instruction) dataSize() int {
+	if isPush(inst.op) {
+		return inst.pushSize
+	}
+	return len(inst.data)
+}
+
+// encodedSize gives the size of the instruction in bytecode.
+func (inst *instruction) encodedSize() int {
+	size := 0
+	if !isBytes(inst.op) {
+		size = 1
+	}
+	return size + inst.dataSize()
 }

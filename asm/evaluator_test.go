@@ -131,17 +131,33 @@ func evaluatorForTesting() *evaluator {
 		panic(fmt.Errorf("error in registerDefinitions: %v", errs[0]))
 	}
 	e := newEvaluator(gs)
-	e.setLabelPC(evalTestDoc, evalTestDoc.Statements[0].(*ast.LabelDefSt), 1)
-	e.setLabelPC(evalTestDoc, evalTestDoc.Statements[1].(*ast.LabelDefSt), 2)
-	e.setLabelPC(evalTestDoc, evalTestDoc.Statements[2].(*ast.LabelDefSt), 3)
-	e.setLabelPC(evalTestDoc, evalTestDoc.Statements[3].(*ast.LabelDefSt), 4)
+	e.registerLabels([]*compilerLabel{
+		{
+			doc:   evalTestDoc,
+			def:   evalTestDoc.Statements[0].(*ast.LabelDefSt),
+			instr: &instruction{pc: 1},
+		},
+		{
+			doc:   evalTestDoc,
+			def:   evalTestDoc.Statements[1].(*ast.LabelDefSt),
+			instr: &instruction{pc: 2},
+		},
+		{
+			doc:   evalTestDoc,
+			def:   evalTestDoc.Statements[2].(*ast.LabelDefSt),
+			instr: &instruction{pc: 3},
+		},
+		{
+			doc:   evalTestDoc,
+			def:   evalTestDoc.Statements[3].(*ast.LabelDefSt),
+			instr: &instruction{pc: 4},
+		},
+	})
 	return e
 }
 
 func evalEnvironmentForTesting() *evalEnvironment {
-	return newEvalEnvironment(&compilerSection{
-		doc: evalTestDoc,
-	})
+	return newEvalEnvironment(&compilerSection{doc: evalTestDoc})
 }
 
 func TestExprEval(t *testing.T) {

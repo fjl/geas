@@ -29,10 +29,11 @@ import (
 
 // evaluator is for evaluating expressions.
 type evaluator struct {
-	inStack    map[*ast.ExpressionMacroDef]struct{}
-	labelPC    map[evalLabelKey]int
-	usedLabels map[*ast.LabelDefSt]struct{}
-	globals    *globalScope
+	inStack     map[*ast.ExpressionMacroDef]struct{}
+	labelInstr  map[evalLabelKey]*instruction
+	usedLabels  map[*ast.LabelDefSt]struct{}
+	globals     *globalScope
+	labelsValid bool // while false, evaluating labels returns unassignedLabelErr
 }
 
 type evalLabelKey struct {
@@ -40,19 +41,11 @@ type evalLabelKey struct {
 	l   *ast.LabelDefSt
 }
 
+// evalEnvironment holds the definitions available for evaluation.
 type evalEnvironment struct {
-	doc       *ast.Document
-	macroArgs *instrMacroArgs
-	variables map[string]*lzint.Value
-}
-
-func newEvaluator(gs *globalScope) *evaluator {
-	return &evaluator{
-		inStack:    make(map[*ast.ExpressionMacroDef]struct{}),
-		labelPC:    make(map[evalLabelKey]int),
-		usedLabels: make(map[*ast.LabelDefSt]struct{}),
-		globals:    gs,
-	}
+	doc       *ast.Document           // for resolving local macros
+	macroArgs *instrMacroArgs         // args of the current instruction macro
+	variables map[string]*lzint.Value // args of the current expression macro
 }
 
 func newEvalEnvironment(s *compilerSection) *evalEnvironment {
@@ -60,6 +53,37 @@ func newEvalEnvironment(s *compilerSection) *evalEnvironment {
 		panic("nil section")
 	}
 	return &evalEnvironment{doc: s.doc, macroArgs: s.macroArgs}
+}
+
+// makeCallEnvironment creates the environment for an expression macro call.
+func (env *evalEnvironment) makeCallEnvironment(defdoc *ast.Document, def *ast.ExpressionMacroDef) *evalEnvironment {
+	return &evalEnvironment{
+		doc:       defdoc,
+		variables: make(map[string]*lzint.Value, len(def.Params)),
+	}
+}
+
+func newEvaluator(gs *globalScope) *evaluator {
+	return &evaluator{
+		inStack:    make(map[*ast.ExpressionMacroDef]struct{}),
+		labelInstr: make(map[evalLabelKey]*instruction),
+		usedLabels: make(map[*ast.LabelDefSt]struct{}),
+		globals:    gs,
+	}
+}
+
+// registerLabels sets up the label-to-instruction mapping. This also makes labels
+// available for evaluation, so the compiler calls this after attempting to pre-evaluate
+// the arguments.
+func (e *evaluator) registerLabels(labels []*compilerLabel) {
+	for _, cl := range labels {
+		if cl.def.Global {
+			e.globals.setLabelInstr(cl.def.Name(), cl.instr)
+		} else {
+			e.labelInstr[evalLabelKey{cl.doc, cl.def}] = cl.instr
+		}
+	}
+	e.labelsValid = true
 }
 
 // lookupExprMacro finds a macro definition in the document chain.
@@ -73,34 +97,34 @@ func (e *evaluator) lookupExprMacro(env *evalEnvironment, name string) (*ast.Exp
 	return nil, nil
 }
 
-// setLabelPC stores the offset of a label within a document.
-func (e *evaluator) setLabelPC(doc *ast.Document, li *ast.LabelDefSt, pc int) {
-	if li.Global {
-		e.globals.setLabelPC(li.Name(), pc)
-	} else {
-		e.labelPC[evalLabelKey{doc, li}] = pc
-	}
-}
-
 // lookupLabel resolves a label reference.
 func (e *evaluator) lookupLabel(doc *ast.Document, lref *ast.LabelRefExpr) (pc int, pcValid bool, err error) {
+	if !e.labelsValid {
+		return 0, false, nil
+	}
+
 	var li *ast.LabelDefSt
+	var instr *instruction
 	if lref.Global {
-		pc, pcValid, li = e.globals.lookupLabel(lref)
+		instr, li = e.globals.lookupLabel(lref)
 	} else {
 		var srcdoc *ast.Document
 		li, srcdoc = doc.LookupLabel(lref)
-		pc, pcValid = e.labelPC[evalLabelKey{srcdoc, li}]
+		instr = e.labelInstr[evalLabelKey{srcdoc, li}]
 	}
 	if li == nil {
 		return 0, false, fmt.Errorf("undefined label %v", lref)
 	}
 	if lref.Dotted && !li.Dotted {
+		//lint:ignore ST1005 using : at the end of message here to refer to a label definition
 		return 0, false, fmt.Errorf("can't use %v to refer to label %s:", lref, li.Name())
+	}
+	if instr == nil {
+		return 0, false, nil
 	}
 	// mark label used (for unused label analysis)
 	e.usedLabels[li] = struct{}{}
-	return pc, pcValid, nil
+	return instr.pc, true, nil
 }
 
 // isLabelUsed reports whether the given label definition was used during expression evaluation.
@@ -282,16 +306,13 @@ func (e *evaluator) evalMacroCall(expr *ast.MacroCallExpr, env *evalEnvironment)
 	defer e.exitMacro(def)
 
 	// Bind arguments.
-	macroEnv := &evalEnvironment{
-		variables: make(map[string]*lzint.Value, len(def.Params)),
-		doc:       defdoc,
-	}
 	if err := checkArgCount(expr, len(def.Params)); err != nil {
 		return nil, err
 	}
 	if len(expr.Args) != len(def.Params) {
 		return nil, fmt.Errorf("%w, macro %s needs %d", ecInvalidArgumentCount, expr.Ident, len(def.Params))
 	}
+	macroEnv := env.makeCallEnvironment(defdoc, def)
 	for i, param := range def.Params {
 		v, err := e.eval(expr.Args[i], env)
 		if err != nil {

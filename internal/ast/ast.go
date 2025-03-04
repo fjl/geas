@@ -330,3 +330,11 @@ func (e *LiteralExpr) IsNumber() bool {
 func (e *LiteralExpr) Text() string {
 	return e.tok.text
 }
+
+// MakeNumber creates a number literal with the given value.
+func MakeNumber(v *lzint.Value) *LiteralExpr {
+	return &LiteralExpr{
+		tok:   token{text: v.String(), typ: numberLiteral},
+		Value: v,
+	}
+}
