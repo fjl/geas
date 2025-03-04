@@ -31,6 +31,12 @@ type compilerProg struct {
 	toplevel *compilerSection
 	cur      *compilerSection
 	evm      *evm.InstructionSet
+	labels   []*compilerLabel
+
+	// This tracks the last label definition.
+	// When the next instruction is added after a label, the instruction
+	// will be linked to the label.
+	currentLabels []*compilerLabel
 }
 
 // compilerSection is a section of the output program.
@@ -47,6 +53,12 @@ type compilerSection struct {
 	children []any
 }
 
+type compilerLabel struct {
+	doc   *ast.Document
+	def   *ast.LabelDefSt
+	instr *instruction
+}
+
 type instrMacroArgs struct {
 	callsite *compilerSection
 	def      *ast.InstructionMacroDef
@@ -57,6 +69,14 @@ func newCompilerProg(topdoc *ast.Document) *compilerProg {
 	p := new(compilerProg)
 	p.toplevel = p.pushSection(topdoc, nil)
 	return p
+}
+
+// finish is called after the Compiler is done with expansion. Here we add an empty
+// instruction at the program end, as a destination for labels.
+func (p *compilerProg) finish() {
+	if len(p.currentLabels) > 0 {
+		p.addInstruction(newInstruction(nil, ""))
+	}
 }
 
 // pushSection creates a new section as a child of the current one.
@@ -84,9 +104,20 @@ func (p *compilerProg) currentSection() *compilerSection {
 	return p.cur
 }
 
+// addLabel appends a label definition to the program.
+func (p *compilerProg) addLabel(l *ast.LabelDefSt, doc *ast.Document) {
+	cl := &compilerLabel{doc: doc, def: l}
+	p.currentLabels = append(p.currentLabels, cl)
+	p.labels = append(p.labels, cl)
+}
+
 // addInstruction appends an instruction to the current section.
 func (p *compilerProg) addInstruction(inst *instruction) {
 	p.cur.children = append(p.cur.children, inst)
+	for _, cl := range p.currentLabels {
+		cl.instr = inst
+	}
+	p.currentLabels = p.currentLabels[:0]
 }
 
 // iterInstructions returns an iterator over all instructions in the program.

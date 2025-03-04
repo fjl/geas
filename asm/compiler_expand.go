@@ -49,12 +49,11 @@ func (li labelDefStatement) expand(c *Compiler, doc *ast.Document, prog *compile
 			return err
 		}
 	}
-
-	inst := newInstruction(li, "")
+	prog.addLabel(li.LabelDefSt, doc)
 	if !li.Dotted {
-		inst.op = "JUMPDEST"
+		inst := newInstruction(li, "JUMPDEST")
+		prog.addInstruction(inst)
 	}
-	prog.addInstruction(inst)
 	return nil
 }
 

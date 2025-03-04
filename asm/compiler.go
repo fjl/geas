@@ -214,13 +214,15 @@ func (c *Compiler) compileDocument(doc *ast.Document) (output []byte) {
 	if prog.cur != prog.toplevel {
 		panic("section stack was not unwound by expansion")
 	}
+	prog.finish()
 
 	// Expansion of is now done, and all further steps work on prog.
 	e := newEvaluator(c.globals)
 	c.preEvaluateArgs(e, prog)
+	e.registerLabels(prog.labels)
 
 	for {
-		c.computePC(e, prog)
+		c.computePC(prog)
 
 		// Assign immediate argument values. Here we use a trick to assign sizes for
 		// "PUSH" instructions: their pushSizes are initially set to one. If we get an

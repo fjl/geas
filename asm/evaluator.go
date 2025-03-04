@@ -29,10 +29,11 @@ import (
 
 // evaluator is for evaluating expressions.
 type evaluator struct {
-	inStack    map[*ast.ExpressionMacroDef]struct{}
-	labelPC    map[evalLabelKey]int
-	usedLabels map[*ast.LabelDefSt]struct{}
-	globals    *globalScope
+	inStack     map[*ast.ExpressionMacroDef]struct{}
+	labelInstr  map[evalLabelKey]*instruction
+	usedLabels  map[*ast.LabelDefSt]struct{}
+	globals     *globalScope
+	labelsValid bool
 }
 
 type evalLabelKey struct {
@@ -49,7 +50,7 @@ type evalEnvironment struct {
 func newEvaluator(gs *globalScope) *evaluator {
 	return &evaluator{
 		inStack:    make(map[*ast.ExpressionMacroDef]struct{}),
-		labelPC:    make(map[evalLabelKey]int),
+		labelInstr: make(map[evalLabelKey]*instruction),
 		usedLabels: make(map[*ast.LabelDefSt]struct{}),
 		globals:    gs,
 	}
@@ -73,24 +74,31 @@ func (e *evaluator) lookupExprMacro(env *evalEnvironment, name string) (*ast.Exp
 	return nil, nil
 }
 
-// setLabelPC stores the offset of a label within a document.
-func (e *evaluator) setLabelPC(doc *ast.Document, li *ast.LabelDefSt, pc int) {
-	if li.Global {
-		e.globals.setLabelPC(li.Name(), pc)
-	} else {
-		e.labelPC[evalLabelKey{doc, li}] = pc
+func (e *evaluator) registerLabels(labels []*compilerLabel) {
+	for _, cl := range labels {
+		if cl.def.Global {
+			e.globals.setLabelInstr(cl.def.Name(), cl.instr)
+		} else {
+			e.labelInstr[evalLabelKey{cl.doc, cl.def}] = cl.instr
+		}
 	}
+	e.labelsValid = true
 }
 
 // lookupLabel resolves a label reference.
 func (e *evaluator) lookupLabel(doc *ast.Document, lref *ast.LabelRefExpr) (pc int, pcValid bool, err error) {
+	if !e.labelsValid {
+		return 0, false, nil
+	}
+
 	var li *ast.LabelDefSt
+	var instr *instruction
 	if lref.Global {
-		pc, pcValid, li = e.globals.lookupLabel(lref)
+		instr, li = e.globals.lookupLabel(lref)
 	} else {
 		var srcdoc *ast.Document
 		li, srcdoc = doc.LookupLabel(lref)
-		pc, pcValid = e.labelPC[evalLabelKey{srcdoc, li}]
+		instr = e.labelInstr[evalLabelKey{srcdoc, li}]
 	}
 	if li == nil {
 		return 0, false, fmt.Errorf("undefined label %v", lref)
@@ -98,9 +106,12 @@ func (e *evaluator) lookupLabel(doc *ast.Document, lref *ast.LabelRefExpr) (pc i
 	if lref.Dotted && !li.Dotted {
 		return 0, false, fmt.Errorf("can't use %v to refer to label %s:", lref, li.Name())
 	}
+	if instr == nil {
+		return 0, false, nil
+	}
 	// mark label used (for unused label analysis)
 	e.usedLabels[li] = struct{}{}
-	return pc, pcValid, nil
+	return instr.pc, true, nil
 }
 
 // isLabelUsed reports whether the given label definition was used during expression evaluation.
