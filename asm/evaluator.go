@@ -112,7 +112,7 @@ func (e *evaluator) isLabelUsed(li *ast.LabelDefSt) bool {
 func (e *evaluator) eval(expr ast.Expr, env *evalEnvironment) (*lzint.Value, error) {
 	switch expr := expr.(type) {
 	case *ast.LiteralExpr:
-		return e.evalLiteral(expr, env)
+		return e.evalLiteral(expr)
 	case *ast.LabelRefExpr:
 		return e.evalLabelRef(expr, env)
 	case *ast.ArithExpr:
@@ -135,7 +135,7 @@ func (e *evaluator) evalAsBytes(expr ast.Expr, env *evalEnvironment) ([]byte, er
 	return v.Bytes()
 }
 
-func (e *evaluator) evalLiteral(expr *ast.LiteralExpr, env *evalEnvironment) (*lzint.Value, error) {
+func (e *evaluator) evalLiteral(expr *ast.LiteralExpr) (*lzint.Value, error) {
 	if expr.Value != nil {
 		return expr.Value, nil
 	}
