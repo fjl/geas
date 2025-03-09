@@ -344,12 +344,16 @@ func (c *Compiler) parseIncludeFile(file string, inst *ast.IncludeSt, depth int)
 func (c *Compiler) generateOutput(prog *compilerProg) []byte {
 	var unreachable unreachableCodeCheck
 	var output []byte
+loop:
 	for _, inst := range prog.iterInstructions() {
 		if len(output) != inst.pc {
 			panic(fmt.Sprintf("BUG: instruction pc=%d, but output has size %d", inst.pc, len(output)))
 		}
 
 		switch {
+		case isBytes(inst.op):
+			output = append(output, inst.data...)
+
 		case isPush(inst.op):
 			if inst.pushSize > 32 {
 				panic("BUG: pushSize > 32")
@@ -379,21 +383,26 @@ func (c *Compiler) generateOutput(prog *compilerProg) []byte {
 			if len(inst.data) < inst.pushSize {
 				output = append(output, make([]byte, inst.pushSize-len(inst.data))...)
 			}
+			output = append(output, inst.data...)
 
 		case inst.op != "":
 			op := prog.evm.OpByName(inst.op)
 			if op == nil {
 				c.errorAt(inst.ast, fmt.Errorf("%w %s", ecUnknownOpcode, inst.op))
+				continue loop
 			}
 			// Unreachable code check.
 			if !c.errors.hasError() {
 				unreachable.check(c, inst.ast, op)
 			}
 			output = append(output, op.Code)
-		}
+			fallthrough
 
-		// Instruction data is always added to output.
-		output = append(output, inst.data...)
+		default:
+			if len(inst.data) > 0 {
+				panic(fmt.Sprintf("BUG: instruction at pc=%d has unexpected data", inst.pc))
+			}
+		}
 	}
 	return output
 }

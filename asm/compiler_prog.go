@@ -277,6 +277,10 @@ func isPush(op string) bool {
 	return strings.HasPrefix(op, "PUSH")
 }
 
+func isBytes(op string) bool {
+	return op == "#bytes"
+}
+
 func isJump(op string) bool {
 	return strings.HasPrefix(op, "JUMP")
 }
@@ -292,9 +296,6 @@ func (inst *instruction) explicitPushSize() (int, bool) {
 
 // expr returns the instruction argument.
 func (inst *instruction) expr() ast.Expr {
-	if inst.op != "" && !isPush(inst.op) {
-		return nil
-	}
 	switch st := inst.ast.(type) {
 	case opcodeStatement:
 		return st.Arg
@@ -303,12 +304,6 @@ func (inst *instruction) expr() ast.Expr {
 	default:
 		return nil
 	}
-}
-
-// isBytes reports whether the instruction is a #bytes statement.
-func (inst *instruction) isBytes() bool {
-	_, ok := inst.ast.(bytesStatement)
-	return ok
 }
 
 // dataSize gives the size of the encoded argument.
@@ -322,7 +317,7 @@ func (inst *instruction) dataSize() int {
 // encodedSize gives the size of the instruction in bytecode.
 func (inst *instruction) encodedSize() int {
 	size := 0
-	if inst.op != "" {
+	if !isBytes(inst.op) {
 		size = 1
 	}
 	return size + inst.dataSize()

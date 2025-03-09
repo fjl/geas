@@ -27,67 +27,64 @@ import (
 // The argument value, inst.data, is assigned this compilation step if the arg expression
 // contains no label references.
 func (c *Compiler) preEvaluateArgs(e *evaluator, prog *compilerProg) {
+loop:
 	for section, inst := range prog.iterInstructions() {
-		if inst.isBytes() {
-			// Handle #bytes.
+		switch {
+		case isBytes(inst.op):
 			v, err := e.evalAsBytes(inst.expr(), section.env)
 			if err == nil {
 				inst.argNoLabels = true
 				inst.data = v
 			}
-			continue
-		}
 
-		// Handle PUSH.
-		argument := inst.expr()
-		if argument == nil {
-			continue
-		}
-		inst.pushSize = 1
-		if s, ok := inst.explicitPushSize(); ok {
-			inst.pushSize = s
-		}
-
-		// Pre-evaluate argument.
-		v, err := e.eval(argument, section.env)
-		var labelErr unassignedLabelError
-		if errors.As(err, &labelErr) {
-			// Expression depends on label position calculation, leave it for later.
-			continue
-		}
-		inst.argNoLabels = true
-		if err != nil {
-			c.errorAt(inst.ast, err)
-			continue
-		}
-		if err := prog.assignPushArg(inst, v.Int(), true); err != nil {
-			c.errorAt(inst.ast, err)
-			continue
+		case isPush(inst.op):
+			if inst.expr() == nil {
+				continue loop // push0
+			}
+			inst.pushSize = 1
+			if s, ok := inst.explicitPushSize(); ok {
+				inst.pushSize = s
+			}
+			// Pre-evaluate argument.
+			v, err := e.eval(inst.expr(), section.env)
+			var labelErr unassignedLabelError
+			if errors.As(err, &labelErr) {
+				// Expression depends on label position calculation, leave it for later.
+				continue loop
+			}
+			inst.argNoLabels = true
+			if err != nil {
+				c.errorAt(inst.ast, err)
+				continue loop
+			}
+			if err := prog.assignPushArg(inst, v.Int(), true); err != nil {
+				c.errorAt(inst.ast, err)
+				continue loop
+			}
 		}
 	}
 }
 
 // evaluateArgs computes the argument values of instructions.
 func (c *Compiler) evaluateArgs(e *evaluator, prog *compilerProg) (inst *instruction, err error) {
+loop:
 	for section, inst := range prog.iterInstructions() {
-		if inst.argNoLabels {
-			continue // pre-calculated
-		}
+		switch {
+		case inst.argNoLabels:
+			// pre-calculated
 
-		if inst.isBytes() {
-			// handle #bytes
+		case isBytes(inst.op):
 			v, err := e.evalAsBytes(inst.expr(), section.env)
 			if err != nil {
 				return inst, err
 			}
 			inst.data = v
-		} else {
-			// handle PUSH
-			argument := inst.expr()
-			if argument == nil {
-				continue // no arg
+
+		case isPush(inst.op):
+			if inst.expr() == nil {
+				continue loop // push0
 			}
-			v, err := e.eval(argument, section.env)
+			v, err := e.eval(inst.expr(), section.env)
 			if err != nil {
 				return inst, err
 			}
