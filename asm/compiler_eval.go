@@ -23,93 +23,72 @@ import (
 
 // preEvaluateArgs computes the initial argument values of instructions.
 //
-// Here we assign the inst.pushSize of all PUSH and PUSH<n> instructions.
-// The argument value, inst.data, is assigned this compilation step if the arg expression
-// contains no label references.
+// Here we assign the inst.dataSize of all PUSH and PUSH<n> instructions. The argument
+// value, inst.data, is assigned this compilation step if the arg expression contains no
+// label references.
 func (c *Compiler) preEvaluateArgs(e *evaluator, prog *compilerProg) {
+loop:
 	for section, inst := range prog.iterInstructions() {
-		if inst.isBytes() {
-			// Handle #bytes.
+		switch {
+		case isBytes(inst.op):
+			inst.argNoLabels = true
 			v, err := e.evalAsBytes(inst.expr(), section.env)
-			if err == nil {
-				inst.argNoLabels = true
+			var labelErr unassignedLabelError
+			if errors.As(err, &labelErr) {
+				// Arg uses labels. This is not allowed in #bytes because their size
+				// depends on the output size of the program.
+				c.errorAt(inst.ast, ecLabelInBytes)
+			} else if err != nil {
+				c.errorAt(inst.ast, err)
+			} else {
 				inst.data = v
+				inst.dataSize = len(v)
 			}
-			continue
-		}
 
-		// Handle PUSH.
-		argument := inst.expr()
-		if argument == nil {
-			continue
+		case isPush(inst.op):
+			if inst.expr() == nil {
+				continue loop // push0
+			}
+			inst.dataSize = 1
+			if s, ok := inst.explicitPushSize(); ok {
+				inst.dataSize = s
+			}
+			// Pre-evaluate argument.
+			v, err := e.eval(inst.expr(), section.env)
+			var labelErr unassignedLabelError
+			if errors.As(err, &labelErr) {
+				// Expression depends on label position calculation, leave it for later.
+				continue loop
+			}
+			inst.argNoLabels = true
+			if err != nil {
+				c.errorAt(inst.ast, err)
+				continue loop
+			}
+			if err := prog.assignPushArg(inst, v.Int(), true); err != nil {
+				c.errorAt(inst.ast, err)
+				continue loop
+			}
 		}
-		inst.pushSize = 1
-		if s, ok := inst.explicitPushSize(); ok {
-			inst.pushSize = s
-		}
-
-		// Pre-evaluate argument.
-		v, err := e.eval(argument, section.env)
-		var labelErr unassignedLabelError
-		if errors.As(err, &labelErr) {
-			// Expression depends on label position calculation, leave it for later.
-			continue
-		}
-		inst.argNoLabels = true
-		if err != nil {
-			c.errorAt(inst.ast, err)
-			continue
-		}
-		if err := prog.assignPushArg(inst, v.Int(), true); err != nil {
-			c.errorAt(inst.ast, err)
-			continue
-		}
-	}
-}
-
-// computePC assigns the PC values of all instructions and labels.
-func (c *Compiler) computePC(e *evaluator, prog *compilerProg) {
-	var pc int
-	for section, inst := range prog.iterInstructions() {
-		if li, ok := inst.ast.(labelDefStatement); ok {
-			e.setLabelPC(section.doc, li.LabelDefSt, pc)
-		}
-
-		inst.pc = pc
-		size := 0
-		if inst.op != "" {
-			size = 1
-		}
-		if isPush(inst.op) {
-			size += inst.pushSize
-		} else {
-			size += len(inst.data)
-		}
-		pc += size
 	}
 }
 
 // evaluateArgs computes the argument values of instructions.
 func (c *Compiler) evaluateArgs(e *evaluator, prog *compilerProg) (inst *instruction, err error) {
+loop:
 	for section, inst := range prog.iterInstructions() {
-		if inst.argNoLabels {
-			continue // pre-calculated
-		}
+		switch {
+		case inst.argNoLabels:
+			// value already assigned by preEvaluateArgs
 
-		if inst.isBytes() {
-			// handle #bytes
-			v, err := e.evalAsBytes(inst.expr(), section.env)
-			if err != nil {
-				return inst, err
+		case isBytes(inst.op):
+			panic("BUG: unevaluated #bytes in evaluateArgs")
+
+		case isPush(inst.op):
+			if inst.expr() == nil {
+				continue loop // push0
 			}
-			inst.data = v
-		} else {
-			// handle PUSH
-			argument := inst.expr()
-			if argument == nil {
-				continue // no arg
-			}
-			v, err := e.eval(argument, section.env)
+			v, err := e.eval(inst.expr(), section.env)
 			if err != nil {
 				return inst, err
 			}
@@ -124,7 +103,7 @@ func (c *Compiler) evaluateArgs(e *evaluator, prog *compilerProg) (inst *instruc
 // assignPushArg sets the argument value of an instruction to v. The byte size of the
 // value is checked against the declared "PUSH<n>" data size.
 //
-// If setSize is true, the pushSize of variable-size "PUSH" instructions will be assigned
+// If setSize is true, the dataSize of variable-size "PUSH" instructions will be assigned
 // based on the value.
 func (prog *compilerProg) assignPushArg(inst *instruction, v *big.Int, setSize bool) error {
 	if v.Sign() < 0 {
@@ -137,9 +116,9 @@ func (prog *compilerProg) assignPushArg(inst *instruction, v *big.Int, setSize b
 
 	_, hasExplicitSize := inst.explicitPushSize()
 	if setSize && !hasExplicitSize {
-		inst.pushSize = prog.autoPushSize(b)
+		inst.dataSize = prog.autoPushSize(b)
 	}
-	if len(b) > inst.pushSize {
+	if len(b) > inst.dataSize {
 		if !hasExplicitSize {
 			return ecVariablePushOverflow
 		}

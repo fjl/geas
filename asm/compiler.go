@@ -211,31 +211,36 @@ func (c *Compiler) compileDocument(doc *ast.Document) (output []byte) {
 
 	// Next, the AST document tree is expanded into a flat list of instructions.
 	c.expand(doc, prog)
-	if prog.cur != prog.toplevel {
-		panic("section stack was not unwound by expansion")
-	}
+	prog.finishExpansion()
 
 	// Expansion of is now done, and all further steps work on prog.
 	e := newEvaluator(c.globals)
 	c.preEvaluateArgs(e, prog)
+	e.registerLabels(prog.labels)
 
 	for {
-		c.computePC(e, prog)
+		prog.computePC()
 
-		// Assign immediate argument values. Here we use a trick to assign sizes for
-		// "PUSH" instructions: their pushSizes are initially set to one. If we get an
-		// overflow condition, the size of that PUSH increases by one and then we
-		// recalculate everything.
+		// Assign immediate argument values of PUSH. The only argument expressions left to
+		// evaluate here are the ones that use labels somehow. This is self-referential,
+		// the label values depend on the size of the output, which depends on the labels,
+		// etc. To compute the fixed point, the following approach is used:
+		//
+		//   - Each PUSH gets an initial dataSize of one.
+		//   - PC values are assigned based on this assumption
+		//   - We compute all arg values. If any arg size overflows the set dataSize, we bump
+		//     it for this instruction and recompute another round.
+		//   - Otherwise we are done.
 		failedInst, err := c.evaluateArgs(e, prog)
-		if err != nil {
-			if errors.Is(err, ecVariablePushOverflow) {
-				failedInst.pushSize += 1
-				continue // try again
-			}
+		if err == nil {
+			break // done
+		} else if errors.Is(err, ecVariablePushOverflow) {
+			failedInst.dataSize += 1
+			continue // recompute after bump
+		} else {
 			c.errorAt(failedInst.ast, err)
 			break // there was some other error
 		}
-		break
 	}
 
 	if c.errors.hasError() {
@@ -342,29 +347,33 @@ func (c *Compiler) parseIncludeFile(file string, inst *ast.IncludeSt, depth int)
 func (c *Compiler) generateOutput(prog *compilerProg) []byte {
 	var unreachable unreachableCodeCheck
 	var output []byte
+loop:
 	for _, inst := range prog.iterInstructions() {
 		if len(output) != inst.pc {
 			panic(fmt.Sprintf("BUG: instruction pc=%d, but output has size %d", inst.pc, len(output)))
 		}
 
 		switch {
+		case isBytes(inst.op):
+			output = append(output, inst.data...)
+
 		case isPush(inst.op):
-			if inst.pushSize > 32 {
-				panic("BUG: pushSize > 32")
+			if inst.dataSize > 32 {
+				panic("BUG: push dataSize > 32")
 			}
-			if len(inst.data) > inst.pushSize {
-				panic(fmt.Sprintf("BUG: push inst.data %d > inst.pushSize %d", len(inst.data), inst.pushSize))
+			if len(inst.data) > inst.dataSize {
+				panic(fmt.Sprintf("BUG: push inst.data %d > inst.dataSize %d", len(inst.data), inst.dataSize))
 			}
 
 			// resolve the op
 			var op *evm.Op
 			if inst.op == "PUSH" {
-				op = prog.evm.PushBySize(inst.pushSize)
+				op = prog.evm.PushBySize(inst.dataSize)
 			} else {
 				op = prog.evm.OpByName(inst.op)
 			}
 			if op == nil {
-				panic(fmt.Sprintf("BUG: opcode for %q (size %d) not found", inst.op, inst.pushSize))
+				panic(fmt.Sprintf("BUG: opcode for %q (size %d) not found", inst.op, inst.dataSize))
 			}
 
 			// Unreachable code check.
@@ -374,24 +383,29 @@ func (c *Compiler) generateOutput(prog *compilerProg) []byte {
 
 			// Add opcode and data padding to output.
 			output = append(output, op.Code)
-			if len(inst.data) < inst.pushSize {
-				output = append(output, make([]byte, inst.pushSize-len(inst.data))...)
+			if len(inst.data) < inst.dataSize {
+				output = append(output, make([]byte, inst.dataSize-len(inst.data))...)
 			}
+			output = append(output, inst.data...)
 
 		case inst.op != "":
 			op := prog.evm.OpByName(inst.op)
 			if op == nil {
 				c.errorAt(inst.ast, fmt.Errorf("%w %s", ecUnknownOpcode, inst.op))
+				continue loop
 			}
 			// Unreachable code check.
 			if !c.errors.hasError() {
 				unreachable.check(c, inst.ast, op)
 			}
 			output = append(output, op.Code)
-		}
+			fallthrough
 
-		// Instruction data is always added to output.
-		output = append(output, inst.data...)
+		default:
+			if len(inst.data) > 0 {
+				panic(fmt.Sprintf("BUG: instruction at pc=%d has unexpected data", inst.pc))
+			}
+		}
 	}
 	return output
 }

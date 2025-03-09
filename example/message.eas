@@ -1,0 +1,66 @@
+#pragma target "byzantium"
+
+;;; -----------------------------------------------------------------------------
+;;; PROGRAM START----------------------------------------------------------------
+
+  calldatasize                    ; [size]
+  push 1                          ; [expSize, size]
+  eq                              ; [expSize==size]
+  iszero                          ; [expSize!=size]
+  jumpi @wrong
+  push 0                          ; [offset]
+  calldataload                    ; [value]
+  dup1                            ; [value, value]
+  push 3<<(31*8)                  ; [exp, value, value]
+  eq                              ; [exp==value, value]
+  jumpi @ok                       ; [value]
+
+wrong:
+  %revert(@errmsg)
+
+ok:
+  ;; Here the 'ok message' is returned to the caller.
+  push .bytesSize(@okmsg)         ; [size]
+  dup1                            ; [size, size]
+  push @okmsg                     ; [codeptr, size, size]
+  push 0                          ; [destOffset, codeptr, size, size]
+  codecopy                        ; [size]
+  push 0                          ; [ptr, size]
+  return                          ; []
+
+;;; -----------------------------------------------------------------------------
+;;; DATA ------------------------------------------------------------------------
+
+.okmsg:
+  #bytes "you have submitted the correct calldata value"
+
+.errmsg:
+  #bytes "wrong calldata value, expected one byte of input == 0x03"
+
+;;; -----------------------------------------------------------------------------
+;;; MACROS ----------------------------------------------------------------------
+
+;;; %revert raises a Solidity-compatible error.
+;;; The msglabel parameter is a label pointing to error message #bytes.
+#define %revert(msglabel) {
+  ;; Data layout:
+  ;;
+  ;;   selector :: 4  ||  0x20 :: 32  ||  len :: 32  ||  reason :: len
+  ;;
+  push .selector("Error(string)") ; [sel]
+  push 0                          ; [destOffset, sel]
+  mstore                          ; []
+  push 0x20                       ; [ptr]
+  push 4                          ; [destOffset, ptr]
+  mstore                          ; []
+  push .bytesSize($msglabel)      ; [len]
+  push 36                         ; [destOffset, len]
+  mstore                          ; []
+  push .bytesSize($msglabel)      ; [size]
+  push $msglabel                  ; [codeptr, size]
+  push 68                         ; [destOffset, codeptr, size]
+  codecopy                        ; []
+  push 68+.bytesSize($msglabel)   ; [length]
+  push 0                          ; [offset, length]
+  revert                          ; []
+}

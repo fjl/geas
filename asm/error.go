@@ -45,6 +45,7 @@ const (
 	ecJumpNeedsLiteralLabel
 	ecJumpToDottedLabel
 	ecJumpToUndefinedLabel
+	ecLabelInBytes
 	ecUnknownOpcode
 	ecUndefinedVariable
 	ecUndefinedMacro
@@ -82,6 +83,8 @@ func (e compilerError) Error() string {
 		return "JUMP to dotted label"
 	case ecJumpToUndefinedLabel:
 		return "JUMP to undefined label"
+	case ecLabelInBytes:
+		return "labels can't be used in #bytes"
 	case ecUnknownOpcode:
 		return "unknown op"
 	case ecUndefinedVariable:

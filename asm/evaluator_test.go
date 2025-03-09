@@ -76,17 +76,19 @@ var evalIntTests = []evalTest{
 	{expr: `"A"`, result: "65"},
 	{expr: `"foo"`, result: "6713199"},
 	// builtins
-	{expr: `.bitlen(0)`, result: "0"},
-	{expr: `.bitlen(0xff)`, result: "8"},
-	{expr: `.bitlen(0x1ff)`, result: "9"},
-	{expr: `.bitlen(0x01ff)`, result: "9"},
-	{expr: `.bytelen(0)`, result: "0"},
-	{expr: `.bytelen(0xff)`, result: "1"},
-	{expr: `.bytelen(0x1ff)`, result: "2"},
-	{expr: `.bytelen(0x01ff)`, result: "2"},
-	{expr: `.bytelen(0x0001ff)`, result: "3"},   // note: leading zero byte
-	{expr: `.bytelen(0x000001ff)`, result: "4"}, // two leading zero bytes
-	{expr: `.bytelen("foobar")`, result: "6"},
+	{expr: `.intbits(0)`, result: "0"},
+	{expr: `.intbits(0xff)`, result: "8"},
+	{expr: `.intbits(0x1ff)`, result: "9"},
+	{expr: `.intbits(0x01ff)`, result: "9"},
+	{expr: `.intbits(0x00ff)`, result: "8"}, // note: leading zero byte dropped
+	{expr: `.len(0)`, result: "0"},
+	{expr: `.len(0x00)`, result: "1"}, // note: leading zero byte counts bc. hex
+	{expr: `.len(0xff)`, result: "1"},
+	{expr: `.len(0x1ff)`, result: "2"},
+	{expr: `.len(0x01ff)`, result: "2"},
+	{expr: `.len(0x0001ff)`, result: "3"},   // note: leading zero byte counts
+	{expr: `.len(0x000001ff)`, result: "4"}, // two leading zero bytes
+	{expr: `.len("foobar")`, result: "6"},
 	{expr: `.abs(0 - 10)`, result: "10"},
 	{expr: `.sha256("text")`, result: "68832153269555879243704685382415794081420120252170153643880971663484982053329"},
 	{expr: `.sha256(33)`, result: "84783983549258160669137366770885509408211009960610860350324922232842582506338"},
@@ -131,15 +133,33 @@ func evaluatorForTesting() *evaluator {
 		panic(fmt.Errorf("error in registerDefinitions: %v", errs[0]))
 	}
 	e := newEvaluator(gs)
-	e.setLabelPC(evalTestDoc, evalTestDoc.Statements[0].(*ast.LabelDefSt), 1)
-	e.setLabelPC(evalTestDoc, evalTestDoc.Statements[1].(*ast.LabelDefSt), 2)
-	e.setLabelPC(evalTestDoc, evalTestDoc.Statements[2].(*ast.LabelDefSt), 3)
-	e.setLabelPC(evalTestDoc, evalTestDoc.Statements[3].(*ast.LabelDefSt), 4)
+	e.registerLabels([]*compilerLabel{
+		{
+			doc:   evalTestDoc,
+			def:   evalTestDoc.Statements[0].(*ast.LabelDefSt),
+			instr: &instruction{pc: 1},
+		},
+		{
+			doc:   evalTestDoc,
+			def:   evalTestDoc.Statements[1].(*ast.LabelDefSt),
+			instr: &instruction{pc: 2},
+		},
+		{
+			doc:   evalTestDoc,
+			def:   evalTestDoc.Statements[2].(*ast.LabelDefSt),
+			instr: &instruction{pc: 3},
+		},
+		{
+			doc:   evalTestDoc,
+			def:   evalTestDoc.Statements[3].(*ast.LabelDefSt),
+			instr: &instruction{pc: 4},
+		},
+	})
 	return e
 }
 
 func evalEnvironmentForTesting() *evalEnvironment {
-	return newEvalEnvironment(&compilerSection{
+	return newEvalEnvironment(nil, &compilerSection{
 		doc: evalTestDoc,
 	})
 }

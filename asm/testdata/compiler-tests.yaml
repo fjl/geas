@@ -105,6 +105,59 @@ bytes-directive-string:
   output:
     bytecode: '616263'
 
+bytes-size-macro:
+  input:
+    code: |
+      push .bytesSize(@label)
+      .label: #bytes "abc"
+  output:
+    bytecode: '6003616263'
+
+bytes-size-with-include-sections:
+  input:
+    code: |
+      push .bytesSize(@LABEL)
+      #include "level1.eas"
+    files:
+      level1.eas: |
+        push 1
+        push 2
+        .LABEL: #bytes "abc"
+        #include "level2.eas"
+      level2.eas: |
+        add
+        push 3
+        push 4
+  output:
+    bytecode: '6003 6001 6002 616263 01 6003 6004'
+
+bytes-size-on-push:
+  input:
+    code: |
+      push .bytesSize(@label)
+      .label: push 0x010203
+  output:
+    errors:
+      - ':1: .bytesSize: expected #bytes at pc=2, found PUSH instruction'
+
+bytes-size-on-jumpdest:
+  input:
+    code: |
+      push .bytesSize(@label)
+      label: #bytes "abc"
+  output:
+    errors:
+      - ':1: .bytesSize: expected #bytes at pc=2, found JUMPDEST instruction'
+
+bytes-size-past-end:
+  input:
+    code: |
+      push .bytesSize(@label+3)
+      .label: #bytes "abc"
+  output:
+    errors:
+      - ':1: value 5 points beyond end of program'
+
 comments-on-label:
   input:
     code: |

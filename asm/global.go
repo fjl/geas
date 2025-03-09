@@ -26,7 +26,7 @@ import (
 // globalScope holds definitions across files.
 type globalScope struct {
 	label      map[string]*ast.LabelDefSt
-	labelPC    map[string]int
+	labelInstr map[string]*instruction
 	labelDoc   map[string]*ast.Document
 	instrMacro map[string]globalDef[*ast.InstructionMacroDef]
 	exprMacro  map[string]globalDef[*ast.ExpressionMacroDef]
@@ -40,7 +40,7 @@ type globalDef[M any] struct {
 func newGlobalScope() *globalScope {
 	return &globalScope{
 		label:      make(map[string]*ast.LabelDefSt),
-		labelPC:    make(map[string]int),
+		labelInstr: make(map[string]*instruction),
 		labelDoc:   make(map[string]*ast.Document),
 		instrMacro: make(map[string]globalDef[*ast.InstructionMacroDef]),
 		exprMacro:  make(map[string]globalDef[*ast.ExpressionMacroDef]),
@@ -107,7 +107,7 @@ func (gs *globalScope) overrideExprMacroValue(name string, val *lzint.Value) {
 		doc: nil,
 		def: &ast.ExpressionMacroDef{
 			Name: name,
-			Body: &ast.LiteralExpr{Value: val},
+			Body: ast.MakeNumber(val),
 		},
 	}
 }
@@ -143,17 +143,17 @@ func (gs *globalScope) setLabelDocument(li *ast.LabelDefSt, doc *ast.Document) e
 	return err
 }
 
-// setLabelPC is called by the compiler when the PC value of a label becomes available.
-func (gs *globalScope) setLabelPC(name string, pc int) {
-	gs.labelPC[name] = pc
+// setLabelNextInstr sets the next instruction after a label.
+func (gs *globalScope) setLabelInstr(name string, instr *instruction) {
+	gs.labelInstr[name] = instr
 }
 
 // lookupLabel returns the PC value of a label, and also reports whether the label was found at all.
-func (gs *globalScope) lookupLabel(lref *ast.LabelRefExpr) (pc int, pcValid bool, def *ast.LabelDefSt) {
+func (gs *globalScope) lookupLabel(lref *ast.LabelRefExpr) (instr *instruction, def *ast.LabelDefSt) {
 	li, ok := gs.label[lref.Ident]
 	if !ok {
-		return 0, false, nil
+		return nil, nil
 	}
-	pc, pcValid = gs.labelPC[lref.Ident]
-	return pc, pcValid, li
+	instr = gs.labelInstr[lref.Ident]
+	return instr, li
 }
