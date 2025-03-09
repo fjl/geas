@@ -68,10 +68,10 @@ type compilerSection struct {
 // comparePC implements compilerProgItem.
 func (s *compilerSection) comparePC(pc int) int {
 	if pc < s.pcLow {
-		return -1
+		return 1
 	}
 	if pc > s.pcHigh {
-		return 1
+		return -1
 	}
 	return 0
 }
