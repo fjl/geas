@@ -203,7 +203,7 @@ type instruction struct {
 
 	// fields assigned during compilation:
 	pc          int    // pc at this instruction
-	pushSize    int    // computed size of push instruction
+	dataSize    int    // computed size of data field
 	data        []byte // computed argument value
 	argNoLabels bool   // true if arg expression does not contain @label
 }
@@ -245,19 +245,11 @@ func (inst *instruction) expr() ast.Expr {
 	}
 }
 
-// dataSize gives the size of the encoded argument.
-func (inst *instruction) dataSize() int {
-	if isPush(inst.op) {
-		return inst.pushSize
-	}
-	return len(inst.data)
-}
-
 // encodedSize gives the size of the instruction in bytecode.
 func (inst *instruction) encodedSize() int {
 	size := 0
 	if !isBytes(inst.op) {
 		size = 1
 	}
-	return size + inst.dataSize()
+	return size + inst.dataSize
 }

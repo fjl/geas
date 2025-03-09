@@ -105,6 +105,16 @@ bytes-directive-string:
   output:
     bytecode: '616263'
 
+bytes-directive-label-minimal:
+  input:
+    code: |
+      add
+      #bytes @label
+      label:
+  output:
+    errors:
+      - ":2: labels can't be used in #bytes"
+
 comments-on-label:
   input:
     code: |
