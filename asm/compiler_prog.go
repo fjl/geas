@@ -99,9 +99,9 @@ func newCompilerProg(topdoc *ast.Document) *compilerProg {
 	return p
 }
 
-// finish is called after the Compiler is done with expansion. Here we add an empty
+// finishExpansion is called after the Compiler is done with expansion. Here we add an empty
 // instruction at the program end, as a destination for labels.
-func (p *compilerProg) finish() {
+func (p *compilerProg) finishExpansion() {
 	if len(p.currentLabels) > 0 {
 		p.addInstruction(newInstruction(nil, ""))
 	}

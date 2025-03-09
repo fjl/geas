@@ -211,7 +211,7 @@ func (c *Compiler) compileDocument(doc *ast.Document) (output []byte) {
 
 	// Next, the AST document tree is expanded into a flat list of instructions.
 	c.expand(doc, prog)
-	prog.finish()
+	prog.finishExpansion()
 
 	// Expansion of is now done, and all further steps work on prog.
 	e := newEvaluator(c.globals)
