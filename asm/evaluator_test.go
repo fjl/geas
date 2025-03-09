@@ -82,6 +82,7 @@ var evalIntTests = []evalTest{
 	{expr: `.intbits(0x01ff)`, result: "9"},
 	{expr: `.intbits(0x00ff)`, result: "8"}, // note: leading zero byte dropped
 	{expr: `.len(0)`, result: "0"},
+	{expr: `.len(0x00)`, result: "1"}, // note: leading zero byte counts bc. hex
 	{expr: `.len(0xff)`, result: "1"},
 	{expr: `.len(0x1ff)`, result: "2"},
 	{expr: `.len(0x01ff)`, result: "2"},
