@@ -71,7 +71,7 @@ loop:
 	for section, inst := range prog.iterInstructions() {
 		switch {
 		case inst.argNoLabels:
-			// pre-calculated
+			// value already assigned by preEvaluateArgs
 
 		case isBytes(inst.op):
 			v, err := e.evalAsBytes(inst.expr(), section.env)
