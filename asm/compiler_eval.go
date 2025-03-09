@@ -67,24 +67,6 @@ func (c *Compiler) preEvaluateArgs(e *evaluator, prog *compilerProg) {
 	}
 }
 
-// computePC assigns the PC values of all instructions and labels.
-func (c *Compiler) computePC(prog *compilerProg) {
-	var pc int
-	for _, inst := range prog.iterInstructions() {
-		inst.pc = pc
-		size := 0
-		if inst.op != "" {
-			size = 1
-		}
-		if isPush(inst.op) {
-			size += inst.pushSize
-		} else {
-			size += len(inst.data)
-		}
-		pc += size
-	}
-}
-
 // evaluateArgs computes the argument values of instructions.
 func (c *Compiler) evaluateArgs(e *evaluator, prog *compilerProg) (inst *instruction, err error) {
 	for section, inst := range prog.iterInstructions() {

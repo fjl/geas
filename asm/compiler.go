@@ -222,7 +222,7 @@ func (c *Compiler) compileDocument(doc *ast.Document) (output []byte) {
 	e.registerLabels(prog.labels)
 
 	for {
-		c.computePC(prog)
+		prog.computePC()
 
 		// Assign immediate argument values. Here we use a trick to assign sizes for
 		// "PUSH" instructions: their pushSizes are initially set to one. If we get an
