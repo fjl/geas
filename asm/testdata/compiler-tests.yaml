@@ -156,7 +156,7 @@ bytes-size-past-end:
       .label: #bytes "abc"
   output:
     errors:
-      - ':1: .bytesSize: expected #bytes at pc=2, found JUMPDEST instruction'
+      - ':1: value 5 points beyond end of program'
 
 comments-on-label:
   input:
