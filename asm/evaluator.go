@@ -33,7 +33,7 @@ type evaluator struct {
 	labelInstr  map[evalLabelKey]*instruction
 	usedLabels  map[*ast.LabelDefSt]struct{}
 	globals     *globalScope
-	labelsValid bool
+	labelsValid bool // while false, evaluating labels returns unassignedLabelErr
 }
 
 type evalLabelKey struct {
@@ -41,11 +41,28 @@ type evalLabelKey struct {
 	l   *ast.LabelDefSt
 }
 
+// evalEnvironment holds the definitions available for evaluation.
 type evalEnvironment struct {
 	prog      *compilerProg
-	doc       *ast.Document
-	macroArgs *instrMacroArgs
-	variables map[string]*lzint.Value
+	doc       *ast.Document           // for resolving local macros
+	macroArgs *instrMacroArgs         // args of the current instruction macro
+	variables map[string]*lzint.Value // args of the current expression macro
+}
+
+func newEvalEnvironment(prog *compilerProg, s *compilerSection) *evalEnvironment {
+	if s == nil {
+		panic("nil section")
+	}
+	return &evalEnvironment{prog: prog, doc: s.doc, macroArgs: s.macroArgs}
+}
+
+// makeCallEnvironment creates the environment for an expression macro call.
+func (env *evalEnvironment) makeCallEnvironment(defdoc *ast.Document, def *ast.ExpressionMacroDef) *evalEnvironment {
+	return &evalEnvironment{
+		prog:      env.prog,
+		doc:       defdoc,
+		variables: make(map[string]*lzint.Value, len(def.Params)),
+	}
 }
 
 func newEvaluator(gs *globalScope) *evaluator {
@@ -57,19 +74,18 @@ func newEvaluator(gs *globalScope) *evaluator {
 	}
 }
 
-func newEvalEnvironment(prog *compilerProg, s *compilerSection) *evalEnvironment {
-	if s == nil {
-		panic("nil section")
+// registerLabels sets up the label-to-instruction mapping. This also makes labels
+// available for evaluation, so the compiler calls this after attempting to pre-evaluate
+// the arguments.
+func (e *evaluator) registerLabels(labels []*compilerLabel) {
+	for _, cl := range labels {
+		if cl.def.Global {
+			e.globals.setLabelInstr(cl.def.Name(), cl.instr)
+		} else {
+			e.labelInstr[evalLabelKey{cl.doc, cl.def}] = cl.instr
+		}
 	}
-	return &evalEnvironment{prog: prog, doc: s.doc, macroArgs: s.macroArgs}
-}
-
-func (env *evalEnvironment) makeCallEnvironment(defdoc *ast.Document, def *ast.ExpressionMacroDef) *evalEnvironment {
-	return &evalEnvironment{
-		prog:      env.prog,
-		doc:       defdoc,
-		variables: make(map[string]*lzint.Value, len(def.Params)),
-	}
+	e.labelsValid = true
 }
 
 // lookupExprMacro finds a macro definition in the document chain.
@@ -81,17 +97,6 @@ func (e *evaluator) lookupExprMacro(env *evalEnvironment, name string) (*ast.Exp
 		return e, doc
 	}
 	return nil, nil
-}
-
-func (e *evaluator) registerLabels(labels []*compilerLabel) {
-	for _, cl := range labels {
-		if cl.def.Global {
-			e.globals.setLabelInstr(cl.def.Name(), cl.instr)
-		} else {
-			e.labelInstr[evalLabelKey{cl.doc, cl.def}] = cl.instr
-		}
-	}
-	e.labelsValid = true
 }
 
 // lookupLabel resolves a label reference.
