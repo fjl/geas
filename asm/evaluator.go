@@ -42,6 +42,7 @@ type evalLabelKey struct {
 }
 
 type evalEnvironment struct {
+	prog      *compilerProg
 	doc       *ast.Document
 	macroArgs *instrMacroArgs
 	variables map[string]*lzint.Value
@@ -56,11 +57,19 @@ func newEvaluator(gs *globalScope) *evaluator {
 	}
 }
 
-func newEvalEnvironment(s *compilerSection) *evalEnvironment {
+func newEvalEnvironment(prog *compilerProg, s *compilerSection) *evalEnvironment {
 	if s == nil {
 		panic("nil section")
 	}
-	return &evalEnvironment{doc: s.doc, macroArgs: s.macroArgs}
+	return &evalEnvironment{prog: prog, doc: s.doc, macroArgs: s.macroArgs}
+}
+
+func (env *evalEnvironment) makeCallEnvironment(defdoc *ast.Document, def *ast.ExpressionMacroDef) *evalEnvironment {
+	return &evalEnvironment{
+		prog:      env.prog,
+		doc:       defdoc,
+		variables: make(map[string]*lzint.Value, len(def.Params)),
+	}
 }
 
 // lookupExprMacro finds a macro definition in the document chain.
@@ -268,7 +277,7 @@ func (e *evaluator) evalVariable(expr *ast.VariableExpr, env *evalEnvironment) (
 		}
 		arg := a.args[i]
 		// Evaluate it in the parent scope.
-		return e.eval(arg, newEvalEnvironment(a.callsite))
+		return e.eval(arg, newEvalEnvironment(env.prog, a.callsite))
 	}
 	return nil, fmt.Errorf("%w $%s", ecUndefinedVariable, expr.Ident)
 }
@@ -293,16 +302,13 @@ func (e *evaluator) evalMacroCall(expr *ast.MacroCallExpr, env *evalEnvironment)
 	defer e.exitMacro(def)
 
 	// Bind arguments.
-	macroEnv := &evalEnvironment{
-		variables: make(map[string]*lzint.Value, len(def.Params)),
-		doc:       defdoc,
-	}
 	if err := checkArgCount(expr, len(def.Params)); err != nil {
 		return nil, err
 	}
 	if len(expr.Args) != len(def.Params) {
 		return nil, fmt.Errorf("%w, macro %s needs %d", ecInvalidArgumentCount, expr.Ident, len(def.Params))
 	}
+	macroEnv := env.makeCallEnvironment(defdoc, def)
 	for i, param := range def.Params {
 		v, err := e.eval(expr.Args[i], env)
 		if err != nil {

@@ -103,9 +103,9 @@ func (p *compilerProg) finish() {
 }
 
 // pushSection creates a new section as a child of the current one.
-func (p *compilerProg) pushSection(doc *ast.Document, macroArgs *instrMacroArgs) *compilerSection {
+func (p *compilerProg) pushSection(doc *ast.Document, macroArgs *instrMacroArgs) *compilerSection { //
 	s := &compilerSection{doc: doc, macroArgs: macroArgs}
-	s.env = newEvalEnvironment(s)
+	s.env = newEvalEnvironment(p, s)
 	if p.cur != nil {
 		s.parent = p.cur
 		p.cur.children = append(p.cur.children, s)

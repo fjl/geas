@@ -157,7 +157,7 @@ func evaluatorForTesting() *evaluator {
 }
 
 func evalEnvironmentForTesting() *evalEnvironment {
-	return newEvalEnvironment(&compilerSection{
+	return newEvalEnvironment(nil, &compilerSection{
 		doc: evalTestDoc,
 	})
 }
