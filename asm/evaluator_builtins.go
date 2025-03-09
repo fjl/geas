@@ -31,10 +31,11 @@ import (
 )
 
 var builtinMacros = make(map[string]builtinMacroFn)
+var deprecatedMacros = make(map[string]string)
 
 func init() {
-	builtinMacros["bitlen"] = bitlenMacro
-	builtinMacros["bytelen"] = bytelenMacro
+	builtinMacros["intbits"] = integerBitsMacro
+	builtinMacros["length"] = bytelenMacro
 	builtinMacros["abs"] = absMacro
 	builtinMacros["address"] = addressMacro
 	builtinMacros["selector"] = selectorMacro
@@ -45,7 +46,7 @@ func init() {
 
 type builtinMacroFn func(*evaluator, *evalEnvironment, *ast.MacroCallExpr) (*lzint.Value, error)
 
-func bitlenMacro(e *evaluator, env *evalEnvironment, call *ast.MacroCallExpr) (*lzint.Value, error) {
+func integerBitsMacro(e *evaluator, env *evalEnvironment, call *ast.MacroCallExpr) (*lzint.Value, error) {
 	if err := checkArgCount(call, 1); err != nil {
 		return nil, err
 	}
