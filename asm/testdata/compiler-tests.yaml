@@ -149,6 +149,15 @@ bytes-size-on-jumpdest:
     errors:
       - ':1: .bytesSize: expected #bytes at pc=2, found JUMPDEST instruction'
 
+bytes-size-past-end:
+  input:
+    code: |
+      push .bytesSize(@label+3)
+      .label: #bytes "abc"
+  output:
+    errors:
+      - ':1: .bytesSize: expected #bytes at pc=2, found JUMPDEST instruction'
+
 comments-on-label:
   input:
     code: |

@@ -201,7 +201,7 @@ func (p *compilerProg) instructionAtPC(pc int) *instruction {
 		}
 		index++
 	}
-	panic("BUG: hit end of program while skipping to next instruction")
+	return nil
 }
 
 // comparePC implements compilerProgElem.
