@@ -35,7 +35,7 @@ var deprecatedMacros = make(map[string]string)
 
 func init() {
 	builtinMacros["intbits"] = integerBitsMacro
-	builtinMacros["length"] = bytelenMacro
+	builtinMacros["len"] = lenMacro
 	builtinMacros["abs"] = absMacro
 	builtinMacros["address"] = addressMacro
 	builtinMacros["selector"] = selectorMacro
@@ -57,7 +57,7 @@ func integerBitsMacro(e *evaluator, env *evalEnvironment, call *ast.MacroCallExp
 	return lzint.FromInt64(v.IntegerBitLen()), nil
 }
 
-func bytelenMacro(e *evaluator, env *evalEnvironment, call *ast.MacroCallExpr) (*lzint.Value, error) {
+func lenMacro(e *evaluator, env *evalEnvironment, call *ast.MacroCallExpr) (*lzint.Value, error) {
 	if err := checkArgCount(call, 1); err != nil {
 		return nil, err
 	}
