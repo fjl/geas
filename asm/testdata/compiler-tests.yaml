@@ -129,7 +129,7 @@ bytes-size-on-jumpdest:
       label: #bytes "abc"
   output:
     errors:
-      - '.bytesSize: expected #bytes at pc=2, found JUMPDEST instruction'
+      - ':1: .bytesSize: expected #bytes at pc=2, found JUMPDEST instruction'
 
 comments-on-label:
   input:
