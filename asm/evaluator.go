@@ -118,6 +118,7 @@ func (e *evaluator) lookupLabel(doc *ast.Document, lref *ast.LabelRefExpr) (pc i
 		return 0, false, fmt.Errorf("undefined label %v", lref)
 	}
 	if lref.Dotted && !li.Dotted {
+		//lint:ignore ST1005 using : at the end of message here to refer to a label definition
 		return 0, false, fmt.Errorf("can't use %v to refer to label %s:", lref, li.Name())
 	}
 	if instr == nil {

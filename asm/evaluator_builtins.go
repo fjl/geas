@@ -31,7 +31,6 @@ import (
 )
 
 var builtinMacros = make(map[string]builtinMacroFn)
-var deprecatedMacros = make(map[string]string)
 
 func init() {
 	builtinMacros["intbits"] = integerBitsMacro
