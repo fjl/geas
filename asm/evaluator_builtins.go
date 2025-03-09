@@ -173,7 +173,7 @@ func bytesSizeMacro(e *evaluator, env *evalEnvironment, call *ast.MacroCallExpr)
 	if !isBytes(instr.op) {
 		return nil, fmt.Errorf(".bytesSize: expected #bytes at pc=%d, found %s instruction", l.Int(), instr.op)
 	}
-	return lzint.FromInt64(int64(instr.encodedSize())), nil
+	return lzint.FromInt64(int64(instr.dataSize())), nil
 }
 
 func resolveInstructionArg(prog *compilerProg, v *lzint.Value) (*instruction, error) {
