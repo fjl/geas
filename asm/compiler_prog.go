@@ -145,7 +145,7 @@ func (p *compilerProg) addInstruction(inst *instruction) {
 
 type iterPos struct {
 	elem           compilerProgElem
-	exitingSection bool // true if visiting section at end
+	exitingSection bool // true when visiting section at end
 }
 
 // iter returns an iterator over all elements of the program.
@@ -329,13 +329,13 @@ func (inst *instruction) encodedSize() int {
 }
 
 // comparePC implements compilerProgItem.
-func (inst *instruction) comparePC(pc int) int {
+func (inst *instruction) comparePC(pc int) (r int) {
 	if pc < inst.pc {
-		return -1
+		return 1
 	}
 	end := inst.pc + inst.encodedSize()
-	if pc > end {
-		return 1
+	if pc >= end {
+		return -1
 	}
 	return 0
 }
