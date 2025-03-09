@@ -40,6 +40,7 @@ func init() {
 	builtinMacros["selector"] = selectorMacro
 	builtinMacros["keccak256"] = keccak256Macro
 	builtinMacros["sha256"] = sha256Macro
+	builtinMacros["bytesSize"] = bytesSizeMacro
 }
 
 type builtinMacroFn func(*evaluator, *evalEnvironment, *ast.MacroCallExpr) (*lzint.Value, error)
@@ -154,4 +155,41 @@ func addressMacro(e *evaluator, env *evalEnvironment, call *ast.MacroCallExpr) (
 
 func isChecksumAddress(str string) bool {
 	return strings.ContainsAny(str, "ABCDEF")
+}
+
+func bytesSizeMacro(e *evaluator, env *evalEnvironment, call *ast.MacroCallExpr) (*lzint.Value, error) {
+	if err := checkArgCount(call, 1); err != nil {
+		return nil, err
+	}
+	l, err := e.eval(call.Args[0], env)
+	if err != nil {
+		return nil, err
+	}
+	instr, err := resolveInstructionArg(env.prog, l)
+	if err != nil {
+		return nil, err
+	}
+	if !instr.isBytes() {
+		return nil, fmt.Errorf(".bytesSize: expected #bytes at pc=%d, found %s instruction", l.Int(), instr.op)
+	}
+	return lzint.FromInt64(int64(instr.encodedSize())), nil
+}
+
+func resolveInstructionArg(prog *compilerProg, v *lzint.Value) (*instruction, error) {
+	const intSize = 32 << (^uint(0) >> 63) // 32 or 64
+
+	intv := int(v.Int().Int64())
+	if v.IntegerBitLen() > intSize || intv > prog.toplevel.pcHigh {
+		return nil, fmt.Errorf("valud %d points beyond end of program", v.Int())
+	} else if intv < 0 {
+		return nil, fmt.Errorf("value %d points before start of program", v.Int())
+	}
+	instr := prog.instructionAtPC(intv)
+	if instr == nil {
+		panic(fmt.Sprintf("BUG: no instruction for PC value %d", intv))
+	}
+	if intv != instr.pc {
+		return nil, fmt.Errorf("value %v points within %s instruction (pc=%d)", intv, instr.op, instr.pc)
+	}
+	return instr, nil
 }

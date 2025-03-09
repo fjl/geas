@@ -105,6 +105,32 @@ bytes-directive-string:
   output:
     bytecode: '616263'
 
+bytes-size-macro:
+  input:
+    code: |
+      push .bytesSize(@label)
+      .label: #bytes "abc"
+  output:
+    bytecode: '6003616263'
+
+bytes-size-on-push:
+  input:
+    code: |
+      push .bytesSize(@label)
+      .label: push 0x010203
+  output:
+    errors:
+      - ':1: .bytesSize: expected #bytes at pc=2, found PUSH instruction'
+
+bytes-size-on-jumpdest:
+  input:
+    code: |
+      push .bytesSize(@label)
+      label: #bytes "abc"
+  output:
+    errors:
+      - '.bytesSize: expected #bytes at pc=2, found JUMPDEST instruction'
+
 comments-on-label:
   input:
     code: |
