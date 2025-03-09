@@ -180,8 +180,8 @@ func resolveInstructionArg(prog *compilerProg, v *lzint.Value) (*instruction, er
 	const intSize = 32 << (^uint(0) >> 63) // 32 or 64
 
 	intv := int(v.Int().Int64())
-	if v.IntegerBitLen() > intSize || intv > prog.toplevel.pcHigh {
-		return nil, fmt.Errorf("valud %d points beyond end of program", v.Int())
+	if v.IntegerBitLen() > intSize || intv > prog.toplevel.endPC {
+		return nil, fmt.Errorf("value %d points beyond end of program", v.Int())
 	} else if intv < 0 {
 		return nil, fmt.Errorf("value %d points before start of program", v.Int())
 	}

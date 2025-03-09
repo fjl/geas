@@ -113,6 +113,24 @@ bytes-size-macro:
   output:
     bytecode: '6003616263'
 
+bytes-size-with-include-sections:
+  input:
+    code: |
+      push .bytesSize(@LABEL)
+      #include "level1.eas"
+    files:
+      level1.eas: |
+        push 1
+        push 2
+        .LABEL: #bytes "abc"
+        #include "level2.eas"
+      level2.eas: |
+        add
+        push 3
+        push 4
+  output:
+    bytecode: '6003 6001 6002 616263 01 6003 6004'
+
 bytes-size-on-push:
   input:
     code: |

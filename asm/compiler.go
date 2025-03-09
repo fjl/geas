@@ -211,9 +211,6 @@ func (c *Compiler) compileDocument(doc *ast.Document) (output []byte) {
 
 	// Next, the AST document tree is expanded into a flat list of instructions.
 	c.expand(doc, prog)
-	if prog.cur != prog.toplevel {
-		panic("section stack was not unwound by expansion")
-	}
 	prog.finish()
 
 	// Expansion of is now done, and all further steps work on prog.

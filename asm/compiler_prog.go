@@ -17,6 +17,8 @@
 package asm
 
 import (
+	"cmp"
+	"fmt"
 	"iter"
 	"slices"
 	"strings"
@@ -28,52 +30,55 @@ import (
 // compilerProg is the output program of the compiler.
 // It contains sections of instructions.
 type compilerProg struct {
-	toplevel *compilerSection
-	cur      *compilerSection
-	evm      *evm.InstructionSet
-	labels   []*compilerLabel
+	elems []compilerProgElem
+	evm   *evm.InstructionSet
 
-	// This tracks the last label definition.
-	// When the next instruction is added after a label, the instruction
-	// will be linked to the label.
+	// Toplevel is the topmost section.
+	toplevel *compilerSection
+
+	// This tracks the current section.
+	cur *compilerSection
+
+	// Labels contains all labels in the program.
+	labels []*compilerLabel
+
+	// This tracks the latest label definitions which haven't been assigned to an
+	// instruction yet. When the next instruction is added after a label, the
+	// instruction will be linked to the label.
 	currentLabels []*compilerLabel
 }
 
 type compilerProgElem interface {
 	// comparePC returns
-	//   -1 if pc is before,
+	//    1 if pc is before,
 	//    0 if pc is within,
-	//    1 if pc is after
+	//   -1 if pc is after
 	// the item.
 	comparePC(pc int) int
 }
 
 // compilerSection is a section of the output program.
 type compilerSection struct {
-	doc *ast.Document
-	env *evalEnvironment
+	doc    *ast.Document
+	env    *evalEnvironment
+	parent *compilerSection
 
-	// This tracks the PC bounds of the section.
-	pcLow, pcHigh int
+	// Bounds of the section.
+	startPC int
+	endPC   int
 
 	// This tracks the arguments of instruction macro calls. When the compiler expands a
 	// macro, it creates a unique section for each call site. The arguments of the call
 	// are stored for use by the expression evaluator.
 	macroArgs *instrMacroArgs
-
-	parent   *compilerSection
-	children []compilerProgElem
 }
 
-// comparePC implements compilerProgItem.
-func (s *compilerSection) comparePC(pc int) int {
-	if pc < s.pcLow {
-		return 1
-	}
-	if pc > s.pcHigh {
-		return -1
-	}
-	return 0
+type sectionStartElem struct {
+	section *compilerSection
+}
+
+type sectionEndElem struct {
+	section *compilerSection
 }
 
 type compilerLabel struct {
@@ -100,16 +105,21 @@ func (p *compilerProg) finish() {
 	if len(p.currentLabels) > 0 {
 		p.addInstruction(newInstruction(nil, ""))
 	}
+	if p.cur != p.toplevel {
+		panic("section stack was not unwound by expansion")
+	}
+	p.elems = append(p.elems, sectionEndElem{p.toplevel})
 }
 
 // pushSection creates a new section as a child of the current one.
-func (p *compilerProg) pushSection(doc *ast.Document, macroArgs *instrMacroArgs) *compilerSection { //
+func (p *compilerProg) pushSection(doc *ast.Document, macroArgs *instrMacroArgs) *compilerSection {
 	s := &compilerSection{doc: doc, macroArgs: macroArgs}
 	s.env = newEvalEnvironment(p, s)
+
 	if p.cur != nil {
 		s.parent = p.cur
-		p.cur.children = append(p.cur.children, s)
 	}
+	p.elems = append(p.elems, sectionStartElem{s})
 	p.cur = s
 	return s
 }
@@ -119,6 +129,7 @@ func (p *compilerProg) popSection() {
 	if p.cur.parent == nil {
 		panic("too much pop")
 	}
+	p.elems = append(p.elems, sectionEndElem{p.cur})
 	p.cur = p.cur.parent
 }
 
@@ -136,67 +147,29 @@ func (p *compilerProg) addLabel(l *ast.LabelDefSt, doc *ast.Document) {
 
 // addInstruction appends an instruction to the current section.
 func (p *compilerProg) addInstruction(inst *instruction) {
-	p.cur.children = append(p.cur.children, inst)
+	p.elems = append(p.elems, inst)
 	for _, cl := range p.currentLabels {
 		cl.instr = inst
 	}
 	p.currentLabels = p.currentLabels[:0]
 }
 
-type iterPos struct {
-	elem           compilerProgElem
-	exitingSection bool // true when visiting section at end
-}
-
-// iter returns an iterator over all elements of the program.
-// Note this visits all sections twice: once when entering, and
-// another time on exit.
-func (p *compilerProg) iter() iter.Seq[iterPos] {
-	type stackElem struct {
-		s *compilerSection
-		i int
-	}
-	stack := []stackElem{{p.toplevel, 0}}
-	return func(yield func(iterPos) bool) {
-	outer:
-		for len(stack) > 0 {
-			e := &stack[len(stack)-1]
-			if !yield(iterPos{e.s, false}) {
-				return
-			}
-			for e.i < len(e.s.children) {
-				cld := e.s.children[e.i]
-				e.i++
-				switch elem := cld.(type) {
-				case *instruction:
-					if !yield(iterPos{elem, false}) {
-						return
-					}
-				case *compilerSection:
-					stack = append(stack, stackElem{elem, 0})
-					continue outer
-				}
-			}
-			if !yield(iterPos{e.s, true}) {
-				return
-			}
-			stack = stack[:len(stack)-1]
-		}
-	}
-}
-
 // iterInstructions returns an iterator over all instructions in the program.
 func (p *compilerProg) iterInstructions() iter.Seq2[*compilerSection, *instruction] {
 	return func(yield func(*compilerSection, *instruction) bool) {
 		var s = p.toplevel
-		for pos := range p.iter() {
-			switch elem := pos.elem.(type) {
+		for _, elem := range p.elems {
+			switch elem := elem.(type) {
 			case *instruction:
 				if !yield(s, elem) {
 					return
 				}
-			case *compilerSection:
-				s = elem
+			case sectionStartElem:
+				s = elem.section
+			case sectionEndElem:
+				s = elem.section.parent
+			default:
+				panic(fmt.Sprintf("BUG: unhandled section type %T", elem))
 			}
 		}
 	}
@@ -204,17 +177,11 @@ func (p *compilerProg) iterInstructions() iter.Seq2[*compilerSection, *instructi
 
 // iterSections returns an iterator over all sections in the program.
 func (p *compilerProg) iterSections() iter.Seq[*compilerSection] {
-	stack := []*compilerSection{p.toplevel}
 	return func(yield func(*compilerSection) bool) {
-		for len(stack) > 0 {
-			section := stack[len(stack)-1]
-			stack = stack[:len(stack)-1]
-			if !yield(section) {
-				return
-			}
-			for _, cld := range slices.Backward(section.children) {
-				if clds, ok := cld.(*compilerSection); ok {
-					stack = append(stack, clds)
+		for _, elem := range p.elems {
+			if elem, ok := elem.(sectionStartElem); ok {
+				if !yield(elem.section) {
+					return
 				}
 			}
 		}
@@ -223,35 +190,56 @@ func (p *compilerProg) iterSections() iter.Seq[*compilerSection] {
 
 // instructionAtPC locates the instruction containing the given PC.
 func (p *compilerProg) instructionAtPC(pc int) *instruction {
-	s := p.toplevel
-	for {
-		index, ok := slices.BinarySearchFunc(s.children, pc, (compilerProgElem).comparePC)
-		if !ok {
-			return nil
-		}
-		switch match := s.children[index].(type) {
-		case *compilerSection:
-			s = match
+	index, ok := slices.BinarySearchFunc(p.elems, pc, (compilerProgElem).comparePC)
+	if !ok {
+		return nil
+	}
+	for index < len(p.elems) {
+		switch match := p.elems[index].(type) {
 		case *instruction:
 			return match
 		}
+		index++
 	}
+	panic("BUG: hit end of program while skipping to next instruction")
+}
+
+// comparePC implements compilerProgElem.
+func (e sectionEndElem) comparePC(pc int) int {
+	return cmp.Compare(e.section.endPC, pc)
+}
+
+// comparePC implements compilerProgElem.
+func (e sectionStartElem) comparePC(pc int) int {
+	return cmp.Compare(e.section.startPC, pc)
+}
+
+// comparePC implements compilerProgElem.
+func (inst *instruction) comparePC(pc int) (r int) {
+	if pc < inst.pc {
+		return 1
+	}
+	end := inst.pc + inst.encodedSize()
+	if pc >= end {
+		return -1
+	}
+	return 0
 }
 
 // computePC assigns the PC values of all instructions and labels.
 func (p *compilerProg) computePC() {
 	var pc int
-	for pos := range p.iter() {
-		switch elem := pos.elem.(type) {
+	for _, elem := range p.elems {
+		switch elem := elem.(type) {
 		case *instruction:
 			elem.pc = pc
 			pc += elem.encodedSize()
-		case *compilerSection:
-			if pos.exitingSection {
-				elem.pcHigh = pc
-			} else {
-				elem.pcLow = pc
-			}
+		case sectionStartElem:
+			elem.section.startPC = pc
+		case sectionEndElem:
+			elem.section.endPC = pc
+		default:
+			panic(fmt.Sprintf("BUG: unhandled section type %T", elem))
 		}
 	}
 }
@@ -321,16 +309,4 @@ func (inst *instruction) encodedSize() int {
 		size = 1
 	}
 	return size + inst.dataSize()
-}
-
-// comparePC implements compilerProgItem.
-func (inst *instruction) comparePC(pc int) (r int) {
-	if pc < inst.pc {
-		return 1
-	}
-	end := inst.pc + inst.encodedSize()
-	if pc >= end {
-		return -1
-	}
-	return 0
 }
