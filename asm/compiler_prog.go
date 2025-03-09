@@ -308,5 +308,5 @@ func (inst *instruction) encodedSize() int {
 	if !isBytes(inst.op) {
 		size = 1
 	}
-	return size + inst.dataSize()
+	return size + inst.pushSize
 }

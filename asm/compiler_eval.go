@@ -32,9 +32,17 @@ loop:
 		switch {
 		case isBytes(inst.op):
 			v, err := e.evalAsBytes(inst.expr(), section.env)
-			if err == nil {
-				inst.argNoLabels = true
+			var labelErr unassignedLabelError
+			if errors.As(err, &labelErr) {
+				// Expression depends on label position calculation, leave it for later.
+				continue loop
+			}
+			inst.argNoLabels = true
+			if err != nil {
+				c.errorAt(inst.ast, err)
+			} else {
 				inst.data = v
+				inst.pushSize = len(v)
 			}
 
 		case isPush(inst.op):
@@ -78,7 +86,9 @@ loop:
 			if err != nil {
 				return inst, err
 			}
-			inst.data = v
+			if err := assignBytesArg(inst, v); err != nil {
+				return inst, err
+			}
 
 		case isPush(inst.op):
 			if inst.expr() == nil {
@@ -135,4 +145,12 @@ func (prog *compilerProg) autoPushSize(value []byte) int {
 		return 1
 	}
 	return len(value)
+}
+
+func assignBytesArg(inst *instruction, v []byte) error {
+	if len(v) > inst.pushSize {
+		return ecVariablePushOverflow
+	}
+	inst.data = v
+	return nil
 }

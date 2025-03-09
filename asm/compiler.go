@@ -226,15 +226,15 @@ func (c *Compiler) compileDocument(doc *ast.Document) (output []byte) {
 		// overflow condition, the size of that PUSH increases by one and then we
 		// recalculate everything.
 		failedInst, err := c.evaluateArgs(e, prog)
-		if err != nil {
-			if errors.Is(err, ecVariablePushOverflow) {
-				failedInst.pushSize += 1
-				continue // try again
-			}
+		if err == nil {
+			break
+		} else if errors.Is(err, ecVariablePushOverflow) {
+			failedInst.pushSize += 1
+			continue // try again
+		} else {
 			c.errorAt(failedInst.ast, err)
 			break // there was some other error
 		}
-		break
 	}
 
 	if c.errors.hasError() {
