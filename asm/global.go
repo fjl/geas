@@ -107,7 +107,7 @@ func (gs *globalScope) overrideExprMacroValue(name string, val *lzint.Value) {
 		doc: nil,
 		def: &ast.ExpressionMacroDef{
 			Name: name,
-			Body: &ast.LiteralExpr{Value: val},
+			Body: ast.MakeNumber(val),
 		},
 	}
 }
