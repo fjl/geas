@@ -143,7 +143,7 @@ func (gs *globalScope) setLabelDocument(li *ast.LabelDefSt, doc *ast.Document) e
 	return err
 }
 
-// setLabelNextInstr sets the next instruction after a label.
+// setLabelInstr sets the next instruction after a label.
 func (gs *globalScope) setLabelInstr(name string, instr *instruction) {
 	gs.labelInstr[name] = instr
 }
