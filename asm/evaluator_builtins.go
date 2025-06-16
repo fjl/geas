@@ -33,8 +33,8 @@ import (
 var builtinMacros = make(map[string]builtinMacroFn)
 
 func init() {
-	builtinMacros["bitlen"] = bitlenMacro
-	builtinMacros["bytelen"] = bytelenMacro
+	builtinMacros["intbits"] = intbitsMacro
+	builtinMacros["len"] = lenMacro
 	builtinMacros["abs"] = absMacro
 	builtinMacros["address"] = addressMacro
 	builtinMacros["selector"] = selectorMacro
@@ -44,7 +44,7 @@ func init() {
 
 type builtinMacroFn func(*evaluator, *evalEnvironment, *ast.MacroCallExpr) (*lzint.Value, error)
 
-func bitlenMacro(e *evaluator, env *evalEnvironment, call *ast.MacroCallExpr) (*lzint.Value, error) {
+func intbitsMacro(e *evaluator, env *evalEnvironment, call *ast.MacroCallExpr) (*lzint.Value, error) {
 	if err := checkArgCount(call, 1); err != nil {
 		return nil, err
 	}
@@ -55,7 +55,7 @@ func bitlenMacro(e *evaluator, env *evalEnvironment, call *ast.MacroCallExpr) (*
 	return lzint.FromInt64(v.IntegerBitLen()), nil
 }
 
-func bytelenMacro(e *evaluator, env *evalEnvironment, call *ast.MacroCallExpr) (*lzint.Value, error) {
+func lenMacro(e *evaluator, env *evalEnvironment, call *ast.MacroCallExpr) (*lzint.Value, error) {
 	if err := checkArgCount(call, 1); err != nil {
 		return nil, err
 	}
