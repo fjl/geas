@@ -50,7 +50,7 @@ func newGlobalScope() *globalScope {
 // registerDefinitions processes a document and registers the globals contained in it.
 func (gs *globalScope) registerDefinitions(doc *ast.Document) (errs []error) {
 	for _, li := range doc.GlobalLabels() {
-		gs.registerLabel(li, doc)
+		gs.registerLabel(li)
 	}
 	for _, mac := range doc.GlobalExprMacros() {
 		def := globalDef[*ast.ExpressionMacroDef]{mac, doc}
@@ -68,7 +68,7 @@ func (gs *globalScope) registerDefinitions(doc *ast.Document) (errs []error) {
 }
 
 // registerLabel registers a label as known.
-func (gs *globalScope) registerLabel(def *ast.LabelDefSt, doc *ast.Document) {
+func (gs *globalScope) registerLabel(def *ast.LabelDefSt) {
 	_, found := gs.label[def.Name()]
 	if !found {
 		gs.label[def.Name()] = def
