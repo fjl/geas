@@ -133,7 +133,7 @@ func evaluatorForTesting() *evaluator {
 	if len(errs) > 0 {
 		panic(fmt.Errorf("error in registerDefinitions: %v", errs[0]))
 	}
-	e := newEvaluator(gs)
+	e := newEvaluator(gs, nil)
 	e.registerLabels([]*compilerLabel{
 		{
 			doc:   evalTestDoc,
@@ -160,7 +160,7 @@ func evaluatorForTesting() *evaluator {
 }
 
 func evalEnvironmentForTesting() *evalEnvironment {
-	return newEvalEnvironment(&compilerSection{doc: evalTestDoc})
+	return newEvalEnvironment(new(compilerProg), &compilerSection{doc: evalTestDoc})
 }
 
 func TestExprEval(t *testing.T) {

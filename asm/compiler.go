@@ -214,7 +214,7 @@ func (c *Compiler) compileDocument(doc *ast.Document) (output []byte) {
 	prog.finishExpansion()
 
 	// Expansion of is now done, and all further steps work on prog.
-	e := newEvaluator(c.globals)
+	e := newEvaluator(c.globals, c)
 	c.preEvaluateArgs(e, prog)
 	e.registerLabels(prog.labels)
 

@@ -33,7 +33,8 @@ type evaluator struct {
 	labelInstr  map[evalLabelKey]*instruction
 	usedLabels  map[*ast.LabelDefSt]struct{}
 	globals     *globalScope
-	labelsValid bool // while false, evaluating labels returns unassignedLabelErr
+	compiler    *Compiler // for assemble macro
+	labelsValid bool      // while false, evaluating labels returns unassignedLabelErr
 }
 
 type evalLabelKey struct {
@@ -43,32 +44,35 @@ type evalLabelKey struct {
 
 // evalEnvironment holds the definitions available for evaluation.
 type evalEnvironment struct {
+	prog      *compilerProg
 	doc       *ast.Document           // for resolving local macros
 	macroArgs *instrMacroArgs         // args of the current instruction macro
 	variables map[string]*lzint.Value // args of the current expression macro
 }
 
-func newEvalEnvironment(s *compilerSection) *evalEnvironment {
+func newEvalEnvironment(prog *compilerProg, s *compilerSection) *evalEnvironment {
 	if s == nil {
 		panic("nil section")
 	}
-	return &evalEnvironment{doc: s.doc, macroArgs: s.macroArgs}
+	return &evalEnvironment{prog: prog, doc: s.doc, macroArgs: s.macroArgs}
 }
 
 // makeCallEnvironment creates the environment for an expression macro call.
 func (env *evalEnvironment) makeCallEnvironment(defdoc *ast.Document, def *ast.ExpressionMacroDef) *evalEnvironment {
 	return &evalEnvironment{
+		prog:      env.prog,
 		doc:       defdoc,
 		variables: make(map[string]*lzint.Value, len(def.Params)),
 	}
 }
 
-func newEvaluator(gs *globalScope) *evaluator {
+func newEvaluator(gs *globalScope, c *Compiler) *evaluator {
 	return &evaluator{
 		inStack:    make(map[*ast.ExpressionMacroDef]struct{}),
 		labelInstr: make(map[evalLabelKey]*instruction),
 		usedLabels: make(map[*ast.LabelDefSt]struct{}),
 		globals:    gs,
+		compiler:   c,
 	}
 }
 
@@ -281,7 +285,7 @@ func (e *evaluator) evalVariable(expr *ast.VariableExpr, env *evalEnvironment) (
 		}
 		arg := a.args[i]
 		// Evaluate it in the parent scope.
-		return e.eval(arg, newEvalEnvironment(a.callsite))
+		return e.eval(arg, newEvalEnvironment(env.prog, a.callsite))
 	}
 	return nil, fmt.Errorf("%w $%s", ecUndefinedVariable, expr.Ident)
 }

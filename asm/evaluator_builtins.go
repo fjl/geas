@@ -20,6 +20,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"math"
 	"math/big"
 	"strings"
 
@@ -40,6 +41,7 @@ func init() {
 	builtinMacros["selector"] = selectorMacro
 	builtinMacros["keccak256"] = keccak256Macro
 	builtinMacros["sha256"] = sha256Macro
+	builtinMacros["assemble"] = assembleMacro
 }
 
 type builtinMacroFn func(*evaluator, *evalEnvironment, *ast.MacroCallExpr) (*lzint.Value, error)
@@ -154,4 +156,28 @@ func addressMacro(e *evaluator, env *evalEnvironment, call *ast.MacroCallExpr) (
 
 func isChecksumAddress(str string) bool {
 	return strings.ContainsAny(str, "ABCDEF")
+}
+
+func assembleMacro(e *evaluator, env *evalEnvironment, call *ast.MacroCallExpr) (*lzint.Value, error) {
+	if err := checkArgCount(call, 1); err != nil {
+		return nil, err
+	}
+	filename, err := e.evalAsBytes(call.Args[0], env)
+	if err != nil {
+		return nil, err
+	}
+
+	subc := New(e.compiler.fsys)
+	subc.SetIncludeDepthLimit(e.compiler.maxIncDepth)
+	subc.SetMaxErrors(math.MaxInt)
+	subc.SetDefaultFork(env.prog.evm.Name())
+	subc.macroOverrides = e.compiler.macroOverrides
+
+	file, err := resolveRelative(env.doc.File, string(filename))
+	if err != nil {
+		return nil, err
+	}
+	bytecode := subc.CompileFile(file)
+	e.compiler.errors.add(subc.ErrorsAndWarnings()...)
+	return lzint.FromBytes(bytecode), nil
 }
