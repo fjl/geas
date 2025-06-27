@@ -268,6 +268,12 @@ func (inst assembleStatement) expand(c *Compiler, doc *ast.Document, prog *compi
 
 // expand of #bytes just adds a data instruction to the program.
 func (inst bytesStatement) expand(c *Compiler, doc *ast.Document, prog *compilerProg) error {
+	if inst.Label != nil {
+		err := labelDefStatement{inst.Label}.expand(c, doc, prog)
+		if err != nil {
+			return err
+		}
+	}
 	prog.addInstruction(newInstruction(inst, "#bytes"))
 	return nil
 }

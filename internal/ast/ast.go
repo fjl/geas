@@ -178,6 +178,7 @@ type (
 	BytesSt struct {
 		pos   Position
 		Value Expr
+		Label *LabelDefSt
 	}
 )
 

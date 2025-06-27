@@ -358,12 +358,32 @@ func parsePragma(p *Parser, d token) {
 
 func parseBytes(p *Parser, d token) {
 	instr := &BytesSt{pos: Position{p.doc.File, d.line}}
-	switch tok := p.next(); tok.typ {
-	case lineEnd, eof:
-		p.throwError(d, "expected expression following #bytes")
-	default:
-		instr.Value = parseExpr(p, tok)
-		p.doc.Statements = append(p.doc.Statements, instr)
+	for {
+		switch tok := p.next(); tok.typ {
+		case lineEnd, eof:
+			p.throwError(d, "expected expression following #bytes")
+
+		case label:
+			if instr.Label != nil {
+				p.throwError(d, "extra label on #bytes")
+			}
+			instr.Label = &LabelDefSt{
+				Src:    p.doc,
+				Dotted: true,
+				Global: IsGlobal(tok.text),
+				tok:    tok,
+			}
+
+		default:
+			instr.Value = parseExpr(p, tok)
+			p.doc.Statements = append(p.doc.Statements, instr)
+			if instr.Label != nil {
+				name := instr.Label.Name()
+				p.doc.labels[name] = instr.Label
+				p.doc.exprMacros[name] = &ExpressionMacroDef{Name: name, Body: instr.Value}
+			}
+			return
+		}
 	}
 }
 

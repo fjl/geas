@@ -115,6 +115,24 @@ bytes-directive-label-minimal:
     errors:
       - ":2: labels can't be used in #bytes"
 
+bytes-directive-named:
+  input:
+    code: |
+      push .len(named)
+      push @named
+      #bytes named: 127
+  output:
+    bytecode: '600160047f'
+
+bytes-directive-global-named:
+  input:
+    code: |
+      push .len(Named)
+      push @Named
+      #bytes Named: 127
+  output:
+    bytecode: '600160047f'
+
 comments-on-label:
   input:
     code: |
