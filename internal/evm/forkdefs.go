@@ -244,4 +244,27 @@ var forkReg = map[string]*InstructionSetDef{
 		Names:  []string{"prague"},
 		Parent: "cancun",
 	},
+
+	"tron": {
+		Names:  []string{"tron"},
+		Parent: "shanghai",
+		Added: []*Op{
+			opm["CALLTOKEN"],
+			opm["TOKENBALANCE"],
+			opm["CALLTOKENVALUE"],
+			opm["CALLTOKENID"],
+			opm["ISCONTRACT"],
+			opm["FREEZE"],
+			opm["UNFREEZE"],
+			opm["FREEZEEXPIRETIME"],
+			opm["VOTEWITNESS"],
+			opm["WITHDRAWREWARD"],
+			opm["FREEZEBALANCEV2"],
+			opm["UNFREEZEBALANCEV2"],
+			opm["CANCELALLUNFREEZEV2"],
+			opm["WITHDRAWEXPIREUNFREEZE"],
+			opm["DELEGATERESOURCE"],
+			opm["UNDELEGATERESOURCE"],
+		},
+	},
 }
