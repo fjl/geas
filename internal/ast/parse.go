@@ -364,12 +364,13 @@ func parseBytes(p *Parser, d token) {
 			p.throwError(d, "expected expression following #bytes")
 
 		case label:
+			// "named bytes"
 			if instr.Label != nil {
 				p.throwError(d, "extra label on #bytes")
 			}
 			instr.Label = &LabelDefSt{
 				Src:    p.doc,
-				Dotted: true,
+				Dotted: true, // always dotted
 				Global: IsGlobal(tok.text),
 				tok:    tok,
 			}
@@ -377,6 +378,8 @@ func parseBytes(p *Parser, d token) {
 		default:
 			instr.Value = parseExpr(p, tok)
 			p.doc.Statements = append(p.doc.Statements, instr)
+
+			// For named bytes, register them as both a macro and label.
 			if instr.Label != nil {
 				name := instr.Label.Name()
 				p.doc.labels[name] = instr.Label
