@@ -149,6 +149,15 @@ bytes-directive-global-named:
   output:
     bytecode: '600160047f'
 
+bytes-directive-named-unused:
+  input:
+    code: |
+      #bytes named: 127
+  output:
+    bytecode: '7f'
+    warnings:
+      - ':1: warning: label @.named unused in program'
+
 comments-on-label:
   input:
     code: |
