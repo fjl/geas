@@ -18,7 +18,7 @@
 }
 
 ;;; Program start.
-    
+
     ;; Read the calldata into memory.
     calldatasize     ; [calldatasize]
     push 0           ; [0, calldatasize]
@@ -67,7 +67,7 @@ FAIL:
 
 ;;; View functions for token metadata, these just return zero.
 
-#define S_decimals = .selector("decimals()")
-#define S_totalSupply = .selector("totalSupply()")
+#define S_decimals = selector("decimals()")
+#define S_totalSupply = selector("totalSupply()")
 
 Return0:
