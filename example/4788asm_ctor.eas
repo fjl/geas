@@ -8,14 +8,12 @@
 
 #pragma target "cancun"
 
-    push @.end - @.start  ; [size]
-    dup1                  ; [size, size] 
-    push @.start          ; [start, size, size]
+    push len(code)        ; [size]
+    dup1                  ; [size, size]
+    push @code            ; [start, size, size]
     push 0                ; [0, start, size, size]
     codecopy              ; [size]
     push 0                ; [0, size]
     return                ; []
 
-.start:
-#assemble "4788asm.eas"
-.end:
+#bytes code: assemble("4788asm.eas")
