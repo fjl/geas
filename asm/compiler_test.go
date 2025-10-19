@@ -95,7 +95,7 @@ func TestCompiler(t *testing.T) {
 				t.Fatal("compilation failed")
 			}
 			checkErrors(t, "warnings", c.Warnings(), test.Output.Warnings)
-			expectedOutput, err := hex.DecodeString(strings.Replace(test.Output.Bytecode, " ", "", -1))
+			expectedOutput, err := hex.DecodeString(strings.ReplaceAll(test.Output.Bytecode, " ", ""))
 			if err != nil {
 				t.Fatalf("invalid hex: %v", err)
 			}
