@@ -18,12 +18,10 @@ package asm
 
 import (
 	"fmt"
-	"math"
 	"strings"
 
 	"github.com/fjl/geas/internal/ast"
 	"github.com/fjl/geas/internal/evm"
-	"github.com/fjl/geas/internal/lzint"
 )
 
 // expand appends a list of AST instructions to the program.
@@ -238,28 +236,16 @@ func (inst includeStatement) expand(c *Compiler, doc *ast.Document, prog *compil
 
 // expand of #assemble performs compilation of the given assembly file.
 func (inst assembleStatement) expand(c *Compiler, doc *ast.Document, prog *compilerProg) error {
-	subc := New(c.fsys)
-	subc.SetIncludeDepthLimit(c.maxIncDepth)
-	subc.SetMaxErrors(math.MaxInt)
-	subc.SetDefaultFork(prog.evm.Name())
-	subc.macroOverrides = c.macroOverrides
-
-	file, err := resolveRelative(doc.File, inst.Filename)
-	if err != nil {
-		return err
-	}
-	bytecode := subc.CompileFile(file)
-	c.errors.add(subc.ErrorsAndWarnings()...)
-	if !subc.Failed() && len(bytecode) == 0 {
-		c.warnf(inst, "empty bytecode output")
-		return nil
-	}
-	// Here we turn #assemble into a #bytes statement with a literal argument.
+	// Here we turn #assemble into a #bytes statement with a call to the assemble() builtin macro.
 	prog.addInstruction(&instruction{
 		op: "#bytes",
 		ast: bytesStatement{
 			&ast.BytesSt{
-				Value: ast.MakeNumber(lzint.FromBytes(bytecode)),
+				Value: &ast.MacroCallExpr{
+					Ident:   "assemble",
+					Builtin: true,
+					Args:    []ast.Expr{ast.MakeString(inst.Filename)},
+				},
 			},
 		},
 	})

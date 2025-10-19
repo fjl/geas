@@ -339,3 +339,11 @@ func MakeNumber(v *lzint.Value) *LiteralExpr {
 		Value: v,
 	}
 }
+
+// MakeString creates a string literal with the given value.
+func MakeString(v string) *LiteralExpr {
+	return &LiteralExpr{
+		tok:   token{text: v, typ: stringLiteral},
+		Value: lzint.FromBytes([]byte(v)),
+	}
+}
