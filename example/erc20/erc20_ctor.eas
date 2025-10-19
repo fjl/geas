@@ -10,7 +10,7 @@
     caller              ; [caller, balance, 0]
     sstore              ; [0]
 
-    push @.start        ; [start, 0]
+    push @code          ; [start, 0]
     dup1                ; [start, start, 0]
     codesize            ; [codesize, start, start, 0]
     sub                 ; [length, start, 0]
@@ -22,5 +22,4 @@
     codecopy            ; [0, length]
     return              ; []
 
-.start:
-#assemble "erc20.eas"
+#bytes code: assemble("erc20.eas")
