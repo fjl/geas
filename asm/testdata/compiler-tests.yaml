@@ -158,6 +158,22 @@ bytes-directive-named-unused:
     warnings:
       - ':1: warning: label @.named unused in program'
 
+bytes-directive-named-bad-syntax-1:
+  input:
+    code: |
+      #bytes named 127
+  output:
+    errors:
+      - ':1: unexpected number literal 127'
+
+bytes-directive-named-bad-syntax-2:
+  input:
+    code: |
+      #bytes named = 127
+  output:
+    errors:
+      - ':1: unexpected equals sign ='
+
 comments-on-label:
   input:
     code: |
