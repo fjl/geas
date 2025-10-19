@@ -1,4 +1,5 @@
 assemble-directive:
+  # This test is just here to check the #assemble statement is still supported.
   input:
     code: |
       push 1
@@ -13,7 +14,22 @@ assemble-directive:
   output:
     bytecode: '6001 6001 01 01 5b 6001 56'
 
-assemble-directive-and-globals:
+assemble-macro-simple:
+  input:
+    code: |
+      push 1
+      push 1
+      add
+      #bytes assemble("file.eas")
+    files:
+      file.eas: |
+        add
+        label:
+        jump @label
+  output:
+    bytecode: '6001 6001 01 01 5b 6001 56'
+
+assemble-macro-and-globals:
   # this reproduces an issue where global definitions got destroyed by #assemble
   input:
     code: |
@@ -21,7 +37,7 @@ assemble-directive-and-globals:
       push 1
       push Global
       add
-      #assemble "file.eas"
+      #bytes assemble("file.eas")
     files:
       file.eas: |
         add
@@ -37,7 +53,7 @@ assemble-directive-globals-not-shared:
       push 1
       push Global
       add
-      #assemble "file.eas"
+      #bytes assemble("file.eas")
     files:
       file.eas: |
         push Global
@@ -53,7 +69,7 @@ assemble-directive-fork-inherit:
     code: |
       #pragma target "berlin"
       push 1
-      #assemble "file.eas"
+      #bytes assemble("file.eas")
     files:
       file.eas: |
         random
@@ -66,7 +82,7 @@ assemble-directive-fork-override:
     code: |
       #pragma target "berlin"
       push 1
-      #assemble "file.eas"
+      #bytes assemble("file.eas")
     files:
       file.eas:  |
         #pragma target "paris"
