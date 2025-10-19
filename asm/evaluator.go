@@ -288,6 +288,7 @@ func (e *evaluator) evalVariable(expr *ast.VariableExpr, env *evalEnvironment) (
 
 func (e *evaluator) evalMacroCall(expr *ast.MacroCallExpr, env *evalEnvironment) (*lzint.Value, error) {
 	if expr.Builtin {
+		// Explicit call to builtin (dot syntax).
 		builtin, ok := builtinMacros[expr.Ident]
 		if ok {
 			return builtin(e, env, expr)
@@ -296,6 +297,12 @@ func (e *evaluator) evalMacroCall(expr *ast.MacroCallExpr, env *evalEnvironment)
 	}
 	def, defdoc := e.lookupExprMacro(env, expr.Ident)
 	if def == nil {
+		// There is no user-defined macro with the given name, try resolving
+		// as builtin macro.
+		builtin, ok := builtinMacros[expr.Ident]
+		if ok {
+			return builtin(e, env, expr)
+		}
 		return nil, fmt.Errorf("%w %s", ecUndefinedMacro, expr.Ident)
 	}
 

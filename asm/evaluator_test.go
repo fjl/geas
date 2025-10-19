@@ -76,26 +76,26 @@ var evalIntTests = []evalTest{
 	{expr: `"A"`, result: "65"},
 	{expr: `"foo"`, result: "6713199"},
 	// builtins
-	{expr: `.intbits(0)`, result: "0"},
-	{expr: `.intbits(0x00)`, result: "0"}, // leading zero byte does not count
-	{expr: `.intbits(0xff)`, result: "8"},
-	{expr: `.intbits(0x1ff)`, result: "9"},
-	{expr: `.intbits(0x01ff)`, result: "9"},
-	{expr: `.intbits(0x000001ff)`, result: "9"},
-	{expr: `.len(0)`, result: "0"},
-	{expr: `.len(0x00)`, result: "1"}, // note: leading zero byte counts bc. hex
-	{expr: `.len(0xff)`, result: "1"},
-	{expr: `.len(0x1ff)`, result: "2"},
-	{expr: `.len(0x01ff)`, result: "2"},
-	{expr: `.len(0x0001ff)`, result: "3"},   // note: leading zero byte
-	{expr: `.len(0x000001ff)`, result: "4"}, // two leading zero bytes
-	{expr: `.len("foobar")`, result: "6"},
-	{expr: `.abs(0 - 10)`, result: "10"},
-	{expr: `.sha256("text")`, result: "68832153269555879243704685382415794081420120252170153643880971663484982053329"},
-	{expr: `.sha256(33)`, result: "84783983549258160669137366770885509408211009960610860350324922232842582506338"},
-	{expr: `.selector("transfer(address,uint256)")`, result: "2835717307"},
-	{expr: `.address(0x658bdf435d810c91414ec09147daa6db62406379)`, result: "579727320398773179602058954232328055508812456825"},
-	{expr: `.address("0x658bdf435d810c91414ec09147daa6db62406379")`, result: "579727320398773179602058954232328055508812456825"},
+	{expr: `intbits(0)`, result: "0"},
+	{expr: `intbits(0x00)`, result: "0"}, // leading zero byte does not count
+	{expr: `intbits(0xff)`, result: "8"},
+	{expr: `intbits(0x1ff)`, result: "9"},
+	{expr: `intbits(0x01ff)`, result: "9"},
+	{expr: `intbits(0x000001ff)`, result: "9"},
+	{expr: `len(0)`, result: "0"},
+	{expr: `len(0x00)`, result: "1"}, // note: leading zero byte counts bc. hex
+	{expr: `len(0xff)`, result: "1"},
+	{expr: `len(0x1ff)`, result: "2"},
+	{expr: `len(0x01ff)`, result: "2"},
+	{expr: `len(0x0001ff)`, result: "3"},   // note: leading zero byte
+	{expr: `len(0x000001ff)`, result: "4"}, // two leading zero bytes
+	{expr: `len("foobar")`, result: "6"},
+	{expr: `abs(0 - 10)`, result: "10"},
+	{expr: `sha256("text")`, result: "68832153269555879243704685382415794081420120252170153643880971663484982053329"},
+	{expr: `sha256(33)`, result: "84783983549258160669137366770885509408211009960610860350324922232842582506338"},
+	{expr: `selector("transfer(address,uint256)")`, result: "2835717307"},
+	{expr: `address(0x658bdf435d810c91414ec09147daa6db62406379)`, result: "579727320398773179602058954232328055508812456825"},
+	{expr: `address("0x658bdf435d810c91414ec09147daa6db62406379")`, result: "579727320398773179602058954232328055508812456825"},
 }
 
 var evalErrorTests = []evalErrorTest{
@@ -104,9 +104,9 @@ var evalErrorTests = []evalErrorTest{
 	{expr: `1 >> (1 << 64)`, err: "rshift amount 18446744073709551616 overflows uint"},
 	{expr: `macro3(foo, 1)`, err: "invalid number of arguments, macro macro3 needs 0"},
 	// builtins
-	{expr: `.selector("transfer(,,uint256)")`, err: "invalid ABI selector"},
-	{expr: `.address(0x658bdf435d810c91414EC09147daa6db62406379)`, err: errAddressChecksum.Error()},
-	{expr: `.sha256(0x011)`, err: "odd-length hex in bytes context"},
+	{expr: `selector("transfer(,,uint256)")`, err: "invalid ABI selector"},
+	{expr: `address(0x658bdf435d810c91414EC09147daa6db62406379)`, err: errAddressChecksum.Error()},
+	{expr: `sha256(0x011)`, err: "odd-length hex in bytes context"},
 }
 
 var evalTestDoc *ast.Document

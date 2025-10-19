@@ -179,7 +179,7 @@ expr-macro-recursion:
     errors:
       - ':3: recursive call of macro rec'
 
-expr-macro-redefine-builtin:
+expr-macro-redefine-builtin-dotted-global:
   input:
     code: |
       #define .Address(x) = x*2
@@ -187,6 +187,39 @@ expr-macro-redefine-builtin:
   output:
     errors:
       - ':1: attempt to redefine builtin macro .Address'
+
+expr-macro-redefine-builtin-dotted-len:
+  input:
+    code: |
+      #define .len(x) = x*2
+      PUSH .len(0x2)
+  output:
+    errors:
+      - ':1: attempt to redefine builtin macro .len'
+
+expr-macro-redefine-builtin:
+  # This is about redefining a builtin macro locally, which is allowed.
+  # The macro remains accessible as a builtin through the dotted identifier.
+  # The point of this feature is just to ensure that newly introduced builtins
+  # do not cause issues with existing definitions in old programs.
+  input:
+    code: |
+      #define len(x) = $x*2
+      PUSH len(0x2)
+      PUSH .len(0x1)
+  output:
+    bytecode: '60046001'
+
+expr-macro-redefine-builtin-2:
+  # This is about redefining a builtin macro, and then calling the builtin
+  # from within the redefinition.
+  input:
+    code: |
+      #define len(x) = .len($x) + 1
+      PUSH len(0x2)
+      PUSH .len(0x1)
+  output:
+    bytecode: '60026001'
 
 expr-macro-undefined:
   input:
