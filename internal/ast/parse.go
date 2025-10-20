@@ -522,11 +522,25 @@ func parsePrimaryExpr(p *Parser, tok token) Expr {
 	case numberLiteral, stringLiteral:
 		return &LiteralExpr{tok: tok}
 
+	case arith:
+		return parseUnaryExpr(p, tok)
+
 	case openParen:
 		return parseParenExpr(p)
 
 	default:
 		p.unexpected(tok)
+		return nil
+	}
+}
+
+func parseUnaryExpr(p *Parser, tok token) Expr {
+	switch op := tokenArithOp(tok); op {
+	case ArithMinus:
+		arg := parseExpr(p, p.next())
+		return &UnaryArithExpr{Op: op, Arg: arg}
+	default:
+		p.throwError(tok, "unexpected arithmetic op %v", op)
 		return nil
 	}
 }

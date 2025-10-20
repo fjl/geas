@@ -229,6 +229,11 @@ type (
 		Left  Expr
 		Right Expr
 	}
+
+	UnaryArithExpr struct {
+		Op  ArithOp
+		Arg Expr
+	}
 )
 
 func (inst *MacroCallSt) Position() Position {
