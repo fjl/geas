@@ -143,6 +143,8 @@ func (e *evaluator) eval(expr ast.Expr, env *evalEnvironment) (*lzint.Value, err
 		return e.evalLiteral(expr)
 	case *ast.LabelRefExpr:
 		return e.evalLabelRef(expr, env)
+	case *ast.UnaryArithExpr:
+		return e.evalUnary(expr, env)
 	case *ast.ArithExpr:
 		return e.evalArith(expr, env)
 	case *ast.VariableExpr:
@@ -199,6 +201,25 @@ func (e *evaluator) evalLabelRef(expr *ast.LabelRefExpr, env *evalEnvironment) (
 		return nil, unassignedLabelError{lref: expr}
 	}
 	return lzint.FromInt(big.NewInt(int64(pc))), nil
+}
+
+func (e *evaluator) evalUnary(expr *ast.UnaryArithExpr, env *evalEnvironment) (*lzint.Value, error) {
+	argVal, err := e.eval(expr.Arg, env)
+	if err != nil {
+		return nil, err
+	}
+	arg := argVal.Int()
+
+	var result *big.Int
+	switch expr.Op {
+	case ast.ArithMinus:
+		result = new(big.Int).Neg(arg)
+
+	default:
+		panic(fmt.Errorf("invalid unary op %v", expr.Op))
+	}
+
+	return lzint.FromInt(result), nil
 }
 
 var bigMaxUint = new(big.Int).SetUint64(math.MaxUint)
