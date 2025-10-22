@@ -311,7 +311,7 @@ you must use explicit PUSH and JUMP.
         eq                      ; [n==size]
         %jump_if_not(@revert)
 
-        push $bytes             ; [size]
+        push $numBytes          ; [size]
         push 0                  ; [offset]
         push 0                  ; [dest, offset, size]
         calldatacopy            ; []
