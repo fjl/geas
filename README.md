@@ -2,10 +2,11 @@
 
 This is geas – the Good Ethereum Assembler[^1] – a macro assembler for the EVM.
 
-You can use it to create any contract for Ethereum, though it's probably a bad idea.
-For real contracts, you should use a well-tested language compiler like Solidity.
-The purpose of geas is mostly creating specialty programs and tinkering with the EVM
-at a low level.
+You can use it to create any contract for Ethereum, though it's probably a bad idea. For
+real contracts, you should use a well-tested language compiler like Solidity. The purpose
+of Geas is mostly creating specialty programs and tinkering with the EVM at a low level.
+
+[^1]: Under no circumstances must it be called the geth assembler.
 
 ### Installation
 
@@ -39,133 +40,265 @@ to get started.
 
 ## Language
 
-Programs accepted by the assembler follow a simple structure. Each line is an instruction.
-Both uppercase and lowercase can be used for instruction names. All known EVM instructions
-are supported.
+The Geas language is intended to be a direct representation of EVM bytecode.
 
-Comments can appear anywhere and are introduced by the semicolon (;) character.
+The EVM is a stack-based virtual machine operating on 256-bit values, with a somewhat
+limited instruction set. Unlike high-level languages (such as Solidity, Vyper), Geas does
+not abstract these properties away. When writing contract programs in Geas you are exposed
+to the design of the EVM as it really is, with very little help.
 
-        push 1  ;; comment
+What little help there is exists to deal with mundane details. When writing and reviewing
+stack-based bytecode, the thinking goes, authors should not also be bothered with the
+question of whether a PUSH instruction is one or two bytes in size, or whether a JUMPDEST
+exists at a particular label. That said, you can always choose to ignore the facilities
+provided for convenience, they are strictly optional.
+
+### Instructions
+
+Programs are listings of instructions. Each instruction is written on its own line. Both
+uppercase and lowercase can be used for instruction names, though lowercase is preferred
+by convention.
+
+Here is a bare-bones example program that loads storage slot zero and adds one the value
+contained in it. Note that the `push1` instruction takes an immediate argument, while
+other instructions do not.
+
+        push0
+        sload
+        push1 1
+        add
+
+### Comments
+
+Comments can appear anywhere and are introduced by the semicolon (;) character. A comment
+always extends to the end of the current line.
+
+        push 1    ; comment
         push 2
         add
 
-Opcodes listed in the program correspond directly with the bytecodes in output.
+By convention, top-level comments start with three semicolons. Groups of instructions are
+titled by two semicolons, and the comment is indented like the instruction. A single
+semicolon is used for instruction-level comments, typically a documentation of the
+post-stack of the instruction. Here's a fully commented example showing the commenting
+convention:
 
-### Jump
+    ;;; This is a top-level comment which explains the program.
+    ;;; Note the three semicolons.
 
-Jump destinations are written as a label followed by colon (:) and can be referred to
-using the notation `@label` together with JUMP or JUMPI.
+        ;; add two numbers
+        push 1            ; [a]
+        push 2            ; [b, a]
+        add               ; []
 
+    ;;; The End
+
+### Push Instructions
+
+PUSH instructions are the mechanism to place numbers on the stack. The EVM instruction set
+defines push instructions with argument sizes of zero (PUSH0) up to a maximum size of 32
+bytes (PUSH32). While you can use explictly-sized (PUSHx) instructions directly, it is
+preferable to let the assembler figure out the right size for you. To do this, use the
+variable-size `push` instruction.
+
+All push-type instructions must be followed by an immediate argument on the same line. The
+argument is an expression, so literal values, math operations, and references to macro
+definitions can be used.
+
+        push 5
+        push (100 * 2) - 3
+        push macroValue
+
+While intermediate results in PUSH argument expressions can be of any size, the *result*
+of the expression must fit into 256 bits. For explicitly-sized PUSHx, the result must fit
+into the declared push size.
+
+Since the EVM does not support negative numbers directly, `push` argument values are not
+allowed be negative.
+
+### Labels and Jumps
+
+The EVM supports two jump instructions, JUMP and JUMPI (conditional jump). Jumps can only
+target pre-declared JUMPDEST instructions.
+
+Jump destinations are written as a label followed by the colon (:) characte and can be
+referred to using the notation `@label` within expressions.
+
+        push 1            ; [sum]
     begin:
-        push 1
-        push 2
-        add
-        jump @begin
+        push 2            ; [a, sum]
+        add               ; [sum]
+        push @begin       ; [label, sum]
+        jump              ; [sum]
 
-When using JUMP with an argument, it turns into a PUSH of the label followed by the jump
-instruction, so the above is equivalent to:
+For convenience, Geas allows writing jump instructions with an argument. When written in
+this way, the jump turns into a push of the label followed by the jump instruction, so the
+above snippet can also be written as:
 
+        push 1            ; [sum]
     begin:
-        push 1
-        push 2
-        add
-        push @begin
-        jump
+        push 2            ; [a, sum]
+        add               ; [sum]
+        jump @begin       ; [sum]
 
 It is also possible to create labels without emitting a JUMPDEST instruction by prefixing
 the label name with the dot (.) character. While dotted labels are not valid for use as an
 argument to JUMP, they can be used with PUSH to measure code offsets.
 
-        push @.end
+        push @end
         codesize
         eq
     .end:
 
-### Push
+Finally, please note that jump destinations can be written explicitly if desired. The
+assembler does not require use of the label syntax, but it is much easier to read, and
+safer, too.
 
-The EVM instruction has sized push instructions from size zero (`PUSH0`) up to a size of
-32 bytes (`PUSH32`). While you can use sized push instructions directly, it is preferable
-to let the assembler figure out the right size for you. To do this use the variable-size
-`PUSH` instruction.
+### #bytes
 
-All PUSH-type instructions must be followed by an immediate argument on the same line.
-Simple math expressions and label references can be used within the argument:
+The `#bytes` directive adds raw bytes into the output. This is typically used for placing
+static data such as error messages.
 
-    .begin:
-        push (@add_it * 2) - 3
-        push 5
-    add_it:
-        add
+`#bytes` takes an arbitrary expression argument like `push`:
 
-Supported arithmetic operations include addition (+), subtraction (-), multiplication (*),
-division (/), and modulo (%). There is also support for bit-shifts (<<, >>), bitwise AND
-(&), OR (|), XOR (^). Note operator precedence is same as Go.
+    #bytes "data"
+    #bytes 0x01020304060708
 
-All arithmetic is performed with arbitrary precision integers. The result of calculations
-must fit into 256 bits in order to be valid as a PUSH argument. For sized push, the result
-must fit into the declared push size. Negative results are not allowed.
+#### Named Bytes
+
+Bytes can also be named by adding a label definition before the expression:
+
+    #bytes named: 0x0fffe3
+
+When used like this, the bytes value becomes available as a macro for use in expressions,
+and also defines a label that can be used to get their offset in the output. The
+definition above could be used like this to copy the bytes into memory:
+
+        push len(named)   ; [size]
+        push @named       ; [codeOffset, size]
+        push 0            ; [dest, codeOffset, size]
+        codecopy          ; []
+
+### Expressions
+
+Expressions are used as `push` and `#bytes` arguments.
+
+The Geas expression language is intended for simple calculations. Expressions are just
+pure functions that work on values, which are arbitrary precision integers.
+
+Intermediate results in an expression can be of any size. Negative number values are also
+supported. Available arithmetic operations include:
+
+- multiplication (*), division (/), modulo (%), bit-shifts (<<, >>)
+- addition (+), subtraction (-), bitwise AND (&), OR(|), XOR (^)
+
+There is limited support for using strings and arbitrary byte sequences in expressions.
+You can write string literals using double quotes, and use hexadecimal literals with a
+`0x` prefix to specify bytes. Please note that strings and bytes are internally
+represented in the same way numbers are. All arithmetic and macros work on all values,
+there are no 'types'.
+
+However, there is one aspect of values where integers and bytes have a subtle difference.
+A value with leading zero bytes can be created by hexadecimal literal like `0x00ff` (or by
+a macro call) and these leading zero bytes will be remembered by the value. When the value
+is used in a context like `#bytes`, leading zero bytes will be included in the output. Any
+operation that works on integers, like arithmetic, will strip leading zero bytes. Here is
+an example:
+
+    ;; This statement outputs two bytes, 0x00 and 0x01:
+    #bytes 0x0001
+
+    ;; But this statement outputs just one, 0x02:
+    #bytes 0x0001 + 1
+
+If in doubt, you can use the `abs()` builtin to remove any leading zero bytes, though it
+is rarely necessary.
 
 ### Expression Macros
 
-Expression macros can be created with the `#define` directive. Macros can be used within
-PUSH argument expressions.
+Expression macros can be created with the `#define` directive. This is mostly intended for
+definitions of constants or values which are used in multiple places.
+
+    #define CONSTANT = 0x8823
+
+        push CONSTANT     ; [v]
+        push 38           ; [offset, v]
+        calldataload      ; [val, v]
+        mul               ; [product]
 
 Macros can have parameters. Refer to parameter values using the dollar sign ($) prefix
-within the macro.
+within the macro definition.
 
-    #define z = 0x8823
-    #define myexpr(x, y) = ($x + $y) * z
+    #define myexpr(x, y) = CONSTANT * ($x + $y)
 
-        push myexpr(1, 2)
+        push myexpr(1, 2) ; [104553]
 
-### Builtin Macros
+### Builtin Expression Macros
 
-There are several builtin macros for common EVM tasks. Names of builtins start with a dot,
-and builtin macros cannot be redefined. Available builtins include:
+There are several builtin macros for use in expressions.
 
-`.abs()` for getting the absolute value of a number:
+`len()` is for computing the byte length of a value. This returns the minimum number of
+bytes necessary to store the value.
 
-    push .abs(0 - 100)
+    push len(1)           ; [1]
+    push len(280)         ; [2]
+    push len("hello")     ; [5]
 
-`.selector()` for computing 4-byte ABI selectors:
+Note `len()` treats the value as bytes, i.e. leading zeros are counted for values derived
+from a string or hex literal:
 
-    push .selector("transfer(address,uint256)")
-    push 0
-    mstore
+    push len(0x0000ff)    ; [3]
 
-`.keccak256()`, `.sha256()` hash functions:
+`intbits()` returns the bit-length of an integer:
 
-    push .sha256("data")
+    push intbits(0x1f)    ; [17]
 
-`.address()` for declaring contract addresses. The checksum and byte length of the address
-are verified.
+`abs()` returns the absolute value of an integer:
 
-    #define otherContract = .address(0x658bdf435d810c91414ec09147daa6db62406379)
+    push abs(-100)        ; [100]
+
+`selector()` computes 4-byte ABI selectors:
+
+    push selector("reward(bytes32)") ; [0x8d6f4b97]
+
+`keccak256()`, `sha256()` hash functions:
+
+    push sha256("data")   ; [0x3a6eb0790f39ac87c94f3856b2dd2c5d110e6811602261a9a923d3bb23adc8b7]
+
+`address()` is for declaring contract addresses. This macro only works with literals as an
+argument. Use it to ensure the byte length and checksum of addresses are correct.
+
+    #define otherContract = address(0x658bdf435d810c91414ec09147daa6db62406379)
+
+`assemble()` runs the assembler on another file, and returns the bytecode. See further
+down for additional information.
+
+    #bytes assemble("otherfile.eas")
 
 ### Instruction Macros
 
-Common groups of instructions can be defined as instruction macros. Names of such macros
-always start with the percent (%) character.
+Common groups of instructions can be defined as instruction macros. This is intended to
+aid help with repetitive code. The abstraction capability of the macro system is very
+limited by design. There are no conditionals, no loops, and no recursion.
 
-    #define %add5_and_store(x, location) {
-        push $x
-        push 5
-        add
-        push $location
-        mstore
+Names of instructions macros start with the percent (%) character.
+
+    #define %inc_and_store(pointer) {
+        push 1                  ; [1, x]
+        add                     ; [x+1]
+        push $pointer           ; [p, x+1]
+        mstore                  ; []
     }
 
 To invoke an instruction macro, write the macro name as a statement on its own line. If
 the macro has no arguments, you can also leave the parentheses off.
 
-    .begin:
-        %add5_and_store(3, 64)
-        %add5_and_store(4, 32)
-        push 32
-        push 64
-        sha3
+    #define counter = 133  ; memory location of counter
 
-Nested macro definitions are not allowed. Macro recursion is also not allowed.
+        ;; increment counter
+        push counter            ; [slot]
+        mload                   ; [val]
+        %inc_and_store(counter) ; []
 
 When defining (local) labels within instruction macros, they will only be visible within
 the macro. There is no way to refer to a local macro label from the outside, though you
@@ -173,32 +306,33 @@ can pass references to such internal labels into another macro. The example belo
 illustrates this, and also shows that in order to jump to a label argument within a macro,
 you must use explicit PUSH and JUMP.
 
-    #define %jump_if_not(label) {
-        iszero
-        push $label
-        jumpi
-    }
-
-    #define %read_input(bytes) {
-        calldatasize
-        push $bytes
-        eq
+    #define %read_input(numBytes) {
+        calldatasize            ; [size]
+        push $numBytes          ; [n, size]
+        eq                      ; [n==size]
         %jump_if_not(@revert)
 
-        push 0
-        push $bytes
-        calldataload
-        jump @continue
+        push $bytes             ; [size]
+        push 0                  ; [offset]
+        push 0                  ; [dest, offset, size]
+        calldatacopy            ; []
+        jump @continue          ; []
 
       revert:
-        push 0
-        push 0
-        revert
+        push 0                  ; [size]
+        push 0                  ; [offset, size]
+        revert                  ; []
 
       continue:
     }
 
-### Including Files
+    #define %jump_if_not(label) {
+        iszero                  ; [cond]
+        push $label             ; [l, cond]
+        jumpi                   ; []
+    }
+
+### Including Other Assembly Files
 
 EVM assembly files can be included into the current program using the `#include`
 directive. Top-level instructions in the included file will be inserted at the position of
@@ -207,7 +341,7 @@ the directive.
 `#include` filenames are resolved relative to the file containing the directive.
 
     .begin:
-        push @.end
+        push @end
         push 32
         mstore
 
@@ -228,15 +362,19 @@ available for use across files. When using `#include`, global definitions in the
 file also become available in all other files.
 
 Global identifiers must be unique across the program, i.e. they can only be defined once.
-Files defining global macros or labels can only be included into the program once. Note
-that the uniqueness requirement also means that instruction macros containing global
-labels can only be called once. Use good judgement when structuring your includes to avoid
-redefinition errors.
+
+This uniqueness requirement has a few implications:
+
+- Files defining global macros or labels can only be included into the program once.
+- Instruction macros which define a global label can only be called once.
+
+Use good judgement when structuring your includes and/or macros to avoid redefinition
+errors.
 
 lib.eas:
 
     #define result = 128
-    #define StoreSum {
+    #define %StoreSum {
         add
         push result
         mstore
@@ -248,19 +386,19 @@ main.eas:
 
         push 1
         push 2
-        %StoreSum  ;; calling global macro defined in lib.evm
+        %StoreSum  ; calling global macro defined in lib.evm
 
-### Configuring the target instruction set
+### Configuring the Target Instruction Set
 
 The EVM is a changing environment. Opcodes may be added (and sometimes removed) as new
-versions of the EVM are released in protocol forks. Geas is aware of EVM forks and their
-respective instruction sets.
+versions of the EVM are released in protocol forks.
 
-Geas always operates on a specific EVM instruction set. It targets the latest known eth
-mainnet fork by default, i.e. all opcodes available in that fork can be used, and opcodes
-that have been removed in any prior fork cannot.
+Geas is aware of EVM forks and their respective instruction sets. When assembling, a
+specific EVM instruction set is used. Geas targets the latest known eth mainnet fork by
+default, i.e. all opcodes available in that fork are available, and opcodes that have been
+removed in any prior fork are not.
 
-Use the `#pragma target` directive to change the target instruction set. The basic syntax is
+Use the `#pragma target` directive to change the target instruction set. The basic syntax is:
 
     #pragma target "name"
 
@@ -273,12 +411,12 @@ applicable to a certain range of past EVM versions.
 
     #pragma target "berlin"
 
-        chainid                ; [id]
-        push 1                 ; [1, id]
-        eq                     ; [id = 1]
-        jumpi @mainnet         ; []
-        push 0x0               ; [zeroaddr]
-        selfdestruct           ; []
+        chainid           ; [id]
+        push 1            ; [1, id]
+        eq                ; [id==1]
+        jumpi @mainnet    ; []
+        push 0x0          ; [zeroaddr]
+        selfdestruct      ; []
     mainnet:
 
 Note that declaring the target instruction set using `#pragma target` will not prevent the
@@ -290,27 +428,28 @@ fork. It may even stop working entirely in a later fork.
 `#pragma target` can only appear in the program once. It cannot be placed in an include
 file. You have to put the directive in the main program file.
 
-### #assemble
+### The assemble() Macro
 
-When writing contract constructors and advanced CALL scenarios, it can be necessary to
-include subprogram bytecode as-is. The `#assemble` directive does this for you.
+When writing contract constructors and CALL/CREATE scenarios, it can be necessary to
+include subprograms into the bytecode as-is.
 
-Using `#assemble` runs the assembler on the specified file, and includes the resulting
-bytecode into the current program. Labels of the subprogram will start at offset zero.
-Unlike with `#include`, global definitions of the subprogram are not imported.
+`assemble()` runs the assembler on the specified file, and returns the output bytecode as
+a value. In conjunction with named `#bytes`, this enables writing contract constructor
+bytecode like this:
 
-        ;; copy subprogram to memory
-        push @.end - @.begin   ; [size]
-        push @.begin           ; [offset, size]
-        push 128               ; [dest, offset, codesize]
-        codecopy               ; []
+        ;; copy the contract to memory
+        push len(code)    ; [size]
+        push @code        ; [offset, size]
+        push 0            ; [ptr, offset, size]
+        codecopy          ; [size]
 
-    .begin:
-    #assemble "subprogram.eas"
-    .end
+        ;; return the bytecode
+        push len(code)    ; [size]
+        push 0            ; [ptr, size]
+        return            ; []
 
-If a target instruction set is configured with `#pragma target`, it will also be used for
-assembling the subprogram. However, the subprogram file can override the instruction set
-using its own `#pragma target` directive.
+    #bytes code: assemble("program.eas")
 
-[^1]: Under no circumstances must it be called the geth assembler.
+Note the current target instruction set will also be used for assembling the subprogram.
+However, the subprogram file can override the instruction set using its own `#pragma
+target` directive.
