@@ -94,7 +94,7 @@ var evalIntTests = []evalTest{
 	{expr: `len(0x0001ff)`, result: "3"},   // note: leading zero byte
 	{expr: `len(0x000001ff)`, result: "4"}, // two leading zero bytes
 	{expr: `len("foobar")`, result: "6"},
-	{expr: `abs(0 - 10)`, result: "10"},
+	{expr: `abs(-10)`, result: "10"},
 	{expr: `sha256("text")`, result: "68832153269555879243704685382415794081420120252170153643880971663484982053329"},
 	{expr: `sha256(33)`, result: "84783983549258160669137366770885509408211009960610860350324922232842582506338"},
 	{expr: `selector("transfer(address,uint256)")`, result: "2835717307"},
