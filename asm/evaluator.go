@@ -342,7 +342,7 @@ func (e *evaluator) evalMacroCall(expr *ast.MacroCallExpr, env *evalEnvironment)
 		return nil, err
 	}
 	if len(expr.Args) != len(def.Params) {
-		return nil, fmt.Errorf("%w, macro %s needs %d", ecInvalidArgumentCount, expr.Ident, len(def.Params))
+		return nil, fmt.Errorf("%w, macro %s takes %d", ecInvalidArgumentCount, expr.Ident, len(def.Params))
 	}
 	macroEnv := env.makeCallEnvironment(defdoc, def)
 	for i, param := range def.Params {
@@ -359,7 +359,7 @@ func (e *evaluator) evalMacroCall(expr *ast.MacroCallExpr, env *evalEnvironment)
 
 func checkArgCount(expr *ast.MacroCallExpr, n int) error {
 	if len(expr.Args) != n {
-		return fmt.Errorf("%w, macro %s needs %d", ecInvalidArgumentCount, expr.Ident, n)
+		return fmt.Errorf("%w, macro %s takes %d", ecInvalidArgumentCount, expr.Ident, n)
 	}
 	return nil
 }

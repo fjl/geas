@@ -108,7 +108,7 @@ var evalErrorTests = []evalErrorTest{
 	{expr: `1 >> (1 << 64)`, err: "rshift amount 18446744073709551616 overflows uint"},
 	{expr: `32 << -2`, err: "negative lshift amount"},
 	{expr: `32 >> -2`, err: "negative rshift amount"},
-	{expr: `macro3(foo, 1)`, err: "invalid number of arguments, macro macro3 needs 0"},
+	{expr: `macro3(foo, 1)`, err: "invalid number of arguments, macro macro3 takes 0"},
 	// builtins
 	{expr: `selector("transfer(,,uint256)")`, err: "invalid ABI selector"},
 	{expr: `address(0x658bdf435d810c91414EC09147daa6db62406379)`, err: errAddressChecksum.Error()},

@@ -521,7 +521,7 @@ global-external-call-with-params:
       TEST_GLOBAL: 10
   output:
     errors:
-      - ':1: invalid number of arguments, macro TEST_GLOBAL needs 0'
+      - ':1: invalid number of arguments, macro TEST_GLOBAL takes 0'
 
 global-override-macro-with-params-warning:
   input:
