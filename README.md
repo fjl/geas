@@ -164,7 +164,7 @@ static data such as error messages.
     #bytes "data"
     #bytes 0x01020304060708
 
-#### Named Bytes
+### Named #bytes
 
 Bytes can also be named by adding a label definition before the expression:
 
