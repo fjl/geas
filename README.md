@@ -440,7 +440,7 @@ bytecode like this:
         push len(code)    ; [size]
         push @code        ; [offset, size]
         push 0            ; [ptr, offset, size]
-        codecopy          ; [size]
+        codecopy          ; []
 
         ;; return the bytecode
         push len(code)    ; [size]
