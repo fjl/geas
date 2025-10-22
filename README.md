@@ -200,10 +200,9 @@ there are no 'types'.
 
 However, there is one aspect of values where integers and bytes have a subtle difference.
 A value with leading zero bytes can be created by hexadecimal literal like `0x00ff` (or by
-a macro call) and these leading zero bytes will be remembered by the value. When the value
-is used in a context like `#bytes`, leading zero bytes will be included in the output. Any
-operation that works on integers, like arithmetic, will strip leading zero bytes. Here is
-an example:
+a macro call) and the value will be stored as-written. When used in a context like
+`#bytes`, the leading zero bytes will be included in the output. Operations that work with
+integers, like arithmetic, will strip leading zero bytes. Here is an example:
 
     ;; This statement outputs two bytes, 0x00 and 0x01:
     #bytes 0x0001
