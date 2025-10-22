@@ -186,8 +186,8 @@ Expressions are used as `push` and `#bytes` arguments.
 The Geas expression language is intended for simple calculations. Expressions are just
 pure functions that work on values, which are arbitrary precision integers.
 
-Intermediate results in an expression can be of any size. Negative number values are also
-supported. Available arithmetic operations include:
+Intermediate results in an expression can be of any size. Calculations cannot overflow.
+Negative number values are also supported. Available arithmetic operations include:
 
 - multiplication (*), division (/), modulo (%), bit-shifts (<<, >>)
 - addition (+), subtraction (-), bitwise AND (&), OR(|), XOR (^)
@@ -331,9 +331,9 @@ you must use explicit PUSH and JUMP.
         jumpi                   ; []
     }
 
-### Including Other Assembly Files
+### #include
 
-EVM assembly files can be included into the current program using the `#include`
+Other Geas source files can be included into the current program using the `#include`
 directive. Top-level instructions in the included file will be inserted at the position of
 the directive.
 
@@ -349,25 +349,26 @@ the directive.
 
 ### Local and Global Scope
 
-Names of labels and macros are case-sensitive. And just like in Go, the case of the first
-letter determines visibility of definitions.
+Names of labels and macros are case-sensitive. Like in Go, the case of the first letter
+determines the visibility of definitions.
 
 Macro and label definitions whose name begins with a lower-case letter are local to the
-file they're defined in. This means local definitions cannot be referenced by `#include`
-files.
+file they're defined in. Local definitions cannot be referenced by `#include` files.
+
+    #define macro = 1   ; this is a file-local definition
 
 Identifiers beginning with an upper-case letter are registered in the global scope and are
 available for use across files. When using `#include`, global definitions in the included
 file also become available in all other files.
 
-Global identifiers must be unique across the program, i.e. they can only be defined once.
-This uniqueness requirement has a few implications:
+    #define Macro = 1   ; this is a global definition
 
-- Files defining global macros or labels can only be included into the program once.
-- Instruction macros which define a global label can only be called once.
+Though macro definitions in Geas look similar to the C preprocessor syntax, the ordering
+of definitions and includes has no effect on the visibility of definitions. Global
+definitions are available everywhere, even before the `#include` statement that defines
+them.
 
-Use good judgement when structuring your includes and/or macros to avoid redefinition
-errors.
+Here is a more complete example with two files.
 
 lib.eas:
 
@@ -385,6 +386,12 @@ main.eas:
         push 1
         push 2
         %StoreSum  ; calling global macro defined in lib.evm
+
+Global identifiers must be unique across the program, i.e. they can only be defined once.
+This uniqueness requirement has a few implications:
+
+- Files defining global macros or labels can only be included into the program once.
+- Instruction macros which define a global label can only be called once.
 
 ### Configuring the Target Instruction Set
 
