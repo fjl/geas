@@ -361,7 +361,6 @@ available for use across files. When using `#include`, global definitions in the
 file also become available in all other files.
 
 Global identifiers must be unique across the program, i.e. they can only be defined once.
-
 This uniqueness requirement has a few implications:
 
 - Files defining global macros or labels can only be included into the program once.
