@@ -537,7 +537,7 @@ func parsePrimaryExpr(p *Parser, tok token) Expr {
 func parseUnaryExpr(p *Parser, tok token) Expr {
 	switch op := tokenArithOp(tok); op {
 	case ArithMinus:
-		arg := parseExpr(p, p.next())
+		arg := parsePrimaryExpr(p, p.next())
 		return &UnaryArithExpr{Op: op, Arg: arg}
 	default:
 		p.throwError(tok, "unexpected arithmetic op %v", op)
