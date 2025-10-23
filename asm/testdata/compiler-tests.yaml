@@ -121,7 +121,7 @@ bytes-directive-string:
   output:
     bytecode: '616263'
 
-bytes-directive-label-minimal:
+bytes-directive-label-error:
   input:
     code: |
       add
@@ -130,6 +130,30 @@ bytes-directive-label-minimal:
   output:
     errors:
       - ":2: labels can't be used in #bytes"
+
+bytes-directive-label-indirect-error:
+  input:
+    code: |
+      #define value = @label + 1
+
+      add
+      #bytes value
+      label:
+  output:
+    errors:
+      # TODO: the reporting is a bit off here, would be nice to fix
+      # this to report where the label actually is
+      - ":4: labels can't be used in #bytes"
+
+bytes-directive-negative:
+  input:
+    code: |
+      add
+      #bytes -1
+      label:
+  output:
+    errors:
+      - ":2: negative int in bytes context"
 
 bytes-directive-named:
   input:
