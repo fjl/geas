@@ -250,6 +250,7 @@ bytes necessary to store the value.
 Note `len()` treats the value as bytes, i.e. leading zero bytes are counted. If this is
 not desired, you can use `abs()` to remove leading zeros.
 
+    push len(0x0000ff)      ; [3]
     push len(abs(0x0000ff)) ; [1]
 
 `intbits()` returns the bit-length of an integer:
