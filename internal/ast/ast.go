@@ -199,43 +199,6 @@ type (
 	}
 )
 
-// expression types
-type (
-	Expr any
-
-	LiteralExpr struct {
-		tok   token
-		Value *lzint.Value // cached value
-	}
-
-	LabelRefExpr struct {
-		Ident  string
-		Dotted bool
-		Global bool
-	}
-
-	VariableExpr struct {
-		Ident string
-	}
-
-	MacroCallExpr struct {
-		Ident   string
-		Builtin bool
-		Args    []Expr
-	}
-
-	ArithExpr struct {
-		Op    ArithOp
-		Left  Expr
-		Right Expr
-	}
-
-	UnaryArithExpr struct {
-		Op  ArithOp
-		Arg Expr
-	}
-)
-
 func (inst *MacroCallSt) Position() Position {
 	return Position{File: inst.Src.File, Line: inst.tok.line}
 }
@@ -292,6 +255,15 @@ func (inst *LabelDefSt) Description() string {
 	return fmt.Sprintf("definition of %s", inst.String())
 }
 
+func (l *LabelDefSt) String() string {
+	r := LabelRefExpr{Dotted: l.Dotted, Ident: l.tok.text}
+	return r.String()
+}
+
+func (l *LabelDefSt) Name() string {
+	return l.tok.text
+}
+
 func (def *InstructionMacroDef) Position() Position {
 	return def.pos
 }
@@ -308,34 +280,50 @@ func (def *ExpressionMacroDef) Description() string {
 	return fmt.Sprintf("definition of %s", def.Name)
 }
 
-func (l *LabelRefExpr) String() string {
-	dot := ""
-	if l.Dotted {
-		dot = "."
+type Expr interface {
+	Position() Position
+}
+
+// expression types
+type (
+	LiteralExpr struct {
+		tok   token
+		Value *lzint.Value // cached value
+		pos   Position
 	}
-	return "@" + dot + l.Ident
-}
 
-func (l *LabelDefSt) String() string {
-	r := LabelRefExpr{Dotted: l.Dotted, Ident: l.tok.text}
-	return r.String()
-}
+	LabelRefExpr struct {
+		Ident  string
+		Dotted bool
+		Global bool
+		pos    Position
+	}
 
-func (l *LabelDefSt) Name() string {
-	return l.tok.text
-}
+	VariableExpr struct {
+		Ident string
+		pos   Position
+	}
 
-func (e *LiteralExpr) IsString() bool {
-	return e.tok.typ == stringLiteral
-}
+	MacroCallExpr struct {
+		Ident   string
+		Builtin bool
+		Args    []Expr
+		pos     Position
+	}
 
-func (e *LiteralExpr) IsNumber() bool {
-	return e.tok.typ == numberLiteral
-}
+	ArithExpr struct {
+		Op    ArithOp
+		Left  Expr
+		Right Expr
+		pos   Position
+	}
 
-func (e *LiteralExpr) Text() string {
-	return e.tok.text
-}
+	UnaryArithExpr struct {
+		Op  ArithOp
+		Arg Expr
+		pos Position
+	}
+)
 
 // MakeNumber creates a number literal with the given value.
 func MakeNumber(v *lzint.Value) *LiteralExpr {
@@ -351,4 +339,48 @@ func MakeString(v string) *LiteralExpr {
 		tok:   token{text: v, typ: stringLiteral},
 		Value: lzint.FromBytes([]byte(v)),
 	}
+}
+
+func (l *LiteralExpr) Position() Position {
+	return l.pos
+}
+
+func (e *LiteralExpr) IsString() bool {
+	return e.tok.typ == stringLiteral
+}
+
+func (e *LiteralExpr) IsNumber() bool {
+	return e.tok.typ == numberLiteral
+}
+
+func (e *LiteralExpr) Text() string {
+	return e.tok.text
+}
+
+func (l *LabelRefExpr) Position() Position {
+	return l.pos
+}
+
+func (l *LabelRefExpr) String() string {
+	dot := ""
+	if l.Dotted {
+		dot = "."
+	}
+	return "@" + dot + l.Ident
+}
+
+func (e *VariableExpr) Position() Position {
+	return e.pos
+}
+
+func (e *MacroCallExpr) Position() Position {
+	return e.pos
+}
+
+func (e *ArithExpr) Position() Position {
+	return e.pos
+}
+
+func (e *UnaryArithExpr) Position() Position {
+	return e.pos
 }

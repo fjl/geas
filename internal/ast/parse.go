@@ -475,7 +475,12 @@ func parseArith(p *Parser, left Expr, tok token, minPrecedence int) Expr {
 		right = parseArithInner(p, right, precedence[op])
 
 		// Combine into binary expression.
-		left = &ArithExpr{Op: op, Left: left, Right: right}
+		left = &ArithExpr{
+			Op:    op,
+			Left:  left,
+			Right: right,
+			pos:   Position{p.doc.File, tok.line},
+		}
 	}
 }
 
@@ -500,7 +505,11 @@ func parseArithInner(p *Parser, right Expr, curPrecedence int) Expr {
 func parsePrimaryExpr(p *Parser, tok token) Expr {
 	switch tok.typ {
 	case identifier, dottedIdentifier:
-		call := &MacroCallExpr{Ident: tok.text, Builtin: tok.typ == dottedIdentifier}
+		call := &MacroCallExpr{
+			Ident:   tok.text,
+			Builtin: tok.typ == dottedIdentifier,
+			pos:     Position{p.doc.File, tok.line},
+		}
 		switch tok := p.next(); tok.typ {
 		case openParen:
 			call.Args = parseCallArguments(p)
@@ -510,17 +519,24 @@ func parsePrimaryExpr(p *Parser, tok token) Expr {
 		return call
 
 	case variableIdentifier:
-		return &VariableExpr{Ident: tok.text}
+		return &VariableExpr{
+			Ident: tok.text,
+			pos:   Position{p.doc.File, tok.line},
+		}
 
 	case labelRef, dottedLabelRef:
 		return &LabelRefExpr{
 			Ident:  tok.text,
 			Dotted: tok.typ == dottedLabelRef,
 			Global: IsGlobal(tok.text),
+			pos:    Position{p.doc.File, tok.line},
 		}
 
 	case numberLiteral, stringLiteral:
-		return &LiteralExpr{tok: tok}
+		return &LiteralExpr{
+			tok: tok,
+			pos: Position{p.doc.File, tok.line},
+		}
 
 	case arith:
 		return parseUnaryExpr(p, tok)
@@ -538,7 +554,11 @@ func parseUnaryExpr(p *Parser, tok token) Expr {
 	switch op := tokenArithOp(tok); op {
 	case ArithMinus:
 		arg := parsePrimaryExpr(p, p.next())
-		return &UnaryArithExpr{Op: op, Arg: arg}
+		return &UnaryArithExpr{
+			Op:  op,
+			Arg: arg,
+			pos: Position{p.doc.File, tok.line},
+		}
 	default:
 		p.throwError(tok, "unexpected arithmetic op %v", op)
 		return nil
