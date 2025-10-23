@@ -177,6 +177,14 @@ func (c *Compiler) warnf(inst ast.Statement, format string, args ...any) {
 	c.errors.add(&simpleWarning{pos: inst.Position(), str: fmt.Sprintf(format, args...)})
 }
 
+// warnDeprecatedMacro warns about using a legacy macro.
+func (c *Compiler) warnDeprecatedMacro(expr ast.Expr, name, replacement string) {
+	c.errors.add(&simpleWarning{
+		pos: expr.Position(),
+		str: fmt.Sprintf("macro %q is deprecated, use %q", name, replacement),
+	})
+}
+
 func (c *Compiler) compileSource(filename string, input []byte) []byte {
 	c.reset()
 	p := ast.NewParser(filename, input, c.lexDebug)

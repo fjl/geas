@@ -333,6 +333,20 @@ expr-macro-legacy-syntax:
       - ":2: warning: legacy definition syntax, missing '=' before expression"
       - ":3: warning: legacy definition syntax, missing '=' before expression"
 
+expr-macro-deprecated:
+  input:
+    code: |
+      sub
+      add
+      push bytelen("abc")
+      push bitlen("abc")
+  output:
+    bytecode:
+      "030160036017"
+    warnings:
+        - ':3: warning: macro "bytelen" is deprecated, use "len"'
+        - ':4: warning: macro "bitlen" is deprecated, use "intbits"'
+
 global-macros:
   input:
     code: |

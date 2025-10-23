@@ -34,9 +34,11 @@ import (
 var builtinMacros = make(map[string]builtinMacroFn)
 
 func init() {
-	builtinMacros["intbits"] = intbitsMacro
 	builtinMacros["len"] = lenMacro
 	builtinMacros["abs"] = absMacro
+	builtinMacros["intbits"] = intbitsMacro
+	builtinMacros["bytelen"] = deprecatedByteLenMacro
+	builtinMacros["bitlen"] = deprecatedBitLenMacro
 	builtinMacros["address"] = addressMacro
 	builtinMacros["selector"] = selectorMacro
 	builtinMacros["keccak256"] = keccak256Macro
@@ -66,6 +68,24 @@ func lenMacro(e *evaluator, env *evalEnvironment, call *ast.MacroCallExpr) (*lzi
 		return nil, err
 	}
 	return lzint.FromInt64(v.ByteLen()), nil
+}
+
+func deprecatedByteLenMacro(e *evaluator, env *evalEnvironment, call *ast.MacroCallExpr) (*lzint.Value, error) {
+	e.compiler.warnDeprecatedMacro(call, "bytelen", "len")
+
+	if err := checkArgCount(call, 1); err != nil {
+		return nil, err
+	}
+	v, err := e.eval(call.Args[0], env)
+	if err != nil {
+		return nil, err
+	}
+	return lzint.FromInt64((int64(v.Int().BitLen()) + 7) / 8), nil
+}
+
+func deprecatedBitLenMacro(e *evaluator, env *evalEnvironment, call *ast.MacroCallExpr) (*lzint.Value, error) {
+	e.compiler.warnDeprecatedMacro(call, "bitlen", "intbits")
+	return intbitsMacro(e, env, call)
 }
 
 func absMacro(e *evaluator, env *evalEnvironment, call *ast.MacroCallExpr) (*lzint.Value, error) {
