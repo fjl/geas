@@ -100,6 +100,11 @@ var evalIntTests = []evalTest{
 	{expr: `selector("transfer(address,uint256)")`, result: "2835717307"},
 	{expr: `address(0x658bdf435d810c91414ec09147daa6db62406379)`, result: "579727320398773179602058954232328055508812456825"},
 	{expr: `address("0x658bdf435d810c91414ec09147daa6db62406379")`, result: "579727320398773179602058954232328055508812456825"},
+	// deprecated builtins
+	{expr: `bytelen(0)`, result: "0"},
+	{expr: `bytelen(0x00ff)`, result: "1"},
+	{expr: `bytelen(0xfff)`, result: "2"},
+	{expr: `bitlen(0x1ff)`, result: "9"},
 }
 
 var evalErrorTests = []evalErrorTest{
@@ -139,7 +144,7 @@ func evaluatorForTesting() *evaluator {
 	if len(errs) > 0 {
 		panic(fmt.Errorf("error in registerDefinitions: %v", errs[0]))
 	}
-	e := newEvaluator(gs, nil)
+	e := newEvaluator(gs, new(Compiler))
 	e.registerLabels([]*compilerLabel{
 		{
 			doc:   evalTestDoc,
