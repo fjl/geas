@@ -181,7 +181,7 @@ func (c *Compiler) warnf(inst ast.Statement, format string, args ...any) {
 func (c *Compiler) warnDeprecatedMacro(expr ast.Expr, name, replacement string) {
 	c.errors.add(&simpleWarning{
 		pos: expr.Position(),
-		str: fmt.Sprintf("macro %q is deprecated, use %q", name, replacement),
+		str: fmt.Sprintf("macro %s() is deprecated, use %s()", name, replacement),
 	})
 }
 

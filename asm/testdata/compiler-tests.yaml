@@ -344,8 +344,8 @@ expr-macro-deprecated:
     bytecode:
       "030160036017"
     warnings:
-        - ':3: warning: macro "bytelen" is deprecated, use "len"'
-        - ':4: warning: macro "bitlen" is deprecated, use "intbits"'
+        - ':3: warning: macro bytelen() is deprecated, use len()'
+        - ':4: warning: macro bitlen() is deprecated, use intbits()'
 
 global-macros:
   input:
