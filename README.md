@@ -278,7 +278,7 @@ down for additional information.
 ### Instruction Macros
 
 Common groups of instructions can be defined as instruction macros. This is intended to
-aid help with repetitive code. The abstraction capability of the macro system is very
+aid with writing repetitive code. The abstraction capability of the macro system is very
 limited by design. There are no conditionals, no loops, and no recursion.
 
 Names of instructions macros start with the percent (%) character.
