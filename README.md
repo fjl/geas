@@ -309,7 +309,7 @@ you must use explicit PUSH and JUMP.
         calldatasize            ; [size]
         push $numBytes          ; [n, size]
         eq                      ; [n==size]
-        %jump_if_not(@revert)
+        %jump_if_not(@revert)   ; []
 
         push $numBytes          ; [size]
         push 0                  ; [offset]
@@ -363,14 +363,13 @@ file also become available in all other files.
 
     #define Macro = 1   ; this is a global definition
 
-Though macro definitions in Geas look similar to the C preprocessor syntax, the ordering
-of definitions and includes has no effect on the visibility of definitions. Global
-definitions are available everywhere, even before the `#include` statement that defines
-them.
+Ordering of definitions and includes has no effect on the visibility of definitions.
+Global definitions are available everywhere, regardless of where the `#include` statement
+that defines them is placed.
 
-Here is a more complete example with two files.
+Here is an example with two files.
 
-lib.eas:
+File lib.eas:
 
     #define result = 128
     #define %StoreSum {
@@ -379,19 +378,24 @@ lib.eas:
         mstore
     }
 
-main.eas:
-
-    #include "lib.eas"
+File main.eas:
 
         push 1
         push 2
-        %StoreSum  ; calling global macro defined in lib.evm
+        %StoreSum  ; calling global macro defined in lib.eas
 
-Global identifiers must be unique across the program, i.e. they can only be defined once.
-This uniqueness requirement has a few implications:
+    #include "lib.eas"
+
+Global identifiers must be unique across the entire program, i.e. they can only be defined
+once. This uniqueness requirement has a few implications:
 
 - Files defining global macros or labels can only be included into the program once.
 - Instruction macros which define a global label can only be called once.
+
+You have to keep this in mind when structuring a multi-file project. If you want to
+maintain library macros in a separate source file, it is best to include this file once
+within the project's top-level entry point. This will add the definitions to the global
+namespace and make them available to all other included files.
 
 ### Configuring the Target Instruction Set
 
