@@ -87,9 +87,9 @@ convention:
     ;;; Note the three semicolons.
 
         ;; add two numbers
-        push 1            ; [a]
-        push 2            ; [b, a]
-        add               ; []
+        push 1              ; [b]
+        push 2              ; [b, a]
+        add                 ; []
 
     ;;; The End
 
@@ -124,22 +124,22 @@ target pre-declared JUMPDEST instructions.
 Jump destinations are written as a label followed by the colon (:) characte and can be
 referred to using the notation `@label` within expressions.
 
-        push 1            ; [sum]
+        push 1              ; [sum]
     begin:
-        push 2            ; [a, sum]
-        add               ; [sum]
-        push @begin       ; [label, sum]
-        jump              ; [sum]
+        push 2              ; [a, sum]
+        add                 ; [sum]
+        push @begin         ; [label, sum]
+        jump                ; [sum]
 
 For convenience, Geas allows writing jump instructions with an argument. When written in
 this way, the jump turns into a push of the label followed by the jump instruction, so the
 above snippet can also be written as:
 
-        push 1            ; [sum]
+        push 1              ; [sum]
     begin:
-        push 2            ; [a, sum]
-        add               ; [sum]
-        jump @begin       ; [sum]
+        push 2              ; [a, sum]
+        add                 ; [sum]
+        jump @begin         ; [sum]
 
 It is also possible to create labels without emitting a JUMPDEST instruction by prefixing
 the label name with the dot (.) character. While dotted labels are not valid for use as an
@@ -174,10 +174,10 @@ When used like this, the bytes value becomes available as a macro for use in exp
 and also defines a label that can be used to get their offset in the output. The
 definition above could be used like this to copy the bytes into memory:
 
-        push len(named)   ; [size]
-        push @named       ; [codeOffset, size]
-        push 0            ; [dest, codeOffset, size]
-        codecopy          ; []
+        push len(named)     ; [size]
+        push @named         ; [codeOffset, size]
+        push 0              ; [dest, codeOffset, size]
+        codecopy            ; []
 
 ### Expressions
 
@@ -220,41 +220,41 @@ definitions of constants or values which are used in multiple places.
 
     #define CONSTANT = 0x8823
 
-        push CONSTANT     ; [v]
-        push 38           ; [offset, v]
-        calldataload      ; [val, v]
-        mul               ; [product]
+        push CONSTANT       ; [v]
+        push 38             ; [offset, v]
+        calldataload        ; [val, v]
+        mul                 ; [product]
 
 Macros can have parameters. Refer to parameter values using the dollar sign ($) prefix
 within the macro definition.
 
     #define myexpr(x, y) = CONSTANT * ($x + $y)
 
-        push myexpr(1, 2) ; [104553]
+        push myexpr(1, 2)   ; [104553]
 
 ### Builtin Expression Macros
 
 There are several builtin macros for use in expressions.
 
+`abs()` returns the absolute value of an integer:
+
+    push abs(-100)          ; [100]
+
 `len()` is for computing the byte length of a value. This returns the minimum number of
 bytes necessary to store the value.
 
-    push len(1)           ; [1]
-    push len(280)         ; [2]
-    push len("hello")     ; [5]
+    push len(1)             ; [1]
+    push len(280)           ; [2]
+    push len("hello")       ; [5]
 
-Note `len()` treats the value as bytes, i.e. leading zeros are counted for values derived
-from a string or hex literal:
+Note `len()` treats the value as bytes, i.e. leading zero bytes are counted. If this is
+not desired, you can use `abs()` to remove leading zeros.
 
-    push len(0x0000ff)    ; [3]
+    push len(abs(0x0000ff)) ; [1]
 
 `intbits()` returns the bit-length of an integer:
 
-    push intbits(0x1f)    ; [17]
-
-`abs()` returns the absolute value of an integer:
-
-    push abs(-100)        ; [100]
+    push intbits(0x1f)      ; [17]
 
 `selector()` computes 4-byte ABI selectors:
 
@@ -262,7 +262,7 @@ from a string or hex literal:
 
 `keccak256()`, `sha256()` hash functions:
 
-    push sha256("data")   ; [0x3a6eb0790f39ac87c94f3856b2dd2c5d110e6811602261a9a923d3bb23adc8b7]
+    push sha256("data")     ; [0x3a6eb0790f39ac87c94f3856b2dd2c5d110e6811602261a9a923d3bb23adc8b7]
 
 `address()` is for declaring contract addresses. This macro only works with literals as an
 argument. Use it to ensure the byte length and checksum of addresses are correct.
@@ -420,12 +420,12 @@ applicable to a certain range of past EVM versions.
 
     #pragma target "berlin"
 
-        chainid           ; [id]
-        push 1            ; [1, id]
-        eq                ; [id==1]
-        jumpi @mainnet    ; []
-        push 0x0          ; [zeroaddr]
-        selfdestruct      ; []
+        chainid             ; [id]
+        push 1              ; [1, id]
+        eq                  ; [id==1]
+        jumpi @mainnet      ; []
+        push 0x0            ; [zeroaddr]
+        selfdestruct        ; []
     mainnet:
 
 Note that declaring the target instruction set using `#pragma target` will not prevent the
@@ -447,15 +447,15 @@ a value. In conjunction with named `#bytes`, this enables writing contract const
 bytecode like this:
 
         ;; copy the contract to memory
-        push len(code)    ; [size]
-        push @code        ; [offset, size]
-        push 0            ; [ptr, offset, size]
-        codecopy          ; []
+        push len(code)      ; [size]
+        push @code          ; [offset, size]
+        push 0              ; [ptr, offset, size]
+        codecopy            ; []
 
         ;; return the bytecode
-        push len(code)    ; [size]
-        push 0            ; [ptr, size]
-        return            ; []
+        push len(code)      ; [size]
+        push 0              ; [ptr, size]
+        return              ; []
 
     #bytes code: assemble("program.eas")
 
