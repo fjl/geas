@@ -287,9 +287,10 @@ type Expr interface {
 // expression types
 type (
 	LiteralExpr struct {
-		tok   token
-		Value *lzint.Value // cached value
-		pos   Position
+		text   string
+		pos    Position
+		value  *lzint.Value
+		string bool
 	}
 
 	LabelRefExpr struct {
@@ -328,33 +329,33 @@ type (
 // MakeNumber creates a number literal with the given value.
 func MakeNumber(v *lzint.Value) *LiteralExpr {
 	return &LiteralExpr{
-		tok:   token{text: v.String(), typ: numberLiteral},
-		Value: v,
+		text:  v.String(),
+		value: v,
 	}
 }
 
 // MakeString creates a string literal with the given value.
 func MakeString(v string) *LiteralExpr {
 	return &LiteralExpr{
-		tok:   token{text: v, typ: stringLiteral},
-		Value: lzint.FromBytes([]byte(v)),
+		text:   v,
+		string: true,
+		value:  lzint.FromBytes([]byte(v)),
 	}
+}
+
+// Value returns the parsed value of the literal.
+func (e *LiteralExpr) Value() *lzint.Value {
+	return e.value
+}
+
+// Text returns the text content of the literal as-written.
+// Note this does not include the quotes for string literals.
+func (e *LiteralExpr) Text() string {
+	return e.text
 }
 
 func (l *LiteralExpr) Position() Position {
 	return l.pos
-}
-
-func (e *LiteralExpr) IsString() bool {
-	return e.tok.typ == stringLiteral
-}
-
-func (e *LiteralExpr) IsNumber() bool {
-	return e.tok.typ == numberLiteral
-}
-
-func (e *LiteralExpr) Text() string {
-	return e.tok.text
 }
 
 func (l *LabelRefExpr) Position() Position {

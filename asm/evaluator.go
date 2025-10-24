@@ -140,7 +140,7 @@ func (e *evaluator) isLabelUsed(li *ast.LabelDefSt) bool {
 func (e *evaluator) eval(expr ast.Expr, env *evalEnvironment) (*lzint.Value, error) {
 	switch expr := expr.(type) {
 	case *ast.LiteralExpr:
-		return e.evalLiteral(expr)
+		return expr.Value(), nil
 	case *ast.LabelRefExpr:
 		return e.evalLabelRef(expr, env)
 	case *ast.UnaryArithExpr:
@@ -163,30 +163,6 @@ func (e *evaluator) evalAsBytes(expr ast.Expr, env *evalEnvironment) ([]byte, er
 		return nil, err
 	}
 	return v.Bytes()
-}
-
-func (e *evaluator) evalLiteral(expr *ast.LiteralExpr) (*lzint.Value, error) {
-	if expr.Value != nil {
-		return expr.Value, nil
-	}
-
-	switch {
-	case expr.IsNumber():
-		val, err := lzint.ParseNumberLiteral(expr.Text())
-		if err != nil {
-			return nil, err
-		}
-		expr.Value = val
-		return val, nil
-
-	case expr.IsString():
-		val := lzint.FromBytes([]byte(expr.Text()))
-		expr.Value = val
-		return val, nil
-
-	default:
-		panic(fmt.Errorf("unhandled astLiteral %q (not string|number)", expr.Text()))
-	}
 }
 
 func (e *evaluator) evalLabelRef(expr *ast.LabelRefExpr, env *evalEnvironment) (*lzint.Value, error) {

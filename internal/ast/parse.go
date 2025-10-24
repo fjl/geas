@@ -17,9 +17,12 @@
 package ast
 
 import (
+	"bytes"
 	"fmt"
 	"regexp"
 	"strconv"
+
+	"github.com/fjl/geas/internal/lzint"
 )
 
 // Parser performs parsing of the token stream.
@@ -532,10 +535,29 @@ func parsePrimaryExpr(p *Parser, tok token) Expr {
 			pos:    Position{p.doc.File, tok.line},
 		}
 
-	case numberLiteral, stringLiteral:
+	case numberLiteral:
+		v, err := lzint.ParseNumberLiteral(tok.text)
+		if err != nil {
+			p.throwError(tok, "invalid number literal: %v", err)
+			return nil
+		}
 		return &LiteralExpr{
-			tok: tok,
-			pos: Position{p.doc.File, tok.line},
+			text:  tok.text,
+			value: v,
+			pos:   Position{p.doc.File, tok.line},
+		}
+
+	case stringLiteral:
+		bytes, err := parseStringText(tok.text)
+		if err != nil {
+			p.throwError(tok, "%w", err)
+			return nil
+		}
+		return &LiteralExpr{
+			text:   tok.text,
+			value:  lzint.FromBytes(bytes),
+			string: true,
+			pos:    Position{p.doc.File, tok.line},
 		}
 
 	case arith:
@@ -637,4 +659,68 @@ func parseListEnd(p *Parser) bool {
 			p.unexpected(tok)
 		}
 	}
+}
+
+// parseStringText parses characters and escape sequences in a string literal.
+func parseStringText(s string) ([]byte, error) {
+	var result bytes.Buffer
+	result.Grow(len(s))
+
+	runes := []rune(s)
+	for i := 0; i < len(runes); i++ {
+		if r := runes[i]; r != '\\' {
+			result.WriteRune(r)
+			continue
+		}
+
+		// Escape sequence.
+		if i+1 >= len(runes) {
+			return nil, fmt.Errorf("incomplete escape sequence at end of string")
+		}
+		next := runes[i+1]
+		if next == 'x' {
+			// \xXX hex sequences are for specifying arbitrary bytes.
+			if i+3 >= len(runes) {
+				return nil, fmt.Errorf("incomplete hex escape sequence in string")
+			}
+			hex1 := runes[i+2]
+			hex2 := runes[i+3]
+			if !isHex(hex1) || !isHex(hex2) {
+				return nil, fmt.Errorf("invalid hex escape sequence \\x%c%c in string", hex1, hex2)
+			}
+			val := hexToByte(hex1)*16 + hexToByte(hex2)
+			result.WriteByte(val)
+			i += 3 // Skip the 'x' and two hex digits.
+		} else {
+			var val byte
+			switch next {
+			case '\\', '"':
+				val = byte(next)
+			case 'n':
+				val = '\n'
+			case 'r':
+				val = '\r'
+			case 't':
+				val = '\t'
+			default:
+				return nil, fmt.Errorf("invalid escape sequence \\%c in string", next)
+			}
+			result.WriteByte(val)
+			i++ // Skip the escaped character.
+		}
+	}
+	return result.Bytes(), nil
+}
+
+// hexToByte converts a hex character to its byte value.
+func hexToByte(r rune) byte {
+	switch {
+	case r >= '0' && r <= '9':
+		return byte(r - '0')
+	case r >= 'a' && r <= 'f':
+		return byte(r - 'a' + 10)
+	case r >= 'A' && r <= 'F':
+		return byte(r - 'A' + 10)
+	}
+	panic("BUG: invalid hex in hexToByte")
 }

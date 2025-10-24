@@ -121,6 +121,21 @@ bytes-directive-string:
   output:
     bytecode: '616263'
 
+bytes-directive-string-escape:
+  input:
+    code: |
+      #bytes "\x01\x02\x03\n\r\t"
+  output:
+    bytecode: '0102030a0d09'
+
+bytes-directive-string-escape-invalid:
+  input:
+    code: |
+      #bytes "\x0"
+  output:
+    errors:
+      - ":1: incomplete hex escape sequence in string"
+
 bytes-directive-label-error:
   input:
     code: |
