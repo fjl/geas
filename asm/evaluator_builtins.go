@@ -71,7 +71,10 @@ func lenMacro(e *evaluator, env *evalEnvironment, call *ast.MacroCallExpr) (*lzi
 }
 
 func deprecatedByteLenMacro(e *evaluator, env *evalEnvironment, call *ast.MacroCallExpr) (*lzint.Value, error) {
-	e.compiler.warnDeprecatedMacro(call, "bytelen", "len")
+	if !e.cache.deprecation[call] {
+		e.compiler.warnDeprecatedMacro(call, "bytelen", "len")
+		e.cache.deprecation[call] = true
+	}
 
 	if err := checkArgCount(call, 1); err != nil {
 		return nil, err
@@ -84,7 +87,11 @@ func deprecatedByteLenMacro(e *evaluator, env *evalEnvironment, call *ast.MacroC
 }
 
 func deprecatedBitLenMacro(e *evaluator, env *evalEnvironment, call *ast.MacroCallExpr) (*lzint.Value, error) {
-	e.compiler.warnDeprecatedMacro(call, "bitlen", "intbits")
+	if !e.cache.deprecation[call] {
+		e.compiler.warnDeprecatedMacro(call, "bitlen", "intbits")
+		e.cache.deprecation[call] = true
+	}
+
 	return intbitsMacro(e, env, call)
 }
 
@@ -182,11 +189,20 @@ func assembleMacro(e *evaluator, env *evalEnvironment, call *ast.MacroCallExpr) 
 	if err := checkArgCount(call, 1); err != nil {
 		return nil, err
 	}
-	filename, err := e.evalAsBytes(call.Args[0], env)
+	filenameBytes, err := e.evalAsBytes(call.Args[0], env)
 	if err != nil {
 		return nil, err
 	}
+	filename := string(filenameBytes)
 
+	// Get value from cache.
+	cacheKey := fileNameCacheKey{env.doc, filename}
+	if v := e.cache.assemble[cacheKey]; v != nil {
+		return v, nil
+	}
+
+	// Perform assembly. Note we take some settings from the current compiler here,
+	// like the selected instruction set and overrides.
 	subc := New(e.compiler.fsys)
 	subc.SetIncludeDepthLimit(e.compiler.maxIncDepth)
 	subc.SetMaxErrors(math.MaxInt)
@@ -199,5 +215,8 @@ func assembleMacro(e *evaluator, env *evalEnvironment, call *ast.MacroCallExpr) 
 	}
 	bytecode := subc.CompileFile(file)
 	e.compiler.errors.add(subc.ErrorsAndWarnings()...)
-	return lzint.FromBytes(bytecode), nil
+
+	v := lzint.FromBytes(bytecode)
+	e.cache.assemble[cacheKey] = v // cache result
+	return v, nil
 }

@@ -48,7 +48,7 @@ assemble-macro-and-globals:
   output:
     bytecode: '6001 6001 01 01 5b 6001 56'
 
-assemble-directive-globals-not-shared:
+assemble-macro-globals-not-shared:
   input:
     code: |
       #define Global = 1
@@ -66,7 +66,7 @@ assemble-directive-globals-not-shared:
     errors:
       - "file.eas:1: undefined macro Global"
 
-assemble-directive-fork-inherit:
+assemble-macro-fork-inherit:
   input:
     code: |
       #pragma target "berlin"
@@ -79,7 +79,7 @@ assemble-directive-fork-inherit:
     errors:
       - 'file.eas:1: unknown op RANDOM (target = "berlin"; added in fork "paris")'
 
-assemble-directive-fork-override:
+assemble-macro-fork-override:
   input:
     code: |
       #pragma target "berlin"
@@ -91,6 +91,18 @@ assemble-directive-fork-override:
         random
   output:
     bytecode: '600144'
+
+assemble-macro-error-once:
+  input:
+    code: |
+      #bytes assemble("file.eas")
+      #bytes assemble("file.eas")
+    files:
+      file.eas:  |
+        unknown1
+  output:
+    errors:
+      - "file.eas:1: unknown op UNKNOWN1"
 
 bytes-directive:
   input:
@@ -387,6 +399,19 @@ expr-macro-deprecated:
     warnings:
         - ':3: warning: macro bytelen() is deprecated, use len()'
         - ':4: warning: macro bitlen() is deprecated, use intbits()'
+
+expr-macro-deprecated-dedup-warning:
+  input:
+    code: |
+      #define call(a) = bytelen($a)
+      push call("abc")
+      push call("abc")
+      push call("abc")
+  output:
+    bytecode:
+      "600360036003"
+    warnings:
+        - ':1: warning: macro bytelen() is deprecated, use len()'
 
 global-macros:
   input:

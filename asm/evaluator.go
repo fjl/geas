@@ -34,12 +34,35 @@ type evaluator struct {
 	usedLabels  map[*ast.LabelDefSt]struct{}
 	globals     *globalScope
 	compiler    *Compiler // for assemble macro
-	labelsValid bool      // while false, evaluating labels returns unassignedLabelErr
+	cache       evalCache
+	labelsValid bool // while false, evaluating labels returns unassignedLabelErr
 }
 
 type evalLabelKey struct {
 	doc *ast.Document
 	l   *ast.LabelDefSt
+}
+
+type evalCache struct {
+	// This map is for callsites of builtins.
+	// It avoids issuing deprecation warnings more than once.
+	deprecation map[ast.Expr]bool
+
+	// Results of assemble(). These are cached to avoid
+	// spamming warnings/errors.
+	assemble map[fileNameCacheKey]*lzint.Value
+}
+
+type fileNameCacheKey struct {
+	doc      *ast.Document
+	filename string
+}
+
+func newEvalCache() evalCache {
+	return evalCache{
+		deprecation: make(map[ast.Expr]bool),
+		assemble:    make(map[fileNameCacheKey]*lzint.Value),
+	}
 }
 
 // evalEnvironment holds the definitions available for evaluation.
@@ -73,6 +96,7 @@ func newEvaluator(gs *globalScope, c *Compiler) *evaluator {
 		usedLabels: make(map[*ast.LabelDefSt]struct{}),
 		globals:    gs,
 		compiler:   c,
+		cache:      newEvalCache(),
 	}
 }
 
