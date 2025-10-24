@@ -79,6 +79,9 @@ var evalIntTests = []evalTest{
 	// string literals
 	{expr: `"A"`, result: "65"},
 	{expr: `"foo"`, result: "6713199"},
+	{expr: `"\x00\x00"`, result: "0"},
+	{expr: `"\x01\xFF"`, result: "0x1ff"},
+	{expr: `"newlines\r\n"`, result: "0x6e65776c696e65730d0a"},
 	// builtins
 	{expr: `intbits(0)`, result: "0"},
 	{expr: `intbits(0x00)`, result: "0"}, // leading zero byte does not count
@@ -94,6 +97,7 @@ var evalIntTests = []evalTest{
 	{expr: `len(0x0001ff)`, result: "3"},   // note: leading zero byte
 	{expr: `len(0x000001ff)`, result: "4"}, // two leading zero bytes
 	{expr: `len("foobar")`, result: "6"},
+	{expr: `len("\x00\x00")`, result: "2"},
 	{expr: `len(-1)`, result: "1"},
 	{expr: `len(abs(0x0000ff))`, result: "1"},
 	{expr: `abs(-10)`, result: "10"},
