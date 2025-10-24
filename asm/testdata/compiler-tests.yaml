@@ -1,4 +1,4 @@
-assemble-directive:
+assemble-directive-deprecated:
   # This test is just here to check the #assemble statement is still supported.
   input:
     code: |
@@ -13,6 +13,8 @@ assemble-directive:
         jump @label
   output:
     bytecode: '6001 6001 01 01 5b 6001 56'
+    warnings:
+      - ":4: warning: #assemble is deprecated, use #bytes assemble(...) instead"
 
 assemble-macro-simple:
   input:

@@ -236,7 +236,9 @@ func (inst includeStatement) expand(c *Compiler, doc *ast.Document, prog *compil
 
 // expand of #assemble performs compilation of the given assembly file.
 func (inst assembleStatement) expand(c *Compiler, doc *ast.Document, prog *compilerProg) error {
-	// Here we turn #assemble into a #bytes statement with a call to the assemble() builtin macro.
+	c.warnf(inst, "#assemble is deprecated, use #bytes assemble(...) instead")
+
+	// Turn "#assemble x" into "#bytes assemble(x)".
 	prog.addInstruction(&instruction{
 		op: "#bytes",
 		ast: bytesStatement{
