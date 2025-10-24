@@ -166,19 +166,6 @@ func (p *compilerProg) iterInstructions() iter.Seq2[*compilerSection, *instructi
 	}
 }
 
-// iterSections returns an iterator over all sections in the program.
-func (p *compilerProg) iterSections() iter.Seq[*compilerSection] {
-	return func(yield func(*compilerSection) bool) {
-		for _, elem := range p.elems {
-			if elem, ok := elem.(sectionStartElem); ok {
-				if !yield(elem.section) {
-					return
-				}
-			}
-		}
-	}
-}
-
 // computePC assigns the PC values of all instructions and labels.
 func (p *compilerProg) computePC() {
 	var pc int
