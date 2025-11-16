@@ -26,8 +26,7 @@ import (
 )
 
 const (
-	defaultIndent     = "    "
-	defaultCommentCol = 32
+	defaultIndent = "    "
 
 	// If the detected comment
 	autoCommentColMin = 22
@@ -40,9 +39,11 @@ type Printer struct {
 	bufferWrapped bool // true if `out` above was wrapped in bufio.Writer
 	lineLength    int  // length of current line
 
-	lenCache map[ast.Statement]lenCacheEntry
+	// Caches for automatic comment column.
+	preFormatCache map[ast.Statement]string
+	macroDefLength map[*ast.InstructionMacroDef]int
 
-	// settings
+	// Settings
 	indent        string
 	indentSet     bool
 	commentCol    int
@@ -52,10 +53,6 @@ type Printer struct {
 type writer interface {
 	WriteString(string) (int, error)
 	WriteByte(byte) error
-}
-
-type lenCacheEntry struct {
-	str string
 }
 
 // SetIndent configures the indentation prefix.
@@ -73,13 +70,11 @@ func (p *Printer) SetCommentColumn(col int) {
 func (p *Printer) reset(w io.Writer) {
 	p.out = bufio.NewWriter(w)
 	p.bufferWrapped = true
-	p.lenCache = nil
+	p.preFormatCache = make(map[ast.Statement]string)
+	p.macroDefLength = make(map[*ast.InstructionMacroDef]int)
 
 	if !p.indentSet {
 		p.indent = defaultIndent
-	}
-	if !p.commentColSet {
-		p.commentCol = defaultCommentCol
 	}
 }
 
@@ -91,7 +86,7 @@ func (p *Printer) Document(w io.Writer, doc *ast.Document) (err error) {
 	// First figure out the column that line comments will be indented to.
 	// To do this, we format all opcode argument expressions and store their
 	// text into a cache.
-	p.lenCache = make(map[ast.Statement]lenCacheEntry)
+
 	p.preFormat(doc)
 	if !p.commentColSet {
 		p.commentCol = p.computeCommentColumn()
@@ -219,12 +214,7 @@ func (p *Printer) document(doc *ast.Document) {
 
 		// Print line comment.
 		if st.Comment() != nil {
-			// Indent up to comment column.
-			for p.lineLength < p.commentCol+1 {
-				p.byte(' ')
-			}
-			p.string("; ") // force one semicolon
-			p.string(st.Comment().InnerText())
+			p.comment(st.Comment(), true)
 		}
 		p.newline()
 	}
@@ -248,6 +238,14 @@ func (p *Printer) preFormat(doc *ast.Document) {
 			continue
 
 		case *ast.InstructionMacroDef:
+			if macroHasIndentedStartComment(st) {
+				// For macros with a start comment, store the length of the header so
+				// computeCommentColumn can take it into account.
+				b.Reset()
+				p.macroDefinitionHead(st)
+				p.macroDefLength[st] = b.Len()
+			}
+			// Traverse macro body statements.
 			p.preFormat(st.Body)
 
 		default:
@@ -256,7 +254,7 @@ func (p *Printer) preFormat(doc *ast.Document) {
 			}
 			b.Reset()
 			p.statement(st)
-			p.lenCache[st] = lenCacheEntry{str: b.String()}
+			p.preFormatCache[st] = b.String()
 		}
 	}
 }
@@ -264,8 +262,14 @@ func (p *Printer) preFormat(doc *ast.Document) {
 // computeCommentColumn computes a column to which line comments will be indented.
 func (p *Printer) computeCommentColumn() int {
 	autocol := autoCommentColMin
-	for _, entry := range p.lenCache {
-		col := len(entry.str) + 1
+	for _, entry := range p.preFormatCache {
+		col := len(entry) + 1
+		if col > autocol && col < autoCommentColMax {
+			autocol = col
+		}
+	}
+	for _, length := range p.macroDefLength {
+		col := length + 1
 		if col > autocol && col < autoCommentColMax {
 			autocol = col
 		}
@@ -275,8 +279,8 @@ func (p *Printer) computeCommentColumn() int {
 
 // statement outputs a statement.
 func (p *Printer) statement(st ast.Statement) {
-	if cached, ok := p.lenCache[st]; ok {
-		p.string(cached.str)
+	if cached, ok := p.preFormatCache[st]; ok {
+		p.string(cached)
 		return
 	}
 
@@ -320,10 +324,17 @@ func (p *Printer) statement(st ast.Statement) {
 		p.expr(st.Body, nil)
 
 	case *ast.InstructionMacroDef:
-		p.string("#define %")
-		p.string(st.Ident)
-		p.parameterList(st.Params)
-		p.string(" {")
+		p.macroDefinitionHead(st)
+		if st.StartComment != nil {
+			if macroHasIndentedStartComment(st) {
+				// Level one comment goes on the same line as the opening brace.
+				p.byte(' ')
+				p.comment(st.StartComment, true)
+			} else {
+				p.newline()
+				p.comment(st.StartComment, false)
+			}
+		}
 		if len(st.Body.Statements) > 0 {
 			p.newline()
 			p.document(st.Body)
@@ -343,17 +354,38 @@ func (p *Printer) statement(st ast.Statement) {
 		p.string(st.Value)
 
 	case *ast.Comment:
-		switch st.Level() {
-		case 1:
-			p.string(p.indent)
-			for p.lineLength < p.commentCol+1 {
-				p.byte(' ')
-			}
-		case 2:
-			p.string(p.indent)
-		}
-		p.string(st.Text)
+		p.comment(st, false)
 	}
+}
+
+func macroHasIndentedStartComment(st *ast.InstructionMacroDef) bool {
+	return st.StartComment != nil && (st.StartComment.Level() == 1 || st.StartComment.IsStackComment())
+}
+
+// macroDefinitionHead writes the beginning of a macro definition.
+func (p *Printer) macroDefinitionHead(st *ast.InstructionMacroDef) {
+	p.string("#define %")
+	p.string(st.Ident)
+	p.parameterList(st.Params)
+	p.string(" {")
+}
+
+// comment writes a comment to the output.
+func (p *Printer) comment(st *ast.Comment, attached bool) {
+	lvl := st.Level()
+	if lvl == 1 || attached {
+		for p.lineLength < p.commentCol+1 {
+			p.byte(' ')
+		}
+		// Strip leading whitespace in comment text.
+		p.string("; ")
+		p.string(st.InnerText())
+		return
+	}
+	if lvl == 2 {
+		p.string(p.indent)
+	}
+	p.string(st.Text)
 }
 
 func (p *Printer) quotedString(s string) {

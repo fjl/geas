@@ -330,6 +330,22 @@ paramLoop:
 		}
 	}
 
+	// Check for comment after the opening brace. As a side effect, this skips over
+	// blank lines at the start of the macro body.
+	var startComment *Comment
+commentLoop:
+	for {
+		switch tok := p.next(); tok.typ {
+		case lineEnd, lineStart:
+		case comment:
+			startComment = p.makeComment(tok)
+			break commentLoop
+		default:
+			p.unread(tok)
+			break commentLoop
+		}
+	}
+
 	// Set definition context in parser.
 	topdoc := p.doc
 	doc := newDocument(p.doc.File, p.doc)
@@ -343,10 +359,11 @@ paramLoop:
 	// Register definition.
 	checkDuplicateMacro(p, nameTok)
 	def := &InstructionMacroDef{
-		stbase: stbase{src: p.doc, line: nameTok.line},
-		Ident:  nameTok.text,
-		Params: params,
-		Body:   doc,
+		stbase:       stbase{src: p.doc, line: nameTok.line},
+		Ident:        nameTok.text,
+		Params:       params,
+		Body:         doc,
+		StartComment: startComment,
 	}
 	doc.Creation = def
 	topdoc.instrMacros[nameTok.text] = def

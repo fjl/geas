@@ -13,3 +13,21 @@
     push 5
     push 2
     mul  ;; this comment will be reformatted to level 1 and indented
+
+
+#define macro1 = 1  ; line comment on macro
+
+#define %macro_ab(a, b) {    ; [stack1]
+        stop   ; [stack2]
+        stop   ; [stack3]
+        ;; it surely stopped now
+}
+
+#define %macro_5(a, b) {
+;;;; [stack1]
+     ;; comment above will be reformatted to level 1 and move after {
+        stop   ; [stack2]
+        stop   ; [stack3]
+        ;; it surely stopped now
+}
+

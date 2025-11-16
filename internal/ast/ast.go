@@ -236,6 +236,10 @@ type (
 		Ident  string
 		Params []string
 		Body   *Document
+
+		// This is the comment attached to the line where the { is.
+		// It's tracked separately to
+		StartComment *Comment
 	}
 )
 
