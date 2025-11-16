@@ -167,6 +167,8 @@ func (e *evaluator) eval(expr ast.Expr, env *evalEnvironment) (*lzint.Value, err
 		return expr.Value(), nil
 	case *ast.LabelRefExpr:
 		return e.evalLabelRef(expr, env)
+	case *ast.GroupExpr:
+		return e.eval(expr.Inner, env)
 	case *ast.UnaryExpr:
 		return e.evalUnary(expr, env)
 	case *ast.BinaryExpr:
