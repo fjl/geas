@@ -351,7 +351,7 @@ func (p *Printer) statement(st ast.Statement) {
 		p.string("#pragma ")
 		p.string(st.Option)
 		p.byte(' ')
-		p.string(st.Value)
+		p.quotedString(st.Value)
 
 	case *ast.Comment:
 		p.comment(st, false)

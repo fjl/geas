@@ -23,3 +23,5 @@ label:
 
 #include "foo.eas"
 #assemble "otherfile.eas"
+
+#pragma target "yolo"
