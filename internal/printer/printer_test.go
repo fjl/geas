@@ -29,21 +29,22 @@ import (
 var exprTests = []struct {
 	in, out string
 }{
-	{"1", "1"},                           // decimal literal
-	{"0x03", "0x03"},                     // hex number literal
-	{`"abc"`, `"abc"`},                   // string literal
-	{`"newline\n"`, `"newline\n"`},       // string literal with escape
-	{"-2", "-2"},                         // unary op
-	{"-(1 + 3)", "-(1 + 3)"},             // binary in unary
-	{"-1 + 3", "-1 + 3"},                 // unary in binary
-	{"1 + 2*3", "1 + 2*3"},               // binary precedence
-	{"2*3 + 1", "2*3 + 1"},               // binary precedence (other way)
-	{"1 + 2 + 3", "1 + 2 + 3"},           // binary chain
-	{"(2 * 3) + 1", "2*3 + 1"},           // parens stripped
-	{"ab(1, 2)", "ab(1, 2)"},             // macro call
-	{".builtin(1, 2)", ".builtin(1, 2)"}, // builtin macro call
-	{"noarg()", "noarg"},                 // macro call w/o args
-	{".noarg()", ".noarg"},               // builtin macro call w/o args
+	{"1", "1"},                             // decimal literal
+	{"0x03", "0x03"},                       // hex number literal
+	{`"abc"`, `"abc"`},                     // string literal
+	{`"newline\n"`, `"newline\n"`},         // string literal with escape
+	{"-2", "-2"},                           // unary op
+	{"-(1 + 3)", "-(1 + 3)"},               // binary in unary
+	{"-1 + 3", "-1 + 3"},                   // unary in binary
+	{"1 + 2*3", "1 + 2*3"},                 // binary precedence
+	{"2*3 + 1", "2*3 + 1"},                 // binary precedence (other way)
+	{"1 + 2 + 3", "1 + 2 + 3"},             // binary chain
+	{"(2 * 3) + 1", "(2 * 3) + 1"},         // parens not stripped
+	{"1 - (2 * 3) + 1", "1 - (2 * 3) + 1"}, // parens not stripped
+	{"ab(1, 2)", "ab(1, 2)"},               // macro call
+	{".builtin(1, 2)", ".builtin(1, 2)"},   // builtin macro call
+	{"noarg()", "noarg"},                   // macro call w/o args
+	{".noarg()", ".noarg"},                 // builtin macro call w/o args
 }
 
 func TestPrintExpr(t *testing.T) {

@@ -156,6 +156,11 @@ func (p *Printer) expr(e ast.Expr, parent ast.Expr) {
 		p.string(e.String())
 		return
 
+	case *ast.GroupExpr:
+		p.byte('(')
+		p.expr(e.Inner, e)
+		p.byte(')')
+
 	case *ast.UnaryExpr:
 		p.string(e.Op.Sign())
 		p.expr(e.Arg, e)
