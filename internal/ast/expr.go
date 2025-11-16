@@ -61,6 +61,12 @@ type (
 		Arg Expr
 		pos Position
 	}
+
+	// This is emitted by the parser for explicit parentheses.
+	GroupExpr struct {
+		Inner Expr
+		pos   Position
+	}
 )
 
 // MakeNumber creates a number literal with the given value.
@@ -135,6 +141,6 @@ func (e *UnaryExpr) Position() Position {
 	return e.pos
 }
 
-func (e *UnaryExpr) Position() Position {
+func (e *GroupExpr) Position() Position {
 	return e.pos
 }

@@ -628,7 +628,7 @@ func parsePrimaryExpr(p *Parser, tok token) Expr {
 		return parseUnaryExpr(p, tok)
 
 	case openParen:
-		return parseParenExpr(p)
+		return parseParenExpr(p, tok)
 
 	default:
 		p.unexpected(tok)
@@ -651,14 +651,17 @@ func parseUnaryExpr(p *Parser, tok token) Expr {
 	}
 }
 
-func parseParenExpr(p *Parser) Expr {
-	var expr Expr
+func parseParenExpr(p *Parser, openParen token) Expr {
+	var expr *GroupExpr
 	switch tok := p.next(); tok.typ {
 	case closeParen:
 		p.throwError(tok, "empty parenthesized expression")
 		return nil
 	default:
-		expr = parseExpr(p, tok)
+		expr = &GroupExpr{
+			Inner: parseExpr(p, tok),
+			pos:   Position{File: p.doc.File, Line: openParen.line},
+		}
 	}
 	// Ensure closing paren is there.
 	for {
