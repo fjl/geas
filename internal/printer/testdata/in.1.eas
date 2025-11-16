@@ -1,0 +1,15 @@
+;;;;; This file is for testing comment levels.
+;;;; These should all be indented to column zero.
+;;; Down to level 3.
+
+    ;; This comment should be indented to the instruction.
+    push 0
+    push 1
+    sub      ; this is an attached line comment
+
+
+             ; this is also a line comment
+
+    push 5
+    push 2
+    mul  ;; this comment will be reformatted to level 1 and indented
