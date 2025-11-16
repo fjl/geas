@@ -295,3 +295,27 @@ func (st *LabelDef) String() string {
 	s.WriteByte(':')
 	return s.String()
 }
+
+// Level returns the number of semicolons in the comment.
+func (st *Comment) Level() int {
+	var count int
+	for _, c := range st.Text {
+		if c != ';' {
+			break
+		}
+		count++
+	}
+	return count
+}
+
+// IsStackComment reports whether the comment is a conventional
+// stack effect docmentation.
+func (st *Comment) IsStackComment() bool {
+	t := st.InnerText()
+	return len(t) > 0 && t[0] == '['
+}
+
+// InnerText returns the actual text of the comment.
+func (st *Comment) InnerText() string {
+	return strings.TrimSpace(strings.TrimLeft(st.Text, ";"))
+}
