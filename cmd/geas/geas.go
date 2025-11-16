@@ -60,7 +60,10 @@ func usage() {
 	 -pc                show program counter
 	 -uppercase         show instruction names as uppercase
 
- -f: FORMAT DOCUMENT
+ -f: SOURCE FORMATTER
+
+	 -w                 write result to (source) file instead of stdout
+	 -check             exit with error if file is not formatted
 
  -i: INFORMATION
 
@@ -227,9 +230,14 @@ func disassembler(args []string) {
 
 func formatter(args []string) {
 	var (
-		fs = newFlagSet("-f")
+		fs             = newFlagSet("-f")
+		writeBack      = fs.Bool("w", false, "")
+		checkFormatted = fs.Bool("check", false, "")
 	)
 	parseFlags(fs, args)
+	if *writeBack && *checkFormatted {
+		exit(2, fmt.Errorf("can't use -w and -check at the same time"))
+	}
 
 	// Read input.
 	var err error
@@ -237,6 +245,9 @@ func formatter(args []string) {
 	file := fileArg(fs)
 	if file == "-" {
 		infd = os.Stdin
+		if *writeBack {
+			exit(2, fmt.Errorf("can't use -w with stdout"))
+		}
 	} else {
 		infd, err = os.Open(file)
 		if err != nil {
@@ -248,8 +259,6 @@ func formatter(args []string) {
 		exit(1, err)
 	}
 	infd.Close()
-
-	output := os.Stdout
 
 	// Format document.
 	parser := ast.NewParser(file, input)
@@ -268,6 +277,31 @@ func formatter(args []string) {
 		}
 	}
 
+	// Write it out.
+	var output io.Writer
+	switch {
+	case *writeBack:
+		var buf bytes.Buffer
+		output = &buf
+		defer func() {
+			if err := os.WriteFile(file, buf.Bytes(), 0644); err != nil {
+				exit(1, err)
+			}
+		}()
+
+	case *checkFormatted:
+		var buf bytes.Buffer
+		output = &buf
+		defer func() {
+			if !bytes.Equal(input, buf.Bytes()) {
+				fmt.Fprintln(os.Stderr, file, "is not formatted")
+				os.Exit(1)
+			}
+		}()
+
+	default:
+		output = os.Stdout
+	}
 	var p printer.Printer
 	if err := p.Document(output, doc); err != nil {
 		exit(1, err)
