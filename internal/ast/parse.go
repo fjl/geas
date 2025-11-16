@@ -543,7 +543,7 @@ func parseArith(p *Parser, left Expr, tok token, minPrecedence int) Expr {
 		right = parseArithInner(p, right, op.Precedence())
 
 		// Combine into binary expression.
-		left = &ArithExpr{
+		left = &BinaryExpr{
 			Op:    op,
 			Left:  left,
 			Right: right,
@@ -640,7 +640,7 @@ func parseUnaryExpr(p *Parser, tok token) Expr {
 	switch op := tokenArithOp(tok); op {
 	case ArithMinus:
 		arg := parsePrimaryExpr(p, p.next())
-		return &UnaryArithExpr{
+		return &UnaryExpr{
 			Op:  op,
 			Arg: arg,
 			pos: Position{p.doc.File, tok.line},

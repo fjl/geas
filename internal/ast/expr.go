@@ -49,14 +49,14 @@ type (
 		pos     Position
 	}
 
-	ArithExpr struct {
+	BinaryExpr struct {
 		Op    ArithOp
 		Left  Expr
 		Right Expr
 		pos   Position
 	}
 
-	UnaryArithExpr struct {
+	UnaryExpr struct {
 		Op  ArithOp
 		Arg Expr
 		pos Position
@@ -127,10 +127,14 @@ func (e *MacroCallExpr) Position() Position {
 	return e.pos
 }
 
-func (e *ArithExpr) Position() Position {
+func (e *BinaryExpr) Position() Position {
 	return e.pos
 }
 
-func (e *UnaryArithExpr) Position() Position {
+func (e *UnaryExpr) Position() Position {
+	return e.pos
+}
+
+func (e *UnaryExpr) Position() Position {
 	return e.pos
 }

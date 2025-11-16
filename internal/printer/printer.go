@@ -156,18 +156,18 @@ func (p *Printer) expr(e ast.Expr, parent ast.Expr) {
 		p.string(e.String())
 		return
 
-	case *ast.UnaryArithExpr:
+	case *ast.UnaryExpr:
 		p.string(e.Op.Sign())
 		p.expr(e.Arg, e)
 
-	case *ast.ArithExpr:
+	case *ast.BinaryExpr:
 		// Add parens if the parent is unary or it has higher precedence.
 		var paren bool
 		var dense bool
 		switch pe := parent.(type) {
-		case *ast.UnaryArithExpr:
+		case *ast.UnaryExpr:
 			paren = true
-		case *ast.ArithExpr:
+		case *ast.BinaryExpr:
 			paren = pe.Op.Precedence() > e.Op.Precedence()
 			dense = pe.Op.Precedence() < e.Op.Precedence()
 		}

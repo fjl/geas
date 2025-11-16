@@ -167,9 +167,9 @@ func (e *evaluator) eval(expr ast.Expr, env *evalEnvironment) (*lzint.Value, err
 		return expr.Value(), nil
 	case *ast.LabelRefExpr:
 		return e.evalLabelRef(expr, env)
-	case *ast.UnaryArithExpr:
+	case *ast.UnaryExpr:
 		return e.evalUnary(expr, env)
-	case *ast.ArithExpr:
+	case *ast.BinaryExpr:
 		return e.evalArith(expr, env)
 	case *ast.VariableExpr:
 		return e.evalVariable(expr, env)
@@ -203,7 +203,7 @@ func (e *evaluator) evalLabelRef(expr *ast.LabelRefExpr, env *evalEnvironment) (
 	return lzint.FromInt(big.NewInt(int64(pc))), nil
 }
 
-func (e *evaluator) evalUnary(expr *ast.UnaryArithExpr, env *evalEnvironment) (*lzint.Value, error) {
+func (e *evaluator) evalUnary(expr *ast.UnaryExpr, env *evalEnvironment) (*lzint.Value, error) {
 	argVal, err := e.eval(expr.Arg, env)
 	if err != nil {
 		return nil, err
@@ -224,7 +224,7 @@ func (e *evaluator) evalUnary(expr *ast.UnaryArithExpr, env *evalEnvironment) (*
 
 var bigMaxUint = new(big.Int).SetUint64(math.MaxUint)
 
-func (e *evaluator) evalArith(expr *ast.ArithExpr, env *evalEnvironment) (*lzint.Value, error) {
+func (e *evaluator) evalArith(expr *ast.BinaryExpr, env *evalEnvironment) (*lzint.Value, error) {
 	// compute operands
 	leftVal, err := e.eval(expr.Left, env)
 	if err != nil {
