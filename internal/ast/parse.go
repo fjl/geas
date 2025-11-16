@@ -34,9 +34,9 @@ type Parser struct {
 }
 
 // NewParser creates a parser.
-func NewParser(file string, content []byte, debug bool) *Parser {
+func NewParser(file string, content []byte) *Parser {
 	return &Parser{
-		in:  runLexer(content, debug),
+		in:  runLexer(content),
 		doc: newDocument(file, nil),
 	}
 }

@@ -18,7 +18,6 @@ package ast
 
 import (
 	"fmt"
-	"os"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -84,19 +83,16 @@ type lexer struct {
 
 	lineno            int // current line number in the source file
 	start, pos, width int // positions for lexing and returning value
-
-	debug bool // flag for triggering debug output
 }
 
 // runLexer lexes the program by name with the given source. It returns a
 // channel on which the tokens are delivered.
-func runLexer(source []byte, debug bool) <-chan token {
+func runLexer(source []byte) <-chan token {
 	ch := make(chan token)
 	l := &lexer{
 		input:  string(source),
 		tokens: ch,
 		state:  lexNext,
-		debug:  debug,
 		lineno: 1,
 	}
 	go func() {
@@ -174,11 +170,6 @@ func (l *lexer) acceptRunUntil(until rune) bool {
 // emit creates a new token and sends it to token channel for processing.
 func (l *lexer) emit(t tokenType) {
 	token := token{line: l.lineno, text: l.input[l.start:l.pos], typ: t}
-
-	if l.debug {
-		fmt.Fprintf(os.Stderr, "%04d: (%-20v) %s\n", token.line, token.typ, token.text)
-	}
-
 	l.tokens <- token
 	l.start = l.pos
 }

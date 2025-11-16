@@ -35,7 +35,6 @@ import (
 // Compiler turns assembly source into bytecode.
 type Compiler struct {
 	fsys           fs.FS
-	lexDebug       bool
 	maxIncDepth    int
 	maxErrors      int
 	defaultFork    string
@@ -78,11 +77,6 @@ func (c *Compiler) reset() {
 // Note: if set to a nil FS, #include is not allowed.
 func (c *Compiler) SetFilesystem(fsys fs.FS) {
 	c.fsys = fsys
-}
-
-// SetDebugLexer enables/disables printing of the token stream to stdout.
-func (c *Compiler) SetDebugLexer(on bool) {
-	c.lexDebug = on
 }
 
 // SetDefaultFork sets the EVM instruction set used by default.
@@ -187,7 +181,7 @@ func (c *Compiler) warnDeprecatedMacro(expr ast.Expr, name, replacement string) 
 
 func (c *Compiler) compileSource(filename string, input []byte) []byte {
 	c.reset()
-	p := ast.NewParser(filename, input, c.lexDebug)
+	p := ast.NewParser(filename, input)
 	doc, errs := p.Parse()
 	if c.errors.addParseErrors(errs) {
 		return nil // abort compilation due to failed parse
@@ -337,7 +331,7 @@ func (c *Compiler) parseIncludeFile(file string, inst *ast.IncludeSt, depth int)
 		c.errorAt(inst, err)
 		return nil
 	}
-	p := ast.NewParser(file, content, c.lexDebug)
+	p := ast.NewParser(file, content)
 	doc, errors := p.Parse()
 	if c.errors.addParseErrors(errors) {
 		return nil

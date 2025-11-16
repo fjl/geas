@@ -22,7 +22,7 @@ import (
 )
 
 func lexAll(src string) []token {
-	ch := runLexer([]byte(src), false)
+	ch := runLexer([]byte(src))
 
 	var tokens []token
 	for i := range ch {

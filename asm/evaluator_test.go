@@ -137,7 +137,7 @@ Label3:
 #define macro3() = 3
 #define macroFunc(a) = $a
 `
-	doc, errs := ast.NewParser("", []byte(source), false).Parse()
+	doc, errs := ast.NewParser("", []byte(source)).Parse()
 	if len(errs) != 0 {
 		panic("parse error: " + errs[0].Error())
 	}
@@ -224,7 +224,7 @@ func TestExprEvalErrors(t *testing.T) {
 }
 
 func parseExprString(str string) (ast.Expr, error) {
-	p := ast.NewParser("string", []byte(str), false)
+	p := ast.NewParser("string", []byte(str))
 	return p.ParseExpression()
 }
 
