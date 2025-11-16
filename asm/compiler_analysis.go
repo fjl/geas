@@ -24,14 +24,14 @@ import (
 
 // checkLabelsUsed warns about label definitions that were not hit by the evaluator.
 func (c *Compiler) checkLabelsUsed(prog *compilerProg, e *evaluator) {
-	seen := make(set.Set[*ast.LabelDefSt])
+	seen := make(set.Set[*ast.LabelDef])
 	for _, l := range prog.labels {
 		if seen.Includes(l.def) {
 			continue
 		}
 		seen.Add(l.def)
 		if !e.isLabelUsed(l.def) {
-			c.warnf(l.def, "label %s unused in program", l.def)
+			c.warnf(l.def, "label %v unused in program", l.def.Ref())
 		}
 	}
 }

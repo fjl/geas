@@ -72,7 +72,7 @@ type sectionEndElem struct {
 
 type compilerLabel struct {
 	doc   *ast.Document
-	def   *ast.LabelDefSt
+	def   *ast.LabelDef
 	instr *instruction // pointed-to instruction
 }
 
@@ -128,7 +128,7 @@ func (p *compilerProg) currentSection() *compilerSection {
 }
 
 // addLabel appends a label definition to the program.
-func (p *compilerProg) addLabel(l *ast.LabelDefSt, doc *ast.Document) {
+func (p *compilerProg) addLabel(l *ast.LabelDef, doc *ast.Document) {
 	cl := &compilerLabel{doc: doc, def: l}
 	p.currentLabels = append(p.currentLabels, cl)
 	p.labels = append(p.labels, cl)

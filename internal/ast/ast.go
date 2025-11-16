@@ -20,8 +20,7 @@ import (
 	"fmt"
 	"maps"
 	"slices"
-
-	"github.com/fjl/geas/internal/lzint"
+	"strings"
 )
 
 // Document is the toplevel of the AST. It represents a list of abstract instructions and
@@ -37,13 +36,13 @@ type Document struct {
 	// This is filled in for instruction macros, #include/#assemble, etc.
 	Creation Statement
 
-	labels      map[string]*LabelDefSt
+	labels      map[string]*LabelDef
 	exprMacros  map[string]*ExpressionMacroDef
 	instrMacros map[string]*InstructionMacroDef
 }
 
 // LookupLabel finds the definition of a label.
-func (doc *Document) LookupLabel(lref *LabelRefExpr) (*LabelDefSt, *Document) {
+func (doc *Document) LookupLabel(lref *LabelRefExpr) (*LabelDef, *Document) {
 	for doc != nil {
 		li, ok := doc.labels[lref.Ident]
 		if ok {
@@ -77,8 +76,8 @@ func (doc *Document) LookupExprMacro(name string) (*ExpressionMacroDef, *Documen
 }
 
 // GlobalLabels returns the list of global label definitions in the docment.
-func (doc *Document) GlobalLabels() []*LabelDefSt {
-	result := make([]*LabelDefSt, 0)
+func (doc *Document) GlobalLabels() []*LabelDef {
+	result := make([]*LabelDef, 0)
 	for _, name := range slices.Sorted(maps.Keys(doc.labels)) {
 		if IsGlobal(name) {
 			result = append(result, doc.labels[name])
@@ -118,6 +117,7 @@ func (doc *Document) InstrMacros() []*InstructionMacroDef {
 	return result
 }
 
+// CreationString explains how the document got into the program.
 func (doc *Document) CreationString() string {
 	if doc.Creation == nil {
 		if doc.File == "" {
@@ -128,260 +128,170 @@ func (doc *Document) CreationString() string {
 	return fmt.Sprintf(" by %s at %v", doc.Creation.Description(), doc.Creation.Position())
 }
 
+// Statement represents a statement in a source file.
 type Statement interface {
-	Position() Position
+	base() *stbase
+
+	// Description is displayed in some error messages referring the statement.
 	Description() string
+
+	// Position tells where the statement is in the source.
+	Position() Position
+
+	// Comment returns the comment that's on the same line as the statement, if any.
+	Comment() *Comment
+
+	// StartsBlock returns true when the source code contains one or more blank lines
+	// before the statement.
+	StartsBlock() bool
+}
+
+// stbase is embedded into all statement types.
+type stbase struct {
+	src         *Document
+	line        int
+	comment     *Comment
+	startsBlock bool
+}
+
+func (st *stbase) base() *stbase {
+	return st
+}
+
+func (st *stbase) Position() Position {
+	return Position{st.src.File, st.line}
+}
+
+func (st *stbase) Document() *Document {
+	return st.src
+}
+
+func (st *stbase) Comment() *Comment {
+	return st.comment
+}
+
+func (st *stbase) StartsBlock() bool {
+	return st.startsBlock
 }
 
 // toplevel statement types
 type (
-	OpcodeSt struct {
+	Opcode struct {
+		stbase
 		Op       string
-		Src      *Document
 		Arg      Expr // Immediate argument for PUSH* / JUMP*.
 		PushSize byte // For PUSH<n>, this is n+1.
-		tok      token
 	}
 
-	LabelDefSt struct {
-		Src    *Document
-		Dotted bool
-		Global bool
-		tok    token
+	LabelDef struct {
+		stbase
+		Ident  string // label name
+		Dotted bool   // whether definition is dotted
 	}
 
-	MacroCallSt struct {
+	InstrMacroCall struct {
+		stbase
 		Ident string
-		Src   *Document
 		Args  []Expr
-		tok   token
 	}
 
-	IncludeSt struct {
-		tok      token
-		Src      *Document
+	Include struct {
+		stbase
 		Filename string
 	}
 
-	AssembleSt struct {
-		tok      token
-		Src      *Document
+	Assemble struct {
+		stbase
 		Filename string
 	}
 
-	PragmaSt struct {
-		pos    Position
+	Pragma struct {
+		stbase
 		Option string
 		Value  string
 	}
 
-	BytesSt struct {
-		pos   Position
+	Bytes struct {
+		stbase
 		Value Expr
-		Label *LabelDefSt
+		Label *LabelDef
 	}
-)
 
-// definitions
-type (
+	Comment struct {
+		stbase
+		Text string
+	}
+
+	// definitions
+
 	ExpressionMacroDef struct {
-		Name   string
+		stbase
+		Ident  string
 		Params []string
 		Body   Expr
-		pos    Position
 	}
 
 	InstructionMacroDef struct {
-		Name   string
+		stbase
+		Ident  string
 		Params []string
 		Body   *Document
-		pos    Position
 	}
 )
 
-func (inst *MacroCallSt) Position() Position {
-	return Position{File: inst.Src.File, Line: inst.tok.line}
+func (st *InstrMacroCall) Description() string {
+	return fmt.Sprintf("invocation of %%%s", st.Ident)
 }
 
-func (inst *MacroCallSt) Description() string {
-	return fmt.Sprintf("invocation of %%%s", inst.Ident)
+func (st *Include) Description() string {
+	return fmt.Sprintf("#include %q", st.Filename)
 }
 
-func (inst *IncludeSt) Position() Position {
-	return Position{File: inst.Src.File, Line: inst.tok.line}
+func (st *Assemble) Description() string {
+	return fmt.Sprintf("#assemble %q", st.Filename)
 }
 
-func (inst *IncludeSt) Description() string {
-	return fmt.Sprintf("#include %q", inst.Filename)
+func (st *Pragma) Description() string {
+	return fmt.Sprintf("#pragma %s %q", st.Option, st.Value)
 }
 
-func (inst *AssembleSt) Position() Position {
-	return Position{File: inst.Src.File, Line: inst.tok.line}
-}
-
-func (inst *AssembleSt) Description() string {
-	return fmt.Sprintf("#assemble %q", inst.Filename)
-}
-
-func (inst *PragmaSt) Position() Position {
-	return inst.pos
-}
-
-func (inst *PragmaSt) Description() string {
-	return fmt.Sprintf("#pragma %s %q", inst.Option, inst.Value)
-}
-
-func (inst *BytesSt) Position() Position {
-	return inst.pos
-}
-
-func (inst *BytesSt) Description() string {
+func (st *Bytes) Description() string {
 	return "#bytes"
 }
 
-func (inst *OpcodeSt) Position() Position {
-	return Position{File: inst.Src.File, Line: inst.tok.line}
+func (st *Opcode) Description() string {
+	return fmt.Sprintf("opcode %s", st.Op)
 }
 
-func (inst *OpcodeSt) Description() string {
-	return fmt.Sprintf("opcode %s", inst.tok.text)
+func (st *Comment) Description() string {
+	return "comment"
 }
 
-func (inst *LabelDefSt) Position() Position {
-	return Position{File: inst.Src.File, Line: inst.tok.line}
+func (st *InstructionMacroDef) Description() string {
+	return fmt.Sprintf("definition of %%%s", st.Ident)
 }
 
-func (inst *LabelDefSt) Description() string {
-	return fmt.Sprintf("definition of %s", inst.String())
+func (st *ExpressionMacroDef) Description() string {
+	return fmt.Sprintf("definition of %s", st.Ident)
 }
 
-func (l *LabelDefSt) String() string {
-	r := LabelRefExpr{Dotted: l.Dotted, Ident: l.tok.text}
-	return r.String()
+func (st *LabelDef) Description() string {
+	return fmt.Sprintf("definition of %v", st.Ref())
 }
 
-func (l *LabelDefSt) Name() string {
-	return l.tok.text
+// Ref returns a label reference for the definition.
+func (st *LabelDef) Ref() *LabelRefExpr {
+	return &LabelRefExpr{Dotted: st.Dotted, Ident: st.Ident}
 }
 
-func (def *InstructionMacroDef) Position() Position {
-	return def.pos
-}
-
-func (def *InstructionMacroDef) Description() string {
-	return fmt.Sprintf("definition of %%%s", def.Name)
-}
-
-func (def *ExpressionMacroDef) Position() Position {
-	return def.pos
-}
-
-func (def *ExpressionMacroDef) Description() string {
-	return fmt.Sprintf("definition of %s", def.Name)
-}
-
-type Expr interface {
-	Position() Position
-}
-
-// expression types
-type (
-	LiteralExpr struct {
-		text   string
-		pos    Position
-		value  *lzint.Value
-		string bool
+// String returns the text of the definition.
+func (st *LabelDef) String() string {
+	var s strings.Builder
+	s.Grow(len(st.Ident) + 2)
+	if st.Dotted {
+		s.WriteByte('.')
 	}
-
-	LabelRefExpr struct {
-		Ident  string
-		Dotted bool
-		Global bool
-		pos    Position
-	}
-
-	VariableExpr struct {
-		Ident string
-		pos   Position
-	}
-
-	MacroCallExpr struct {
-		Ident   string
-		Builtin bool
-		Args    []Expr
-		pos     Position
-	}
-
-	ArithExpr struct {
-		Op    ArithOp
-		Left  Expr
-		Right Expr
-		pos   Position
-	}
-
-	UnaryArithExpr struct {
-		Op  ArithOp
-		Arg Expr
-		pos Position
-	}
-)
-
-// MakeNumber creates a number literal with the given value.
-func MakeNumber(v *lzint.Value) *LiteralExpr {
-	return &LiteralExpr{
-		text:  v.String(),
-		value: v,
-	}
-}
-
-// MakeString creates a string literal with the given value.
-func MakeString(v string) *LiteralExpr {
-	return &LiteralExpr{
-		text:   v,
-		string: true,
-		value:  lzint.FromBytes([]byte(v)),
-	}
-}
-
-// Value returns the parsed value of the literal.
-func (e *LiteralExpr) Value() *lzint.Value {
-	return e.value
-}
-
-// Text returns the text content of the literal as-written.
-// Note this does not include the quotes for string literals.
-func (e *LiteralExpr) Text() string {
-	return e.text
-}
-
-func (l *LiteralExpr) Position() Position {
-	return l.pos
-}
-
-func (l *LabelRefExpr) Position() Position {
-	return l.pos
-}
-
-func (l *LabelRefExpr) String() string {
-	dot := ""
-	if l.Dotted {
-		dot = "."
-	}
-	return "@" + dot + l.Ident
-}
-
-func (e *VariableExpr) Position() Position {
-	return e.pos
-}
-
-func (e *MacroCallExpr) Position() Position {
-	return e.pos
-}
-
-func (e *ArithExpr) Position() Position {
-	return e.pos
-}
-
-func (e *UnaryArithExpr) Position() Position {
-	return e.pos
+	s.WriteString(st.Ident)
+	s.WriteByte(':')
+	return s.String()
 }

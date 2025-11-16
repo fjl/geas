@@ -38,7 +38,7 @@ func TestLexer(t *testing.T) {
 	}{
 		{
 			input:  ";; this is a comment",
-			tokens: []token{{typ: lineStart, line: 1}, {typ: eof, line: 1}},
+			tokens: []token{{typ: lineStart, line: 1}, {typ: comment, text: ";; this is a comment", line: 1}, {typ: eof, line: 1}},
 		},
 		{
 			input:  "0x12345678",
@@ -79,19 +79,19 @@ func TestLexer(t *testing.T) {
 		// comment after label
 		{
 			input:  "@label123 ;; comment",
-			tokens: []token{{typ: lineStart, line: 1}, {typ: labelRef, text: "label123", line: 1}, {typ: eof, line: 1}},
+			tokens: []token{{typ: lineStart, line: 1}, {typ: labelRef, text: "label123", line: 1}, {typ: comment, text: ";; comment", line: 1}, {typ: eof, line: 1}},
 		},
 		// comment after instruction
 		{
 			input:  "push 3 ;; comment\nadd",
-			tokens: []token{{typ: lineStart, line: 1}, {typ: identifier, text: "push", line: 1}, {typ: numberLiteral, text: "3", line: 1}, {typ: lineEnd, text: "\n", line: 1}, {typ: lineStart, line: 2}, {typ: identifier, line: 2, text: "add"}, {typ: eof, line: 2}},
+			tokens: []token{{typ: lineStart, line: 1}, {typ: identifier, text: "push", line: 1}, {typ: numberLiteral, text: "3", line: 1}, {typ: comment, text: ";; comment", line: 1}, {typ: lineEnd, text: "\n", line: 1}, {typ: lineStart, line: 2}, {typ: identifier, line: 2, text: "add"}, {typ: eof, line: 2}},
 		},
 	}
 
 	for _, test := range tests {
 		tokens := lexAll(test.input)
 		if !reflect.DeepEqual(tokens, test.tokens) {
-			t.Errorf("input %q\ngot:  %+v\nwant: %+v", test.input, tokens, test.tokens)
+			t.Errorf("input %q\ngot:  %v\nwant: %v", test.input, tokens, test.tokens)
 		}
 	}
 }

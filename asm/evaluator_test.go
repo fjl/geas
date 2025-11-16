@@ -154,22 +154,22 @@ func evaluatorForTesting() *evaluator {
 	e.registerLabels([]*compilerLabel{
 		{
 			doc:   evalTestDoc,
-			def:   evalTestDoc.Statements[0].(*ast.LabelDefSt),
+			def:   evalTestDoc.Statements[0].(*ast.LabelDef),
 			instr: &instruction{pc: 1},
 		},
 		{
 			doc:   evalTestDoc,
-			def:   evalTestDoc.Statements[1].(*ast.LabelDefSt),
+			def:   evalTestDoc.Statements[1].(*ast.LabelDef),
 			instr: &instruction{pc: 2},
 		},
 		{
 			doc:   evalTestDoc,
-			def:   evalTestDoc.Statements[2].(*ast.LabelDefSt),
+			def:   evalTestDoc.Statements[2].(*ast.LabelDef),
 			instr: &instruction{pc: 3},
 		},
 		{
 			doc:   evalTestDoc,
-			def:   evalTestDoc.Statements[3].(*ast.LabelDefSt),
+			def:   evalTestDoc.Statements[3].(*ast.LabelDef),
 			instr: &instruction{pc: 4},
 		},
 	})

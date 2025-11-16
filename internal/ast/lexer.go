@@ -18,6 +18,7 @@ package ast
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -37,15 +38,18 @@ type token struct {
 	typ  tokenType
 }
 
-func (t *token) String() string {
-	return fmt.Sprintf("%v %s (line %d)", t.typ, t.text, t.line)
+func (t token) String() string {
+	if t.text == "" {
+		return fmt.Sprintf("<%d:%v>", t.line, t.typ)
+	}
+	return fmt.Sprintf("<%d:%v %q>", t.line, t.typ, t.text)
 }
 
 // tokenType are the different types the lexer
 // is able to parse and return.
 type tokenType byte
 
-//go:generate go run golang.org/x/tools/cmd/stringer@latest -linecomment -type tokenType
+//  //go:generate go run golang.org/x/tools/cmd/stringer@latest -linecomment -type tokenType
 
 const (
 	eof                tokenType = iota // end of file
@@ -70,7 +74,42 @@ const (
 	closeBrace                          // closing brace
 	equals                              // equals sign
 	arith                               // arithmetic operation
+	comment                             // comment token
 )
+
+var tokentypetable = map[tokenType]string{
+	eof:                "end of file",
+	lineStart:          "beginning of line",
+	lineEnd:            "end of line",
+	invalidToken:       "invalid character",
+	identifier:         "identifier",
+	dottedIdentifier:   "dotted identifier",
+	variableIdentifier: "parameter reference",
+	labelRef:           "label reference",
+	dottedLabelRef:     "dotted label reference",
+	label:              "label definition",
+	dottedLabel:        "dotted label definition",
+	numberLiteral:      "number literal",
+	stringLiteral:      "string literal",
+	openParen:          "open parenthesis",
+	closeParen:         "close parenthesis",
+	comma:              "comma",
+	directive:          "directive",
+	instMacroIdent:     "macro identifier",
+	openBrace:          "open brace",
+	closeBrace:         "closing brace",
+	equals:             "equals sign",
+	arith:              "arithmetic operation",
+	comment:            "comment",
+}
+
+func (t tokenType) String() string {
+	s, ok := tokentypetable[t]
+	if !ok {
+		panic("invalid token " + strconv.Itoa(int(t)))
+	}
+	return s
+}
 
 // lexer is the basic construct for parsing
 // source code and turning them in to tokens.
@@ -268,7 +307,7 @@ func lexNext(l *lexer) stateFn {
 // of the line and discards the text.
 func lexComment(l *lexer) stateFn {
 	l.acceptRunUntil('\n')
-	l.ignore()
+	l.emit(comment)
 	return lexNext
 }
 
