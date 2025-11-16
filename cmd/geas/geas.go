@@ -31,7 +31,9 @@ import (
 
 	"github.com/fjl/geas/asm"
 	"github.com/fjl/geas/disasm"
+	"github.com/fjl/geas/internal/ast"
 	"github.com/fjl/geas/internal/evm"
+	"github.com/fjl/geas/internal/printer"
 )
 
 var t2s = strings.NewReplacer("\t", "  ")
@@ -41,7 +43,7 @@ func usage() {
 	if len(vsn) > 0 {
 		fmt.Fprintln(os.Stderr, "Version:", vsn)
 	}
-	fmt.Fprint(os.Stderr, `Usage: geas {-a | -d | -i} [options...] <file>`+
+	fmt.Fprint(os.Stderr, `Usage: geas -[adfi] [options...] <file>`+
 		t2s.Replace(`
  -a: ASSEMBLER (default)
 
@@ -57,6 +59,8 @@ func usage() {
 	 -blocks            blank lines between logical blocks
 	 -pc                show program counter
 	 -uppercase         show instruction names as uppercase
+
+ -f: FORMAT DOCUMENT
 
  -i: INFORMATION
 
@@ -82,6 +86,9 @@ func main() {
 
 	case mode == "-d":
 		disassembler(os.Args[2:])
+
+	case mode == "-f":
+		formatter(os.Args[2:])
 
 	case mode == "-i":
 		information(os.Args[2:])
@@ -216,6 +223,55 @@ func disassembler(args []string) {
 	}
 	err = d.Disassemble(bytecode, output)
 	exit(1, err)
+}
+
+func formatter(args []string) {
+	var (
+		fs = newFlagSet("-f")
+	)
+	parseFlags(fs, args)
+
+	// Read input.
+	var err error
+	var infd io.ReadCloser
+	file := fileArg(fs)
+	if file == "-" {
+		infd = os.Stdin
+	} else {
+		infd, err = os.Open(file)
+		if err != nil {
+			exit(1, err)
+		}
+	}
+	input, err := io.ReadAll(io.LimitReader(infd, inputLimit))
+	if err != nil {
+		exit(1, err)
+	}
+	infd.Close()
+
+	output := os.Stdout
+
+	// Format document.
+	parser := ast.NewParser(file, input)
+	doc, errs := parser.Parse()
+	if len(errs) > 0 {
+		var hasRealError bool
+		for _, err := range errs {
+			if !asm.IsWarning(err) {
+				hasRealError = true
+			}
+			fmt.Fprintln(os.Stderr, err)
+		}
+		if hasRealError {
+			exit(2, fmt.Errorf("document has errors"))
+			return
+		}
+	}
+
+	var p printer.Printer
+	if err := p.Document(output, doc); err != nil {
+		exit(1, err)
+	}
 }
 
 func information(args []string) {
