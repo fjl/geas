@@ -21,7 +21,7 @@
         stop   ; [stack2]
         stop   ; [stack3]
         ;; it surely stopped now
-}
+} ; [endstack]
 
 #define %macro_5(a, b) {
 ;;;; [stack1]

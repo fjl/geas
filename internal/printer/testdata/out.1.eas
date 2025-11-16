@@ -19,7 +19,7 @@
     stop                   ; [stack2]
     stop                   ; [stack3]
     ;; it surely stopped now
-}
+}                          ; [endstack]
 
 #define %macro_5(a, b) {   ; [stack1]
     ;; comment above will be reformatted to level 1 and move after {

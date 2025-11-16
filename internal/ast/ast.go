@@ -237,8 +237,9 @@ type (
 		Params []string
 		Body   *Document
 
-		// This is the comment attached to the line where the { is.
-		// It's tracked separately to
+		// This is the comment attached to the line where the opening brace { is. It's
+		// tracked separately because this is typically where the input stack of the macro
+		// will be documented.
 		StartComment *Comment
 	}
 )
