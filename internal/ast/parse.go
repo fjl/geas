@@ -267,6 +267,7 @@ loop:
 	// Register the macro.
 	checkDuplicateMacro(p, name)
 	p.doc.exprMacros[name.text] = def
+	p.doc.Statements = append(p.doc.Statements, def)
 }
 
 func parseInstructionMacroDef(p *Parser, nameTok token) {
@@ -306,6 +307,7 @@ paramLoop:
 	def := &InstructionMacroDef{Name: nameTok.text, pos: pos, Params: params, Body: doc}
 	doc.Creation = def
 	topdoc.instrMacros[nameTok.text] = def
+	topdoc.Statements = append(topdoc.Statements, def)
 }
 
 func checkDuplicateMacro(p *Parser, nameTok token) {
