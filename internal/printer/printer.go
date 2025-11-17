@@ -333,7 +333,6 @@ func (p *Printer) statement(st ast.Statement) {
 		if st.StartComment != nil {
 			if macroHasIndentedStartComment(st) {
 				// Level one comment goes on the same line as the opening brace.
-				p.byte(' ')
 				p.comment(st.StartComment, true)
 			} else {
 				p.newline()
