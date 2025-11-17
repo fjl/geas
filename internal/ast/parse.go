@@ -193,15 +193,19 @@ func parseStatement(p *Parser) (done bool) {
 	}
 
 	// Check what's left on this line after the statement.
-	switch tok := p.next(); tok.typ {
-	case lineEnd:
+	// Note we skip this for instruction macro definitions because they
+	// usually end on a separate line with just the closing brace.
+	if _, ok := st.(*InstructionMacroDef); !ok {
+		switch tok := p.next(); tok.typ {
+		case lineEnd:
 		// Consume line ending.
-	case comment:
-		// Check if there is a comment that should be attached to the statement.
-		st.base().comment = p.makeComment(tok)
-	default:
-		// There's another statement on the same line, the next call will handle it.
-		p.unread(tok)
+		case comment:
+			// Check if there is a comment that should be attached to the statement.
+			st.base().comment = p.makeComment(tok)
+		default:
+			// There's another statement on the same line, the next call will handle it.
+			p.unread(tok)
+		}
 	}
 
 	st.base().startsBlock = lineCount > 1
