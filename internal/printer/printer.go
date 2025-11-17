@@ -379,9 +379,10 @@ func (p *Printer) macroDefinitionHead(st *ast.InstructionMacroDef) {
 func (p *Printer) comment(st *ast.Comment, attached bool) {
 	lvl := st.Level()
 	if lvl == 1 || attached {
-		for p.lineLength < p.commentCol+1 {
+		for p.lineLength < p.commentCol {
 			p.byte(' ')
 		}
+		p.byte(' ')
 		// Strip leading whitespace in comment text.
 		p.string("; ")
 		p.string(st.InnerText())
