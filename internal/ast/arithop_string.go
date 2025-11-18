@@ -20,14 +20,14 @@ func _() {
 	_ = x[ArithXor-10]
 }
 
-const _ArithOp_name = "ArithPlusArithMinusArithMulArithDivArithModArithLshiftArithRshiftArithAndArithOrArithNot"
+const _ArithOp_name = "ArithPlusArithMinusArithMulArithDivArithModArithLshiftArithRshiftArithAndArithOrArithXor"
 
 var _ArithOp_index = [...]uint8{0, 9, 19, 27, 35, 43, 54, 65, 73, 80, 88}
 
 func (i ArithOp) String() string {
-	i -= 1
-	if i >= ArithOp(len(_ArithOp_index)-1) {
-		return "ArithOp(" + strconv.FormatInt(int64(i+1), 10) + ")"
+	idx := int(i) - 1
+	if i < 1 || idx >= len(_ArithOp_index)-1 {
+		return "ArithOp(" + strconv.FormatInt(int64(i), 10) + ")"
 	}
-	return _ArithOp_name[_ArithOp_index[i]:_ArithOp_index[i+1]]
+	return _ArithOp_name[_ArithOp_index[idx]:_ArithOp_index[idx+1]]
 }

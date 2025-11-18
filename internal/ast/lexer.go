@@ -18,7 +18,6 @@ package ast
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -49,8 +48,7 @@ func (t token) String() string {
 // is able to parse and return.
 type tokenType byte
 
-//  //go:generate go run golang.org/x/tools/cmd/stringer@latest -linecomment -type tokenType
-
+//go:generate go run golang.org/x/tools/cmd/stringer -linecomment -type tokenType
 const (
 	eof                tokenType = iota // end of file
 	lineStart                           // beginning of line
@@ -74,42 +72,8 @@ const (
 	closeBrace                          // closing brace
 	equals                              // equals sign
 	arith                               // arithmetic operation
-	comment                             // comment token
+	comment                             // comment
 )
-
-var tokentypetable = map[tokenType]string{
-	eof:                "end of file",
-	lineStart:          "beginning of line",
-	lineEnd:            "end of line",
-	invalidToken:       "invalid character",
-	identifier:         "identifier",
-	dottedIdentifier:   "dotted identifier",
-	variableIdentifier: "parameter reference",
-	labelRef:           "label reference",
-	dottedLabelRef:     "dotted label reference",
-	label:              "label definition",
-	dottedLabel:        "dotted label definition",
-	numberLiteral:      "number literal",
-	stringLiteral:      "string literal",
-	openParen:          "open parenthesis",
-	closeParen:         "close parenthesis",
-	comma:              "comma",
-	directive:          "directive",
-	instMacroIdent:     "macro identifier",
-	openBrace:          "open brace",
-	closeBrace:         "closing brace",
-	equals:             "equals sign",
-	arith:              "arithmetic operation",
-	comment:            "comment",
-}
-
-func (t tokenType) String() string {
-	s, ok := tokentypetable[t]
-	if !ok {
-		panic("invalid token " + strconv.Itoa(int(t)))
-	}
-	return s
-}
 
 // lexer is the basic construct for parsing
 // source code and turning them in to tokens.

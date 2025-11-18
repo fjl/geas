@@ -18,7 +18,7 @@ package ast
 
 import "fmt"
 
-//go:generate go run golang.org/x/tools/cmd/stringer@latest -type ArithOp
+//go:generate go run golang.org/x/tools/cmd/stringer -type ArithOp
 
 // ArithOp is an arithmetic operation.
 type ArithOp byte
