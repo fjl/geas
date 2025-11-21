@@ -303,7 +303,9 @@ func (p *Printer) statement(st ast.Statement) {
 		p.string("#bytes")
 		if st.Label != nil {
 			p.byte(' ')
-			p.string(st.Label.String())
+			l := *st.Label
+			l.Dotted = false
+			p.string(l.String())
 		}
 		if st.Value != nil {
 			p.byte(' ')
