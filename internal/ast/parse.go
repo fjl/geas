@@ -34,9 +34,9 @@ type Parser struct {
 }
 
 // NewParser creates a parser.
-func NewParser(file string, content []byte, debug bool) *Parser {
+func NewParser(file string, content []byte) *Parser {
 	return &Parser{
-		in:  runLexer(content, debug),
+		in:  runLexer(content),
 		doc: newDocument(file, nil),
 	}
 }
@@ -44,7 +44,7 @@ func NewParser(file string, content []byte, debug bool) *Parser {
 func newDocument(file string, parent *Document) *Document {
 	return &Document{
 		File:        file,
-		labels:      make(map[string]*LabelDefSt),
+		labels:      make(map[string]*LabelDef),
 		exprMacros:  make(map[string]*ExpressionMacroDef),
 		instrMacros: make(map[string]*InstructionMacroDef),
 		Parent:      parent,
@@ -91,7 +91,7 @@ func (p *Parser) throwError(tok token, format string, args ...any) {
 
 // unexpected signals that an unexpected token occurred in the input.
 func (p *Parser) unexpected(tok token) {
-	p.throwError(tok, "unexpected %s %s", tok.typ.String(), tok.text)
+	p.throwError(tok, "unexpected %v %s", tok.typ, tok.text)
 }
 
 // Parse runs the parser, outputting a document.
@@ -144,75 +144,118 @@ func (p *Parser) atDocumentTop() bool {
 	return p.doc.Parent == nil
 }
 
+// makeComment creates a comment node.
+func (p *Parser) makeComment(tok token) *Comment {
+	return &Comment{
+		stbase: stbase{src: p.doc, line: tok.line},
+		Text:   tok.text,
+	}
+}
+
 // ------------- start parser functions -------------
 
+// parseStatement reads a single statement and adds it to the parser document.
 func parseStatement(p *Parser) (done bool) {
-	switch tok := p.next(); tok.typ {
-	case eof, closeBrace:
-		if p.atDocumentTop() != (tok.typ == eof) {
+	var st Statement
+	var lineCount int
+
+	// Parse up to statement.
+	for st == nil {
+		switch tok := p.next(); tok.typ {
+		// Handle end of document.
+		case eof, closeBrace:
+			if p.atDocumentTop() != (tok.typ == eof) {
+				p.unexpected(tok)
+			}
+			return true
+
+		// Process line endings.
+		case lineStart:
+			lineCount++
+		case lineEnd:
+
+		// Statements:
+		case comment:
+			// The line has just a comment and nothing else,
+			// so the comment becomes its own statement.
+			st = p.makeComment(tok)
+		case label, dottedLabel:
+			st = parseLabelDef(p, tok)
+		case directive:
+			st = parseDirective(p, tok)
+		case identifier:
+			st = parseOpcode(p, tok)
+		case instMacroIdent:
+			st = parseInstructionMacroCall(p, tok)
+		default:
 			p.unexpected(tok)
 		}
-		return true
-	case label, dottedLabel:
-		parseLabelDef(p, tok)
-	case directive:
-		parseDirective(p, tok)
-	case identifier:
-		parseInstruction(p, tok)
-	case instMacroIdent:
-		parseInstructionMacroCall(p, tok)
-	case lineStart, lineEnd:
-		return false
-	default:
-		p.unexpected(tok)
 	}
+
+	// Check what's left on this line after the statement.
+	// Note we skip this for instruction macro definitions because they
+	// usually end on a separate line with just the closing brace.
+	if _, ok := st.(*InstructionMacroDef); !ok {
+		switch tok := p.next(); tok.typ {
+		case lineEnd:
+		// Consume line ending.
+		case comment:
+			// Check if there is a comment that should be attached to the statement.
+			st.base().comment = p.makeComment(tok)
+		default:
+			// There's another statement on the same line, the next call will handle it.
+			p.unread(tok)
+		}
+	}
+
+	st.base().startsBlock = lineCount > 1
+	p.doc.Statements = append(p.doc.Statements, st)
 	return false
 }
 
-func parseLabelDef(p *Parser, tok token) {
+func parseLabelDef(p *Parser, tok token) *LabelDef {
 	name := tok.text
-	li := &LabelDefSt{
-		tok:    tok,
-		Src:    p.doc,
+	li := &LabelDef{
+		stbase: stbase{src: p.doc, line: tok.line},
+		Ident:  name,
 		Dotted: tok.typ == dottedLabel,
-		Global: IsGlobal(name),
 	}
-	p.doc.Statements = append(p.doc.Statements, li)
 	if firstDef, ok := p.doc.labels[name]; ok {
 		p.throwError(tok, "%w", ErrLabelAlreadyDef(firstDef, li))
-		return
+		return li
 	}
 	p.doc.labels[name] = li
+	return li
 }
 
-func parseDirective(p *Parser, tok token) {
+func parseDirective(p *Parser, tok token) Statement {
 	switch tok.text {
 	case "#define":
 		if !p.atDocumentTop() {
 			p.throwError(tok, "nested macro definitions are not allowed")
 		}
-		parseMacroDef(p)
+		return parseMacroDef(p)
 	case "#include":
-		parseInclude(p, tok)
+		return parseInclude(p, tok)
 	case "#assemble":
-		parseAssemble(p, tok)
+		return parseAssemble(p, tok)
 	case "#pragma":
-		parsePragma(p, tok)
+		return parsePragma(p, tok)
 	case "#bytes":
-		parseBytes(p, tok)
+		return parseBytes(p, tok)
 	default:
 		p.throwError(tok, "unknown compiler directive %q", tok.text)
+		return nil
 	}
 }
 
-func parseMacroDef(p *Parser) {
+func parseMacroDef(p *Parser) Statement {
 	name := p.next()
 	switch name.typ {
 	case dottedIdentifier:
 		p.throwError(name, "attempt to redefine builtin macro .%s", name.text)
 	case instMacroIdent:
-		parseInstructionMacroDef(p, name)
-		return
+		return parseInstructionMacroDef(p, name)
 	case identifier:
 	default:
 		p.unexpected(name)
@@ -220,8 +263,8 @@ func parseMacroDef(p *Parser) {
 
 	// Parse parameters and body.
 	var (
-		pos          = Position{File: p.doc.File, Line: name.line}
-		def          = &ExpressionMacroDef{Name: name.text, pos: pos}
+		base         = stbase{src: p.doc, line: name.line}
+		def          = &ExpressionMacroDef{stbase: base, Ident: name.text}
 		bodyTok      token
 		didParams    bool
 		legacySyntax bool
@@ -229,7 +272,7 @@ func parseMacroDef(p *Parser) {
 loop:
 	for {
 		switch tok := p.next(); tok.typ {
-		case lineEnd, eof:
+		case lineEnd, eof, comment:
 			p.throwError(tok, "incomplete macro definition")
 
 		case openBrace:
@@ -267,15 +310,16 @@ loop:
 	// Register the macro.
 	checkDuplicateMacro(p, name)
 	p.doc.exprMacros[name.text] = def
+	return def
 }
 
-func parseInstructionMacroDef(p *Parser, nameTok token) {
+func parseInstructionMacroDef(p *Parser, nameTok token) *InstructionMacroDef {
 	var params []string
 	var didParams bool
 paramLoop:
 	for {
 		switch tok := p.next(); tok.typ {
-		case lineEnd, eof:
+		case lineEnd, eof, comment:
 			p.throwError(tok, "incomplete macro definition")
 		case openBrace:
 			break paramLoop // start of body
@@ -287,6 +331,22 @@ paramLoop:
 			}
 		default:
 			p.unexpected(tok)
+		}
+	}
+
+	// Check for comment after the opening brace. As a side effect, this skips over
+	// blank lines at the start of the macro body.
+	var startComment *Comment
+commentLoop:
+	for {
+		switch tok := p.next(); tok.typ {
+		case lineEnd, lineStart:
+		case comment:
+			startComment = p.makeComment(tok)
+			break commentLoop
+		default:
+			p.unread(tok)
+			break commentLoop
 		}
 	}
 
@@ -302,10 +362,16 @@ paramLoop:
 
 	// Register definition.
 	checkDuplicateMacro(p, nameTok)
-	pos := Position{File: p.doc.File, Line: nameTok.line}
-	def := &InstructionMacroDef{Name: nameTok.text, pos: pos, Params: params, Body: doc}
+	def := &InstructionMacroDef{
+		stbase:       stbase{src: p.doc, line: nameTok.line},
+		Ident:        nameTok.text,
+		Params:       params,
+		Body:         doc,
+		StartComment: startComment,
+	}
 	doc.Creation = def
 	topdoc.instrMacros[nameTok.text] = def
+	return def
 }
 
 func checkDuplicateMacro(p *Parser, nameTok token) {
@@ -318,49 +384,49 @@ func checkDuplicateMacro(p *Parser, nameTok token) {
 	}
 }
 
-func parseInclude(p *Parser, d token) {
-	instr := &IncludeSt{Src: p.doc, tok: d}
+func parseInclude(p *Parser, d token) *Include {
+	st := &Include{stbase: stbase{src: p.doc, line: d.line}}
 	switch tok := p.next(); tok.typ {
 	case stringLiteral:
-		instr.Filename = tok.text
-		p.doc.Statements = append(p.doc.Statements, instr)
+		st.Filename = tok.text
 	default:
 		p.throwError(tok, "expected filename following #include")
 	}
+	return st
 }
 
-func parseAssemble(p *Parser, d token) {
-	instr := &AssembleSt{Src: p.doc, tok: d}
+func parseAssemble(p *Parser, d token) *Assemble {
+	st := &Assemble{stbase: stbase{src: p.doc, line: d.line}}
 	switch tok := p.next(); tok.typ {
 	case stringLiteral:
-		instr.Filename = tok.text
-		p.doc.Statements = append(p.doc.Statements, instr)
+		st.Filename = tok.text
 	default:
 		p.throwError(tok, "expected filename following #assemble")
 	}
+	return st
 }
 
-func parsePragma(p *Parser, d token) {
-	instr := &PragmaSt{pos: Position{p.doc.File, d.line}}
+func parsePragma(p *Parser, d token) *Pragma {
+	st := &Pragma{stbase: stbase{src: p.doc, line: d.line}}
 	switch tok := p.next(); tok.typ {
 	case identifier:
-		instr.Option = tok.text
+		st.Option = tok.text
 		switch v := p.next(); v.typ {
 		case stringLiteral, numberLiteral:
-			instr.Value = v.text
+			st.Value = v.text
 		case equals:
-			p.throwError(tok, "unexpected = after #pragma %s", instr.Option)
+			p.throwError(tok, "unexpected = after #pragma %s", st.Option)
 		default:
 			p.throwError(tok, "#pragma option value must be string or number literal")
 		}
-		p.doc.Statements = append(p.doc.Statements, instr)
 	default:
 		p.throwError(tok, "expected option name following #pragma")
 	}
+	return st
 }
 
-func parseBytes(p *Parser, d token) {
-	instr := &BytesSt{pos: Position{p.doc.File, d.line}}
+func parseBytes(p *Parser, d token) *Bytes {
+	st := &Bytes{stbase: stbase{src: p.doc, line: d.line}}
 	for {
 		switch tok := p.next(); tok.typ {
 		case lineEnd, eof:
@@ -368,49 +434,50 @@ func parseBytes(p *Parser, d token) {
 
 		case label:
 			// "named bytes"
-			if instr.Label != nil {
+			if st.Label != nil {
 				p.throwError(d, "extra label on #bytes")
 			}
-			instr.Label = &LabelDefSt{
-				Src:    p.doc,
+			st.Label = &LabelDef{
+				stbase: st.stbase,
 				Dotted: true, // always dotted
-				Global: IsGlobal(tok.text),
-				tok:    tok,
+				Ident:  tok.text,
 			}
 
 		default:
-			instr.Value = parseExpr(p, tok)
-			p.doc.Statements = append(p.doc.Statements, instr)
+			st.Value = parseExpr(p, tok)
 
 			// For named bytes, register them as both a macro and label.
-			if instr.Label != nil {
-				name := instr.Label.Name()
-				p.doc.labels[name] = instr.Label
-				p.doc.exprMacros[name] = &ExpressionMacroDef{Name: name, Body: instr.Value}
+			if st.Label != nil {
+				p.doc.labels[st.Label.Ident] = st.Label
+				p.doc.exprMacros[st.Label.Ident] = &ExpressionMacroDef{
+					Ident: st.Label.Ident,
+					Body:  st.Value,
+				}
 			}
-			return
+			return st
 		}
 	}
 }
 
-func parseInstruction(p *Parser, tok token) {
-	opcode := &OpcodeSt{Op: tok.text, Src: p.doc, tok: tok}
+func parseOpcode(p *Parser, tok token) *Opcode {
+	st := &Opcode{
+		stbase: stbase{src: p.doc, line: tok.line},
+		Op:     tok.text,
+	}
 	size, isPush := parsePushSize(tok.text)
 	if isPush {
-		opcode.PushSize = byte(size + 1)
+		st.PushSize = byte(size + 1)
 	}
-
-	// Register in document.
-	p.doc.Statements = append(p.doc.Statements, opcode)
 
 	// Parse optional argument.
 	argToken := p.next()
 	switch argToken.typ {
-	case lineEnd, eof:
-		return
+	case lineEnd, eof, comment:
+		p.unread(argToken)
 	default:
-		opcode.Arg = parseExpr(p, argToken)
+		st.Arg = parseExpr(p, argToken)
 	}
+	return st
 }
 
 var sizedPushRE = regexp.MustCompile("(?i)^PUSH([0-9]*)$")
@@ -427,18 +494,20 @@ func parsePushSize(name string) (int, bool) {
 	return -1, true
 }
 
-func parseInstructionMacroCall(p *Parser, nameTok token) {
-	call := &MacroCallSt{Src: p.doc, Ident: nameTok.text, tok: nameTok}
-	p.doc.Statements = append(p.doc.Statements, call)
-
+func parseInstructionMacroCall(p *Parser, nameTok token) *InstructionMacroCall {
+	st := &InstructionMacroCall{
+		stbase: stbase{src: p.doc, line: nameTok.line},
+		Ident:  nameTok.text,
+	}
 	switch tok := p.next(); tok.typ {
-	case lineEnd, eof:
-		return
+	case lineEnd, eof, comment:
+		p.unread(tok)
 	case openParen:
-		call.Args = parseCallArguments(p)
+		st.Args = parseCallArguments(p)
 	default:
 		p.unexpected(tok)
 	}
+	return st
 }
 
 // parseExpr parses an expression.
@@ -455,7 +524,7 @@ func parseArith(p *Parser, left Expr, tok token, minPrecedence int) Expr {
 		switch tok.typ {
 		case arith:
 			op = tokenArithOp(tok)
-			if precedence[op] < minPrecedence {
+			if op.Precedence() < minPrecedence {
 				p.unread(tok)
 				return left
 			}
@@ -475,10 +544,10 @@ func parseArith(p *Parser, left Expr, tok token, minPrecedence int) Expr {
 		}
 
 		// Check for next op of higher precedence.
-		right = parseArithInner(p, right, precedence[op])
+		right = parseArithInner(p, right, op.Precedence())
 
 		// Combine into binary expression.
-		left = &ArithExpr{
+		left = &BinaryExpr{
 			Op:    op,
 			Left:  left,
 			Right: right,
@@ -492,7 +561,7 @@ func parseArithInner(p *Parser, right Expr, curPrecedence int) Expr {
 		switch tok := p.next(); tok.typ {
 		case arith:
 			nextop := tokenArithOp(tok)
-			if precedence[nextop] <= curPrecedence {
+			if nextop.Precedence() <= curPrecedence {
 				p.unread(tok)
 				return right
 			}
@@ -531,7 +600,6 @@ func parsePrimaryExpr(p *Parser, tok token) Expr {
 		return &LabelRefExpr{
 			Ident:  tok.text,
 			Dotted: tok.typ == dottedLabelRef,
-			Global: IsGlobal(tok.text),
 			pos:    Position{p.doc.File, tok.line},
 		}
 
@@ -564,7 +632,7 @@ func parsePrimaryExpr(p *Parser, tok token) Expr {
 		return parseUnaryExpr(p, tok)
 
 	case openParen:
-		return parseParenExpr(p)
+		return parseParenExpr(p, tok)
 
 	default:
 		p.unexpected(tok)
@@ -576,7 +644,7 @@ func parseUnaryExpr(p *Parser, tok token) Expr {
 	switch op := tokenArithOp(tok); op {
 	case ArithMinus:
 		arg := parsePrimaryExpr(p, p.next())
-		return &UnaryArithExpr{
+		return &UnaryExpr{
 			Op:  op,
 			Arg: arg,
 			pos: Position{p.doc.File, tok.line},
@@ -587,14 +655,17 @@ func parseUnaryExpr(p *Parser, tok token) Expr {
 	}
 }
 
-func parseParenExpr(p *Parser) Expr {
-	var expr Expr
+func parseParenExpr(p *Parser, openParen token) Expr {
+	var expr *GroupExpr
 	switch tok := p.next(); tok.typ {
 	case closeParen:
 		p.throwError(tok, "empty parenthesized expression")
 		return nil
 	default:
-		expr = parseExpr(p, tok)
+		expr = &GroupExpr{
+			Inner: parseExpr(p, tok),
+			pos:   Position{File: p.doc.File, Line: openParen.line},
+		}
 	}
 	// Ensure closing paren is there.
 	for {

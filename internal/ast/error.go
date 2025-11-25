@@ -56,7 +56,7 @@ func (e *ParseError) Unwrap() error {
 	return e.err
 }
 
-func ErrLabelAlreadyDef(firstDef, secondDef *LabelDefSt) error {
+func ErrLabelAlreadyDef(firstDef, secondDef *LabelDef) error {
 	dotInfo := ""
 	if firstDef.Dotted && !secondDef.Dotted {
 		dotInfo = " (as dotted label)"
@@ -64,5 +64,5 @@ func ErrLabelAlreadyDef(firstDef, secondDef *LabelDefSt) error {
 	if !firstDef.Dotted && secondDef.Dotted {
 		dotInfo = " (as jumpdest)"
 	}
-	return fmt.Errorf("%v already defined%s", secondDef, dotInfo)
+	return fmt.Errorf("%v already defined%s", secondDef.Ref(), dotInfo)
 }

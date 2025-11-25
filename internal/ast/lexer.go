@@ -18,7 +18,6 @@ package ast
 
 import (
 	"fmt"
-	"os"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -38,16 +37,18 @@ type token struct {
 	typ  tokenType
 }
 
-func (t *token) String() string {
-	return fmt.Sprintf("%v %s (line %d)", t.typ, t.text, t.line)
+func (t token) String() string {
+	if t.text == "" {
+		return fmt.Sprintf("<%d:%v>", t.line, t.typ)
+	}
+	return fmt.Sprintf("<%d:%v %q>", t.line, t.typ, t.text)
 }
 
 // tokenType are the different types the lexer
 // is able to parse and return.
 type tokenType byte
 
-//go:generate go run golang.org/x/tools/cmd/stringer@latest -linecomment -type tokenType
-
+//go:generate go run golang.org/x/tools/cmd/stringer -linecomment -type tokenType
 const (
 	eof                tokenType = iota // end of file
 	lineStart                           // beginning of line
@@ -71,6 +72,7 @@ const (
 	closeBrace                          // closing brace
 	equals                              // equals sign
 	arith                               // arithmetic operation
+	comment                             // comment
 )
 
 // lexer is the basic construct for parsing
@@ -84,19 +86,16 @@ type lexer struct {
 
 	lineno            int // current line number in the source file
 	start, pos, width int // positions for lexing and returning value
-
-	debug bool // flag for triggering debug output
 }
 
 // runLexer lexes the program by name with the given source. It returns a
 // channel on which the tokens are delivered.
-func runLexer(source []byte, debug bool) <-chan token {
+func runLexer(source []byte) <-chan token {
 	ch := make(chan token)
 	l := &lexer{
 		input:  string(source),
 		tokens: ch,
 		state:  lexNext,
-		debug:  debug,
 		lineno: 1,
 	}
 	go func() {
@@ -174,11 +173,6 @@ func (l *lexer) acceptRunUntil(until rune) bool {
 // emit creates a new token and sends it to token channel for processing.
 func (l *lexer) emit(t tokenType) {
 	token := token{line: l.lineno, text: l.input[l.start:l.pos], typ: t}
-
-	if l.debug {
-		fmt.Fprintf(os.Stderr, "%04d: (%-20v) %s\n", token.line, token.typ, token.text)
-	}
-
 	l.tokens <- token
 	l.start = l.pos
 }
@@ -277,7 +271,7 @@ func lexNext(l *lexer) stateFn {
 // of the line and discards the text.
 func lexComment(l *lexer) stateFn {
 	l.acceptRunUntil('\n')
-	l.ignore()
+	l.emit(comment)
 	return lexNext
 }
 

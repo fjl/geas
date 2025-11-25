@@ -137,7 +137,7 @@ Label3:
 #define macro3() = 3
 #define macroFunc(a) = $a
 `
-	doc, errs := ast.NewParser("", []byte(source), false).Parse()
+	doc, errs := ast.NewParser("", []byte(source)).Parse()
 	if len(errs) != 0 {
 		panic("parse error: " + errs[0].Error())
 	}
@@ -154,22 +154,22 @@ func evaluatorForTesting() *evaluator {
 	e.registerLabels([]*compilerLabel{
 		{
 			doc:   evalTestDoc,
-			def:   evalTestDoc.Statements[0].(*ast.LabelDefSt),
+			def:   evalTestDoc.Statements[0].(*ast.LabelDef),
 			instr: &instruction{pc: 1},
 		},
 		{
 			doc:   evalTestDoc,
-			def:   evalTestDoc.Statements[1].(*ast.LabelDefSt),
+			def:   evalTestDoc.Statements[1].(*ast.LabelDef),
 			instr: &instruction{pc: 2},
 		},
 		{
 			doc:   evalTestDoc,
-			def:   evalTestDoc.Statements[2].(*ast.LabelDefSt),
+			def:   evalTestDoc.Statements[2].(*ast.LabelDef),
 			instr: &instruction{pc: 3},
 		},
 		{
 			doc:   evalTestDoc,
-			def:   evalTestDoc.Statements[3].(*ast.LabelDefSt),
+			def:   evalTestDoc.Statements[3].(*ast.LabelDef),
 			instr: &instruction{pc: 4},
 		},
 	})
@@ -224,7 +224,7 @@ func TestExprEvalErrors(t *testing.T) {
 }
 
 func parseExprString(str string) (ast.Expr, error) {
-	p := ast.NewParser("string", []byte(str), false)
+	p := ast.NewParser("string", []byte(str))
 	return p.ParseExpression()
 }
 

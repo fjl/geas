@@ -1,0 +1,4 @@
+;;; named bytes
+
+#bytes named: 0x03            ; named bytes 1
+#bytes named_long_long: 0x02  ; named bytes 2

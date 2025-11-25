@@ -16,7 +16,9 @@
 
 package ast
 
-//go:generate go run golang.org/x/tools/cmd/stringer@latest -type ArithOp
+import "fmt"
+
+//go:generate go run golang.org/x/tools/cmd/stringer -type ArithOp
 
 // ArithOp is an arithmetic operation.
 type ArithOp byte
@@ -47,6 +49,53 @@ var arithChars = map[rune]ArithOp{
 	'^': ArithXor,
 }
 
+// Sign returns the sign of the operation.
+func (op ArithOp) Sign() string {
+	switch op {
+	case ArithPlus:
+		return "+"
+	case ArithMinus:
+		return "-"
+	case ArithMul:
+		return "*"
+	case ArithDiv:
+		return "/"
+	case ArithMod:
+		return "%"
+	case ArithLshift:
+		return "<<"
+	case ArithRshift:
+		return ">>"
+	case ArithAnd:
+		return "&"
+	case ArithOr:
+		return "|"
+	case ArithXor:
+		return "^"
+	default:
+		panic(fmt.Errorf("invalid ArithOp %d", op))
+	}
+}
+
+var precedenceTable = [ArithMax + 1]int{
+	ArithMul:    2,
+	ArithDiv:    2,
+	ArithMod:    2,
+	ArithLshift: 2,
+	ArithRshift: 2,
+	ArithAnd:    2,
+	ArithPlus:   1,
+	ArithMinus:  1,
+	ArithOr:     1,
+	ArithXor:    1,
+}
+
+// Precedence returns the precedence level of the operation.
+func (op ArithOp) Precedence() int {
+	return precedenceTable[op]
+}
+
+// tokenArithOp returns the arithmetic operation represented by an operator token.
 func tokenArithOp(tok token) ArithOp {
 	if tok.typ != arith {
 		panic("token is not arith")
@@ -65,17 +114,4 @@ func tokenArithOp(tok token) ArithOp {
 		}
 		return op
 	}
-}
-
-var precedence = [ArithMax + 1]int{
-	ArithMul:    2,
-	ArithDiv:    2,
-	ArithMod:    2,
-	ArithLshift: 2,
-	ArithRshift: 2,
-	ArithAnd:    2,
-	ArithPlus:   1,
-	ArithMinus:  1,
-	ArithOr:     1,
-	ArithXor:    1,
 }

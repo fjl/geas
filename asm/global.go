@@ -25,7 +25,7 @@ import (
 
 // globalScope holds definitions across files.
 type globalScope struct {
-	label      map[string]*ast.LabelDefSt
+	label      map[string]*ast.LabelDef
 	labelInstr map[string]*instruction
 	labelDoc   map[string]*ast.Document
 	instrMacro map[string]globalDef[*ast.InstructionMacroDef]
@@ -39,7 +39,7 @@ type globalDef[M any] struct {
 
 func newGlobalScope() *globalScope {
 	return &globalScope{
-		label:      make(map[string]*ast.LabelDefSt),
+		label:      make(map[string]*ast.LabelDef),
 		labelInstr: make(map[string]*instruction),
 		labelDoc:   make(map[string]*ast.Document),
 		instrMacro: make(map[string]globalDef[*ast.InstructionMacroDef]),
@@ -54,13 +54,13 @@ func (gs *globalScope) registerDefinitions(doc *ast.Document) (errs []error) {
 	}
 	for _, mac := range doc.GlobalExprMacros() {
 		def := globalDef[*ast.ExpressionMacroDef]{mac, doc}
-		if err := gs.registerExprMacro(mac.Name, def); err != nil {
+		if err := gs.registerExprMacro(mac.Ident, def); err != nil {
 			errs = append(errs, err)
 		}
 	}
 	for _, mac := range doc.GlobalInstrMacros() {
 		def := globalDef[*ast.InstructionMacroDef]{mac, doc}
-		if err := gs.registerInstrMacro(mac.Name, def); err != nil {
+		if err := gs.registerInstrMacro(mac.Ident, def); err != nil {
 			errs = append(errs, err)
 		}
 	}
@@ -68,10 +68,10 @@ func (gs *globalScope) registerDefinitions(doc *ast.Document) (errs []error) {
 }
 
 // registerLabel registers a label as known.
-func (gs *globalScope) registerLabel(def *ast.LabelDefSt) {
-	_, found := gs.label[def.Name()]
+func (gs *globalScope) registerLabel(def *ast.LabelDef) {
+	_, found := gs.label[def.Ident]
 	if !found {
-		gs.label[def.Name()] = def
+		gs.label[def.Ident] = def
 	}
 }
 
@@ -106,8 +106,8 @@ func (gs *globalScope) overrideExprMacroValue(name string, val *lzint.Value) {
 	gs.exprMacro[name] = globalDef[*ast.ExpressionMacroDef]{
 		doc: nil,
 		def: &ast.ExpressionMacroDef{
-			Name: name,
-			Body: ast.MakeNumber(val),
+			Ident: name,
+			Body:  ast.MakeNumber(val),
 		},
 	}
 }
@@ -128,8 +128,8 @@ func (gs *globalScope) lookupExprMacro(name string) (*ast.ExpressionMacroDef, *a
 //
 // These documents need to be tracked here in order to report the first macro invocation
 // or #include statement that created a label.
-func (gs *globalScope) setLabelDocument(li *ast.LabelDefSt, doc *ast.Document) error {
-	name := li.Name()
+func (gs *globalScope) setLabelDocument(li *ast.LabelDef, doc *ast.Document) error {
+	name := li.Ident
 	firstDefDoc := gs.labelDoc[name]
 	if firstDefDoc == nil {
 		gs.labelDoc[name] = doc
@@ -149,7 +149,7 @@ func (gs *globalScope) setLabelInstr(name string, instr *instruction) {
 }
 
 // lookupLabel returns the PC value of a label, and also reports whether the label was found at all.
-func (gs *globalScope) lookupLabel(lref *ast.LabelRefExpr) (instr *instruction, def *ast.LabelDefSt) {
+func (gs *globalScope) lookupLabel(lref *ast.LabelRefExpr) (instr *instruction, def *ast.LabelDef) {
 	li, ok := gs.label[lref.Ident]
 	if !ok {
 		return nil, nil

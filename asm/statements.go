@@ -28,29 +28,29 @@ type statement interface {
 
 // Statement types.
 type (
-	opcodeStatement    struct{ *ast.OpcodeSt }
-	labelDefStatement  struct{ *ast.LabelDefSt }
-	macroCallStatement struct{ *ast.MacroCallSt }
-	includeStatement   struct{ *ast.IncludeSt }
-	assembleStatement  struct{ *ast.AssembleSt }
-	bytesStatement     struct{ *ast.BytesSt }
+	opcodeStatement    struct{ *ast.Opcode }
+	labelDefStatement  struct{ *ast.LabelDef }
+	macroCallStatement struct{ *ast.InstructionMacroCall }
+	includeStatement   struct{ *ast.Include }
+	assembleStatement  struct{ *ast.Assemble }
+	bytesStatement     struct{ *ast.Bytes }
 )
 
 // statementFromAST converts AST statements into compiler statements. Note this function
 // returns nil for statement types the compiler doesn't care about.
 func statementFromAST(st ast.Statement) statement {
 	switch st := st.(type) {
-	case *ast.OpcodeSt:
+	case *ast.Opcode:
 		return opcodeStatement{st}
-	case *ast.LabelDefSt:
+	case *ast.LabelDef:
 		return labelDefStatement{st}
-	case *ast.MacroCallSt:
+	case *ast.InstructionMacroCall:
 		return macroCallStatement{st}
-	case *ast.IncludeSt:
+	case *ast.Include:
 		return includeStatement{st}
-	case *ast.AssembleSt:
+	case *ast.Assemble:
 		return assembleStatement{st}
-	case *ast.BytesSt:
+	case *ast.Bytes:
 		return bytesStatement{st}
 	default:
 		return nil

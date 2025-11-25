@@ -42,13 +42,13 @@ func (c *Compiler) expand(doc *ast.Document, prog *compilerProg) {
 // expand creates an instruction for the label. For dotted labels, the instruction is
 // empty (i.e. has size zero). For regular labels, a JUMPDEST is created.
 func (li labelDefStatement) expand(c *Compiler, doc *ast.Document, prog *compilerProg) error {
-	if li.Global {
-		ast := li.LabelDefSt
+	if ast.IsGlobal(li.Ident) {
+		ast := li.LabelDef
 		if err := c.globals.setLabelDocument(ast, doc); err != nil {
 			return err
 		}
 	}
-	prog.addLabel(li.LabelDefSt, doc)
+	prog.addLabel(li.LabelDef, doc)
 	if !li.Dotted {
 		inst := newInstruction(li, "JUMPDEST")
 		prog.addInstruction(inst)
@@ -130,8 +130,8 @@ func (c *Compiler) validateJumpArg(doc *ast.Document, arg ast.Expr) error {
 		return fmt.Errorf("%w %v", ecJumpToDottedLabel, lref)
 	}
 
-	var li *ast.LabelDefSt
-	if lref.Global {
+	var li *ast.LabelDef
+	if ast.IsGlobal(lref.Ident) {
 		li = c.globals.label[lref.Ident]
 	} else {
 		li, _ = doc.LookupLabel(lref)
@@ -222,7 +222,7 @@ func (c *Compiler) exitMacro(m *ast.InstructionMacroDef) {
 // expand of #include appends the included file's instructions to the program.
 // Note this accesses the documents parsed by processIncludes.
 func (inst includeStatement) expand(c *Compiler, doc *ast.Document, prog *compilerProg) error {
-	incdoc := c.includes[inst.IncludeSt]
+	incdoc := c.includes[inst.Include]
 	if incdoc == nil {
 		// The document is not in doc.includes, so there must've been a parse error.
 		// We can just ignore the statement here since the error was already reported.
@@ -242,7 +242,7 @@ func (inst assembleStatement) expand(c *Compiler, doc *ast.Document, prog *compi
 	prog.addInstruction(&instruction{
 		op: "#bytes",
 		ast: bytesStatement{
-			&ast.BytesSt{
+			&ast.Bytes{
 				Value: &ast.MacroCallExpr{
 					Ident:   "assemble",
 					Builtin: true,

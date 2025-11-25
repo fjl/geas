@@ -35,7 +35,6 @@ import (
 // Compiler turns assembly source into bytecode.
 type Compiler struct {
 	fsys           fs.FS
-	lexDebug       bool
 	maxIncDepth    int
 	maxErrors      int
 	defaultFork    string
@@ -43,7 +42,7 @@ type Compiler struct {
 
 	globals    *globalScope
 	macroStack map[*ast.InstructionMacroDef]struct{}
-	includes   map[*ast.IncludeSt]*ast.Document
+	includes   map[*ast.Include]*ast.Document
 	errors     errorList
 }
 
@@ -70,7 +69,7 @@ func New(fsys fs.FS) *Compiler {
 func (c *Compiler) reset() {
 	c.globals = newGlobalScope()
 	c.macroStack = make(map[*ast.InstructionMacroDef]struct{})
-	c.includes = make(map[*ast.IncludeSt]*ast.Document)
+	c.includes = make(map[*ast.Include]*ast.Document)
 	c.errors = errorList{maxErrors: c.maxErrors}
 }
 
@@ -78,11 +77,6 @@ func (c *Compiler) reset() {
 // Note: if set to a nil FS, #include is not allowed.
 func (c *Compiler) SetFilesystem(fsys fs.FS) {
 	c.fsys = fsys
-}
-
-// SetDebugLexer enables/disables printing of the token stream to stdout.
-func (c *Compiler) SetDebugLexer(on bool) {
-	c.lexDebug = on
 }
 
 // SetDefaultFork sets the EVM instruction set used by default.
@@ -187,7 +181,7 @@ func (c *Compiler) warnDeprecatedMacro(expr ast.Expr, name, replacement string) 
 
 func (c *Compiler) compileSource(filename string, input []byte) []byte {
 	c.reset()
-	p := ast.NewParser(filename, input, c.lexDebug)
+	p := ast.NewParser(filename, input)
 	doc, errs := p.Parse()
 	if c.errors.addParseErrors(errs) {
 		return nil // abort compilation due to failed parse
@@ -268,10 +262,10 @@ func (c *Compiler) processIncludes(doc *ast.Document, prog *compilerProg, stack 
 	errs := c.globals.registerDefinitions(doc)
 	c.errors.add(errs...)
 
-	var list []*ast.IncludeSt
+	var list []*ast.Include
 	for _, st := range doc.Statements {
 		switch st := st.(type) {
-		case *ast.IncludeSt:
+		case *ast.Include:
 			file, err := resolveRelative(doc.File, st.Filename)
 			if err != nil {
 				c.errorAt(st, err)
@@ -283,7 +277,7 @@ func (c *Compiler) processIncludes(doc *ast.Document, prog *compilerProg, stack 
 				list = append(list, st)
 			}
 
-		case *ast.PragmaSt:
+		case *ast.Pragma:
 			switch st.Option {
 			case "target":
 				if len(stack) != 0 {
@@ -322,7 +316,7 @@ func resolveRelative(basepath string, filename string) (string, error) {
 	return res, nil
 }
 
-func (c *Compiler) parseIncludeFile(file string, inst *ast.IncludeSt, depth int) *ast.Document {
+func (c *Compiler) parseIncludeFile(file string, inst *ast.Include, depth int) *ast.Document {
 	if c.fsys == nil {
 		c.errorAt(inst, ecIncludeNoFS)
 		return nil
@@ -337,7 +331,7 @@ func (c *Compiler) parseIncludeFile(file string, inst *ast.IncludeSt, depth int)
 		c.errorAt(inst, err)
 		return nil
 	}
-	p := ast.NewParser(file, content, c.lexDebug)
+	p := ast.NewParser(file, content)
 	doc, errors := p.Parse()
 	if c.errors.addParseErrors(errors) {
 		return nil
