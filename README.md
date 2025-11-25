@@ -189,8 +189,8 @@ pure functions that work on values, which are arbitrary precision integers.
 Intermediate results in an expression can be of any size. Calculations cannot overflow.
 Negative number values are also supported. Available arithmetic operations include:
 
-- multiplication (*), division (/), modulo (%), bit-shifts (<<, >>)
-- addition (+), subtraction (-), bitwise AND (&), OR(|), XOR (^)
+- multiplication (*), division (/), modulo (%), bit-shifts (<<, >>), bitwise AND (&)
+- addition (+), subtraction (-), bitwise OR(|), XOR (^)
 
 There is limited support for using strings and arbitrary byte sequences in expressions.
 You can write string literals using double quotes, and use hexadecimal literals with a
@@ -240,11 +240,11 @@ There are several builtin macros for use in expressions.
 
     push abs(-100)          ; [100]
 
-`len()` is for computing the byte length of a value. This returns the minimum number of
-bytes necessary to store the value.
+`len()` is for computing the byte length of a value. This returns the number of bytes
+necessary to store the value.
 
     push len(1)             ; [1]
-    push len(280)           ; [2]
+    push len(0x1f)          ; [2]
     push len("hello")       ; [5]
 
 Note `len()` treats the value as bytes, i.e. leading zero bytes are counted. If this is
