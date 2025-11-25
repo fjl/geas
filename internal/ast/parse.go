@@ -494,8 +494,8 @@ func parsePushSize(name string) (int, bool) {
 	return -1, true
 }
 
-func parseInstructionMacroCall(p *Parser, nameTok token) *InstrMacroCall {
-	st := &InstrMacroCall{
+func parseInstructionMacroCall(p *Parser, nameTok token) *InstructionMacroCall {
+	st := &InstructionMacroCall{
 		stbase: stbase{src: p.doc, line: nameTok.line},
 		Ident:  nameTok.text,
 	}

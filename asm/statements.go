@@ -30,7 +30,7 @@ type statement interface {
 type (
 	opcodeStatement    struct{ *ast.Opcode }
 	labelDefStatement  struct{ *ast.LabelDef }
-	macroCallStatement struct{ *ast.InstrMacroCall }
+	macroCallStatement struct{ *ast.InstructionMacroCall }
 	includeStatement   struct{ *ast.Include }
 	assembleStatement  struct{ *ast.Assemble }
 	bytesStatement     struct{ *ast.Bytes }
@@ -44,7 +44,7 @@ func statementFromAST(st ast.Statement) statement {
 		return opcodeStatement{st}
 	case *ast.LabelDef:
 		return labelDefStatement{st}
-	case *ast.InstrMacroCall:
+	case *ast.InstructionMacroCall:
 		return macroCallStatement{st}
 	case *ast.Include:
 		return includeStatement{st}

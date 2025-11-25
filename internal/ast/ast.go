@@ -189,7 +189,7 @@ type (
 		Dotted bool   // whether definition is dotted
 	}
 
-	InstrMacroCall struct {
+	InstructionMacroCall struct {
 		stbase
 		Ident string
 		Args  []Expr
@@ -244,7 +244,7 @@ type (
 	}
 )
 
-func (st *InstrMacroCall) Description() string {
+func (st *InstructionMacroCall) Description() string {
 	return fmt.Sprintf("invocation of %%%s", st.Ident)
 }
 

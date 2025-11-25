@@ -347,7 +347,7 @@ func (p *Printer) statement(st ast.Statement) {
 		}
 		p.byte('}')
 
-	case *ast.InstrMacroCall:
+	case *ast.InstructionMacroCall:
 		p.string(p.indent)
 		p.byte('%')
 		p.string(st.Ident)
