@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+
+	"github.com/fjl/geas/internal/set"
 )
 
 // Op is an operation that modifies the stack.
@@ -87,11 +89,17 @@ func (s *Stack) Apply(op Op, comment []string) error {
 	// Add output items. If any names from the operation's input list are reused, their
 	// item identifiers will be restored. For all other names, new items are created.
 	outputs := op.StackOut()
+	var newOutputs set.Set[int]
 	for i := len(outputs) - 1; i >= 0; i-- {
 		if item, ok := s.opItems[outputs[i]]; ok {
 			s.push(item)
 		} else {
-			s.push(s.newItem())
+			item := s.newItem()
+			s.push(item)
+			if newOutputs == nil {
+				newOutputs = make(set.Set[int], 1)
+			}
+			newOutputs.Add(item)
 		}
 	}
 
@@ -106,10 +114,14 @@ func (s *Stack) Apply(op Op, comment []string) error {
 		}
 		if item, ok := s.nameToItem[name]; ok && item != stackItem {
 			return ErrMismatch{Items: s.Items(), Slot: i, Want: name}
-		} else {
-			// Rename the item according to the comment.
-			s.setName(stackItem, name)
 		}
+		// The comment is not supposed to rename items that weren't produced by
+		// this operation.
+		if !newOutputs.Includes(stackItem) && s.nameToItem[name] == 0 {
+			return ErrCommentRenamesItem{NewName: name, Item: s.itemToName[stackItem]}
+		}
+		// Rename the item according to the comment.
+		s.setName(stackItem, name)
 	}
 	// By now the comment is known not to have more items than the stack, and all declared
 	// names match the stack. Notably, there is no expectation that comments are complete,

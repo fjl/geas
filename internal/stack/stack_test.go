@@ -116,5 +116,15 @@ func TestStackAnalysis(t *testing.T) {
 			},
 		)
 	})
+	t.Run("stackItemRenamed", func(t *testing.T) {
+		st := newTest(t, "[a, b]")
+		st.applyOK(push1, "[x, a, b]")
+		st.applyErr(add, "[sum, c]",
+			ErrCommentRenamesItem{
+				Item:    "b",
+				NewName: "c",
+			},
+		)
+	})
 
 }
