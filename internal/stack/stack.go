@@ -40,8 +40,9 @@ type Stack struct {
 	nameToItem map[string]int
 	itemToName map[int]string
 
-	// buffer for apply
-	opItems map[string]int
+	// buffers for apply
+	opItems    map[string]int
+	opNewItems set.Set[int]
 }
 
 func New() *Stack {
@@ -49,6 +50,7 @@ func New() *Stack {
 		nameToItem: make(map[string]int),
 		itemToName: make(map[int]string),
 		opItems:    make(map[string]int),
+		opNewItems: make(set.Set[int]),
 	}
 }
 
@@ -89,17 +91,14 @@ func (s *Stack) Apply(op Op, comment []string) error {
 	// Add output items. If any names from the operation's input list are reused, their
 	// item identifiers will be restored. For all other names, new items are created.
 	outputs := op.StackOut()
-	var newOutputs set.Set[int]
+	clear(s.opNewItems)
 	for i := len(outputs) - 1; i >= 0; i-- {
 		if item, ok := s.opItems[outputs[i]]; ok {
 			s.push(item)
 		} else {
 			item := s.newItem()
 			s.push(item)
-			if newOutputs == nil {
-				newOutputs = make(set.Set[int], 1)
-			}
-			newOutputs.Add(item)
+			s.opNewItems.Add(item)
 		}
 	}
 
@@ -117,7 +116,7 @@ func (s *Stack) Apply(op Op, comment []string) error {
 		}
 		// The comment is not supposed to rename items that weren't produced by
 		// this operation.
-		if !newOutputs.Includes(stackItem) && s.nameToItem[name] == 0 {
+		if !s.opNewItems.Includes(stackItem) && s.nameToItem[name] == 0 {
 			return ErrCommentRenamesItem{NewName: name, Item: s.itemToName[stackItem]}
 		}
 		// Rename the item according to the comment.
