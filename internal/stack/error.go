@@ -75,3 +75,14 @@ type ErrMismatch struct {
 func (e ErrMismatch) Error() string {
 	return fmt.Sprintf("stack item %d differs (expected %q, have %q) in %s", e.Slot, e.Want, e.Items[e.Slot], render(e.Items))
 }
+
+// ErrCommentRenamesItem is raised when the stack comment changes the name of an existing
+// item, i.e. one that wasn't produced by the current operation.
+type ErrCommentRenamesItem struct {
+	Item    string
+	NewName string
+}
+
+func (e ErrCommentRenamesItem) Error() string {
+	return fmt.Sprintf("comment introduces new name %s for existing stack item %s", e.NewName, e.Item)
+}
