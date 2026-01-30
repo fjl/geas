@@ -495,7 +495,6 @@ func (op Op) StackOut(imm byte) []string {
 }
 
 // ValidateImmediate reports whether imm is a valid immediate byte for this opcode.
-// Invalid ranges are defined by EIP-8024 for backward compatibility with existing opcodes.
 func (op Op) ValidateImmediate(imm byte) bool {
 	switch op.Name {
 	case "DUPN", "SWAPN":
@@ -579,4 +578,60 @@ func DecodeImmediatePair(x byte) (int, int) {
 		return q + 1, r + 1
 	}
 	return r + 1, 29 - q
+}
+
+// EncodeImmediateArgs encodes the immediate byte for the opcode.
+func (op Op) EncodeImmediateArgs(args []byte) (byte, error) {
+	switch op.Name {
+	case "DUPN", "SWAPN":
+		if len(args) != 1 {
+			return 0, fmt.Errorf("%s requires 1 immediate", op.Name)
+		}
+		return encodeImmediateSingle(int(args[0]))
+	case "EXCHANGE":
+		if len(args) != 2 {
+			return 0, fmt.Errorf("%s requires 2 immediates", op.Name)
+		}
+		return encodeImmediatePair(int(args[0]), int(args[1]))
+	default:
+		return 0, fmt.Errorf("%s does not support immediates", op.Name)
+	}
+}
+
+// encodeImmediateSingle encodes a stack depth (17-235) into DUPN/SWAPN immediate byte.
+func encodeImmediateSingle(depth int) (byte, error) {
+	switch {
+	case depth >= 17 && depth <= 107:
+		return byte(depth - 17), nil
+	case depth >= 108 && depth <= 235:
+		return byte(depth + 20), nil
+	default:
+		return 0, fmt.Errorf("stack depth %d out of range (17-235)", depth)
+	}
+}
+
+// encodeImmediatePair encodes two stack positions into EXCHANGE immediate byte.
+// n and m are 1-indexed positions. This reverses DecodeImmediatePair.
+func encodeImmediatePair(n, m int) (byte, error) {
+	// Reverse the decoding logic to find k, then encode to byte
+	var k int
+	if n < m {
+		q, r := n-1, m-1
+		k = q*16 + r
+	} else {
+		r, q := n-1, 29-m
+		k = q*16 + r
+	}
+	// Convert k back to byte
+	var x byte
+	if k <= 79 {
+		x = byte(k)
+	} else {
+		x = byte(k + 48)
+	}
+	// Validate result
+	if x > 0x4f && x < 0xd0 {
+		return 0, fmt.Errorf("positions (%d, %d) cannot be encoded", n, m)
+	}
+	return x, nil
 }
