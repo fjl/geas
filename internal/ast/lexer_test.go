@@ -17,7 +17,7 @@
 package ast
 
 import (
-	"reflect"
+	"slices"
 	"testing"
 )
 
@@ -90,7 +90,7 @@ func TestLexer(t *testing.T) {
 
 	for _, test := range tests {
 		tokens := lexAll(test.input)
-		if !reflect.DeepEqual(tokens, test.tokens) {
+		if !slices.Equal(tokens, test.tokens) {
 			t.Errorf("input %q\ngot:  %v\nwant: %v", test.input, tokens, test.tokens)
 		}
 	}
