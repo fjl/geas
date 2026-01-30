@@ -81,7 +81,8 @@ func (op opcodeStatement) expand(c *Compiler, doc *ast.Document, prog *compilerP
 		}
 
 	default:
-		if _, err := prog.resolveOp(opcode); err != nil {
+		evmOp, err := prog.resolveOp(opcode)
+		if err != nil {
 			return err
 		}
 		if op.Arg != nil {
@@ -89,6 +90,18 @@ func (op opcodeStatement) expand(c *Compiler, doc *ast.Document, prog *compilerP
 				return ecPushzeroWithArgument
 			}
 			return ecUnexpectedArgument
+		}
+		// Handle immediates.
+		if evmOp.HasImmediate {
+			if len(op.Immediates) == 0 {
+				return ecMissingImmediate
+			}
+			inst.immediate, err = evmOp.EncodeImmediateArgs(op.Immediates)
+			if err != nil {
+				return err
+			}
+		} else if len(op.Immediates) > 0 {
+			return ecUnexpectedImmediate
 		}
 	}
 

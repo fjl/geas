@@ -401,6 +401,9 @@ loop:
 				unreachable.check(c, inst.ast, op)
 			}
 			output = append(output, op.Code)
+			if op.HasImmediate {
+				output = append(output, inst.immediate)
+			}
 			fallthrough
 
 		default:
