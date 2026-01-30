@@ -17,6 +17,7 @@
 package evm
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -36,23 +37,12 @@ type Op struct {
 	// - Jump is set for all jumps
 	// - Unconditional is set for unconditional jumps
 	// - JumpDest is set for JUMPDEST
-	Push, Term, Jump, Unconditional, JumpDest bool
-}
-
-func (op Op) PushSize() int {
-	n, _ := strconv.Atoi(strings.TrimPrefix(op.Name, "PUSH"))
-	return n
-}
-
-func (op Op) StackIn() []string {
-	return op.in
-}
-
-func (op Op) StackOut() []string {
-	return op.out
+	Push, Term, Jump, Unconditional, JumpDest, HasImmediate bool
 }
 
 type stack = []string
+
+var opm = computeOpsMap()
 
 // This is the list of all opcodes.
 var oplist = []*Op{
@@ -384,6 +374,11 @@ var oplist = []*Op{
 	{Name: "DELEGATERESOURCE", Code: 0xde, in: stack{"resourceType", "delegateBalance", "receiverAddress"}, out: stack{"ok"}},
 	{Name: "UNDELEGATERESOURCE", Code: 0xdf, in: stack{"resourceType", "unDelegateBalance", "receiverAddress"}, out: stack{"ok"}},
 
+	// EIP-8024
+	{Name: "DUPN", Code: 0xe6, HasImmediate: true},
+	{Name: "SWAPN", Code: 0xe7, HasImmediate: true},
+	{Name: "EXCHANGE", Code: 0xe8, HasImmediate: true},
+
 	// Call family
 	{
 		Name: "CREATE",
@@ -447,8 +442,6 @@ var oplist = []*Op{
 	},
 }
 
-var opm = computeOpsMap()
-
 func computeOpsMap() map[string]*Op {
 	stacknames := make(set.Set[string], 20)
 	m := make(map[string]*Op, len(oplist))
@@ -468,4 +461,107 @@ func computeOpsMap() map[string]*Op {
 		}
 	}
 	return m
+}
+
+func (op Op) PushSize() int {
+	n, _ := strconv.Atoi(strings.TrimPrefix(op.Name, "PUSH"))
+	return n
+}
+
+func (op Op) StackIn(imm byte) []string {
+	switch op.Name {
+	case "EXCHANGE":
+		return exchangeStackIn(imm)
+	case "SWAPN":
+		return swapnStackIn(imm)
+	case "DUPN":
+		return dupnStackIn(imm)
+	default:
+		return op.in
+	}
+}
+
+func (op Op) StackOut(imm byte) []string {
+	switch op.Name {
+	case "EXCHANGE":
+		return exchangeStackOut(imm)
+	case "SWAPN":
+		return swapnStackOut(imm)
+	case "DUPN":
+		return dupnStackOut(imm)
+	default:
+		return op.out
+	}
+}
+
+var stackwords [255]string
+
+func init() {
+	for i := range stackwords {
+		stackwords[i] = fmt.Sprintf("v%d", i)
+	}
+}
+
+func dupnStackIn(imm uint8) []string {
+	depth := decodeSingle(imm)
+	return stackwords[:depth]
+}
+
+func dupnStackOut(imm uint8) []string {
+	depth := decodeSingle(imm)
+	// DUPN duplicates the nth item to top: [x1...xn] -> [xn, x1...xn]
+	stk := make([]string, depth+1)
+	stk[0] = stackwords[depth-1] // duplicated item at top
+	copy(stk[1:], stackwords[:depth])
+	return stk
+}
+
+func swapnStackIn(imm uint8) []string {
+	depth := decodeSingle(imm)
+	return stackwords[:depth]
+}
+
+func swapnStackOut(imm uint8) []string {
+	depth := decodeSingle(imm)
+	// SWAPN swaps top with nth item
+	stk := make([]string, depth)
+	copy(stk, stackwords[:depth])
+	stk[0], stk[depth-1] = stk[depth-1], stk[0]
+	return stk
+}
+
+func exchangeStackIn(imm uint8) []string {
+	n, m := decodePair(imm)
+	need := max(n, m)
+	return stackwords[:need]
+}
+
+func exchangeStackOut(imm uint8) []string {
+	n, m := decodePair(imm)
+	need := max(n, m)
+	stk := make([]string, need)
+	copy(stk, stackwords[:need])
+	stk[n-1], stk[m-1] = stk[m-1], stk[n-1]
+	return stk
+}
+
+func decodeSingle(x byte) int {
+	if x <= 90 {
+		return int(x) + 17
+	}
+	return int(x) - 20
+}
+
+func decodePair(x byte) (int, int) {
+	var k int
+	if x <= 79 {
+		k = int(x)
+	} else {
+		k = int(x) - 48
+	}
+	q, r := k/16, k%16
+	if q < r {
+		return q + 1, r + 1
+	}
+	return r + 1, 29 - q
 }
