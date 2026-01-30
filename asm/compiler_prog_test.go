@@ -17,7 +17,6 @@
 package asm
 
 import (
-	"reflect"
 	"slices"
 	"testing"
 
@@ -81,7 +80,7 @@ func TestIterInstructions(t *testing.T) {
 		{section[2], instr[6]},
 		{section[2], instr[7]},
 	}
-	if !reflect.DeepEqual(result, expected) {
+	if !slices.Equal(result, expected) {
 		t.Log("result:")
 		for _, item := range result {
 			t.Logf("  s%d (%p): instr%d (%p)", slices.Index(section, item.compilerSection), item.compilerSection, slices.Index(instr, item.instruction), item.instruction)
