@@ -17,8 +17,8 @@
 package lzint
 
 import (
+	"bytes"
 	"math/big"
-	"reflect"
 	"testing"
 )
 
@@ -209,7 +209,7 @@ func TestValue(t *testing.T) {
 			} else {
 				if err != nil {
 					t.Errorf("Bytes returned error: %v", err)
-				} else if !reflect.DeepEqual(b, test.ExpectedBytes) {
+				} else if !bytes.Equal(b, test.ExpectedBytes) {
 					t.Errorf("wrong Bytes: %+v", b)
 				}
 			}
