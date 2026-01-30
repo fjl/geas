@@ -469,8 +469,13 @@ func parseOpcode(p *Parser, tok token) *Opcode {
 		st.PushSize = byte(size + 1)
 	}
 
-	// Parse optional argument.
+	// Parse optional immediates in brackets.
 	argToken := p.next()
+	if argToken.typ == openBracket {
+		st.Immediates = parseImmediates(p)
+		argToken = p.next()
+	}
+	// Parse optional argument.
 	switch argToken.typ {
 	case lineEnd, eof, comment:
 		p.unread(argToken)
@@ -478,6 +483,40 @@ func parseOpcode(p *Parser, tok token) *Opcode {
 		st.Arg = parseExpr(p, argToken)
 	}
 	return st
+}
+
+func parseImmediates(p *Parser) []byte {
+	const limit = 2 // how many immediates allowed
+
+	var args []byte
+	for {
+		tok := p.next()
+		switch tok.typ {
+		case numberLiteral:
+			n, _ := lzint.ParseNumberLiteral(tok.text)
+			if n.IntegerBitLen() > 8 {
+				p.throwError(tok, "immediate value > 8 bits")
+			}
+			args = append(args, byte(n.Int().Uint64()))
+		case lineEnd, eof, comment:
+			p.throwError(tok, "unexpected end of immediates")
+		default:
+			p.throwError(tok, "expected number in immediates list")
+		}
+		tok = p.next()
+		switch tok.typ {
+		case closeBracket:
+			return args
+		case comma:
+			if len(args) >= limit {
+				p.throwError(tok, "too many immediates")
+			}
+		case lineEnd, eof, comment:
+			p.throwError(tok, "unexpected end of immediates")
+		default:
+			p.throwError(tok, "expected ',' or ']'")
+		}
+	}
 }
 
 var sizedPushRE = regexp.MustCompile("(?i)^PUSH([0-9]*)$")

@@ -178,9 +178,10 @@ func (st *stbase) StartsBlock() bool {
 type (
 	Opcode struct {
 		stbase
-		Op       string
-		Arg      Expr // Immediate argument for PUSH* / JUMP*.
-		PushSize byte // For PUSH<n>, this is n+1.
+		Op         string
+		Arg        Expr  // Immediate argument for PUSH* / JUMP*.
+		Immediates []byte // Immediate arguments in brackets, e.g. dupn[x], exchange[x, y].
+		PushSize   byte  // For PUSH<n>, this is n+1.
 	}
 
 	LabelDef struct {

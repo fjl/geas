@@ -70,6 +70,8 @@ const (
 	instMacroIdent                      // macro identifier
 	openBrace                           // open brace
 	closeBrace                          // closing brace
+	openBracket                         // open bracket
+	closeBracket                        // close bracket
 	equals                              // equals sign
 	arith                               // arithmetic operation
 	comment                             // comment
@@ -211,6 +213,14 @@ func lexNext(l *lexer) stateFn {
 
 		case r == '}':
 			l.emit(closeBrace)
+			return lexNext
+
+		case r == '[':
+			l.emit(openBracket)
+			return lexNext
+
+		case r == ']':
+			l.emit(closeBracket)
 			return lexNext
 
 		case r == ',':
