@@ -93,6 +93,9 @@ func (d *Disassembler) Disassemble(bytecode []byte, outW io.Writer) error {
 			if op.Push {
 				size := d.printPush(out, op, bytecode[pc:])
 				pc += size
+			} else if op.HasImmediate {
+				size := d.printImmediate(out, op, bytecode[pc:])
+				pc += size
 			} else {
 				d.printOp(out, op)
 			}
@@ -141,6 +144,30 @@ func (d *Disassembler) printPush(out io.Writer, op *evm.Op, code []byte) (dataSi
 	data := code[1 : size+1]
 	fmt.Fprintf(out, " %#x", data)
 	return len(data)
+}
+
+func (d *Disassembler) printImmediate(out io.Writer, op *evm.Op, code []byte) (dataSize int) {
+	if len(code) < 2 {
+		// Truncated instruction
+		fmt.Fprintf(out, "#bytes %#x", code)
+		return len(code) - 1
+	}
+	imm := code[1]
+	if !op.ValidateImmediate(imm) {
+		fmt.Fprintf(out, "#bytes %#x   ; invalid %s", code[0], op.Name)
+		return 0
+	}
+	d.printOp(out, op)
+	switch op.Name {
+	case "DUPN", "SWAPN":
+		fmt.Fprintf(out, "[%d]", evm.DecodeImmediateSingle(imm))
+	case "EXCHANGE":
+		n, m := evm.DecodeImmediatePair(imm)
+		fmt.Fprintf(out, "[%d, %d]", n, m)
+	default:
+		panic("unknown instruction with immediate")
+	}
+	return 1
 }
 
 func (d *Disassembler) newline(out io.Writer, prevOp *evm.Op, nextOp *evm.Op) {

@@ -25,6 +25,69 @@ import (
 	"github.com/fjl/geas/asm"
 )
 
+func TestImmediateOpcodes(t *testing.T) {
+	// Test EIP-8024 opcodes: DUPN (0xe6), SWAPN (0xe7), EXCHANGE (0xe8)
+	bytecode, _ := hex.DecodeString("e600e780e812e8d0")
+	expectedOutput := strings.TrimSpace(`
+dupn[17]
+swapn[108]
+exchange[2, 3]
+exchange[1, 19]
+`)
+
+	var buf strings.Builder
+	d := New()
+	d.SetShowBlocks(false)
+	d.SetTarget("amsterdam")
+	d.Disassemble(bytecode, &buf)
+	output := strings.TrimSpace(buf.String())
+	if output != expectedOutput {
+		t.Fatalf("wrong output:\ngot:\n%s\n\nwant:\n%s", output, expectedOutput)
+	}
+}
+
+func TestImmediateOpcodeTruncated(t *testing.T) {
+	bytecode, _ := hex.DecodeString("e6")
+	expectedOutput := "#bytes 0xe6"
+
+	var buf strings.Builder
+	d := New()
+	d.SetShowBlocks(false)
+	d.SetTarget("amsterdam")
+	d.Disassemble(bytecode, &buf)
+	output := strings.TrimSpace(buf.String())
+	if output != expectedOutput {
+		t.Fatalf("wrong output:\ngot: %s\nwant: %s", output, expectedOutput)
+	}
+}
+
+// This checks that the disassembler can handle immediate opcodes which are not working.
+func TestImmediateOpcodeInvalid(t *testing.T) {
+	bytecode, _ := hex.DecodeString("e75be6605be7610000e65fe850")
+	expectedOutput := strings.TrimSpace(`
+#bytes 0xe7   ; invalid SWAPN
+jumpdest
+#bytes 0xe6   ; invalid DUPN
+push1 0x5b
+#bytes 0xe7   ; invalid SWAPN
+push2 0x0000
+#bytes 0xe6   ; invalid DUPN
+push0
+#bytes 0xe8   ; invalid EXCHANGE
+pop
+`)
+
+	var buf strings.Builder
+	d := New()
+	d.SetShowBlocks(false)
+	d.SetTarget("amsterdam")
+	d.Disassemble(bytecode, &buf)
+	output := strings.TrimSpace(buf.String())
+	if output != expectedOutput {
+		t.Fatalf("wrong output:\ngot: %s\nwant: %s", output, expectedOutput)
+	}
+}
+
 func TestIncompletePush(t *testing.T) {
 	bytecode, _ := hex.DecodeString("6080604052348015600e575f80fd5b50603e80601a5f395ff3fe60806040525f80fdfea2646970667358221220ba4339602dd535d09d71fae3164f7aa7f6e098ec879fc9e8f36bd912d4877c5264736f6c63430008190033")
 	expectedOutput := strings.TrimSpace(`
