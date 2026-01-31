@@ -38,26 +38,26 @@ func newTest(t *testing.T, initial string) *stackTest {
 	return &stackTest{t, s}
 }
 
-func (t *stackTest) applyOK(op *evm.Op, comment string) {
+func (t *stackTest) applyOK(op *evm.Op, imm byte, comment string) {
 	t.t.Helper()
 	commentSlice, err := ParseComment(comment)
 	if err != nil {
 		panic("invalid stack comment: " + comment)
 	}
 	t.t.Logf("apply %5s on %s", op.Name, t.s.String())
-	if err := t.s.Apply(op, commentSlice); err != nil {
+	if err := t.s.Apply(op, imm, commentSlice); err != nil {
 		t.t.Fatalf("error: %v", err)
 	}
 }
 
-func (t *stackTest) applyErr(op *evm.Op, comment string, wantErr error) {
+func (t *stackTest) applyErr(op *evm.Op, imm byte, comment string, wantErr error) {
 	t.t.Helper()
 	commentSlice, err := ParseComment(comment)
 	if err != nil {
 		panic("invalid stack comment: " + comment)
 	}
 	t.t.Logf("apply %5s on %s", op.Name, t.s.String())
-	err = t.s.Apply(op, commentSlice)
+	err = t.s.Apply(op, imm, commentSlice)
 	if err == nil {
 		t.t.Fatalf("expected error, got none")
 	}
@@ -77,20 +77,20 @@ func TestStackAnalysis(t *testing.T) {
 	)
 	t.Run("ok", func(t *testing.T) {
 		st := newTest(t, "[a, b, c, d]")
-		st.applyOK(dup2, "[b, a, b, c]")
-		st.applyOK(add, "[sum, b, c]")
-		st.applyOK(swap2, "[c, b, sum]")
-		st.applyOK(dup1, "[c, c, b, sum]")
-		st.applyOK(push1, "[val, c, c, b, sum]")
-		st.applyOK(swap2, "[c, c, val, b, sum]")
+		st.applyOK(dup2, 0, "[b, a, b, c]")
+		st.applyOK(add, 0, "[sum, b, c]")
+		st.applyOK(swap2, 0, "[c, b, sum]")
+		st.applyOK(dup1, 0, "[c, c, b, sum]")
+		st.applyOK(push1, 0, "[val, c, c, b, sum]")
+		st.applyOK(swap2, 0, "[c, c, val, b, sum]")
 	})
 	t.Run("initWithDuplicates", func(t *testing.T) {
 		st := newTest(t, "[a, a, a]")
-		st.applyOK(add, "[sum, a]")
+		st.applyOK(add, 0, "[sum, a]")
 	})
 	t.Run("commentMismatch", func(t *testing.T) {
 		st := newTest(t, "[a, b, c, d]")
-		st.applyErr(add, "[sum, d, c]",
+		st.applyErr(add, 0, "[sum, d, c]",
 			ErrMismatch{
 				Items: []string{"sum", "c", "d"},
 				Slot:  1,
@@ -100,7 +100,7 @@ func TestStackAnalysis(t *testing.T) {
 	})
 	t.Run("opUnderflows", func(t *testing.T) {
 		st := newTest(t, "[a]")
-		st.applyErr(add, "[sum]",
+		st.applyErr(add, 0, "[sum]",
 			ErrOpUnderflows{
 				Want: 2,
 				Have: 1,
@@ -109,7 +109,7 @@ func TestStackAnalysis(t *testing.T) {
 	})
 	t.Run("commentUnderflows", func(t *testing.T) {
 		st := newTest(t, "[a, b]")
-		st.applyErr(add, "[sum, b]",
+		st.applyErr(add, 0, "[sum, b]",
 			ErrCommentUnderflows{
 				Items: []string{"sum"},
 				Want:  2,
@@ -118,8 +118,8 @@ func TestStackAnalysis(t *testing.T) {
 	})
 	t.Run("stackItemRenamed", func(t *testing.T) {
 		st := newTest(t, "[a, b]")
-		st.applyOK(push1, "[x, a, b]")
-		st.applyErr(add, "[sum, c]",
+		st.applyOK(push1, 0, "[x, a, b]")
+		st.applyErr(add, 0, "[sum, c]",
 			ErrCommentRenamesItem{
 				Item:    "b",
 				NewName: "c",

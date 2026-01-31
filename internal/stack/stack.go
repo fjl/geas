@@ -26,8 +26,8 @@ import (
 
 // Op is an operation that modifies the stack.
 type Op interface {
-	StackIn() []string  // input items
-	StackOut() []string // output items
+	StackIn(imm byte) []string  // input items
+	StackOut(imm byte) []string // output items
 }
 
 // Stack is a symbolic EVM stack. It tracks the positions
@@ -72,10 +72,10 @@ func (s *Stack) Init(names []string) {
 
 // Apply performs a stack manipulation.
 // The comment is checked for correctness if non-nil.
-func (s *Stack) Apply(op Op, comment []string) error {
+func (s *Stack) Apply(op Op, imm byte, comment []string) error {
 	// Drop consumed items, but remember them by name.
 	clear(s.opItems)
-	inputs := op.StackIn()
+	inputs := op.StackIn(imm)
 	for i, name := range inputs {
 		if _, ok := s.opItems[name]; ok {
 			panic("BUG: op has duplicate input stack item " + name)
@@ -90,7 +90,7 @@ func (s *Stack) Apply(op Op, comment []string) error {
 
 	// Add output items. If any names from the operation's input list are reused, their
 	// item identifiers will be restored. For all other names, new items are created.
-	outputs := op.StackOut()
+	outputs := op.StackOut(imm)
 	clear(s.opNewItems)
 	for i := len(outputs) - 1; i >= 0; i-- {
 		if item, ok := s.opItems[outputs[i]]; ok {
