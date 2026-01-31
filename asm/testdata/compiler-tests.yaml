@@ -847,6 +847,15 @@ instr-macro-variable-shadow:
   output:
     bytecode: "6001 6002"
 
+immediates:
+  input:
+    code: |
+      dupn[17]
+      dupn[18]
+      add
+      exchange[10, 3]
+      swapn[8]
+    
 opcode-unknown-in-fork:
   input:
     code: |
