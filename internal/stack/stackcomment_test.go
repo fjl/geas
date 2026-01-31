@@ -39,6 +39,10 @@ var parseCommentTests = []struct {
 		input:  "[a, b]",
 		output: []string{"a", "b"},
 	},
+	{
+		input:  "[0, b]",
+		output: []string{"0", "b"},
+	},
 	// whitespace removal, nesting
 	{
 		input:  "[a == b, d', (x*y) + 1 - 2, arr[1:2], fn(a, b)]",

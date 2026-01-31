@@ -67,13 +67,15 @@ func (t *stackTest) applyErr(op *evm.Op, imm byte, comment string, wantErr error
 }
 
 func TestStackAnalysis(t *testing.T) {
-	vm := evm.FindInstructionSet("frontier")
+	vm := evm.FindInstructionSet("cancun")
 	var (
+		push0 = vm.PushBySize(0)
 		push1 = vm.PushBySize(1)
 		add   = vm.OpByName("ADD")
 		swap2 = vm.OpByName("SWAP2")
 		dup1  = vm.OpByName("DUP1")
 		dup2  = vm.OpByName("DUP2")
+		pop   = vm.OpByName("POP")
 	)
 	t.Run("ok", func(t *testing.T) {
 		st := newTest(t, "[a, b, c, d]")
@@ -83,6 +85,11 @@ func TestStackAnalysis(t *testing.T) {
 		st.applyOK(dup1, 0, "[c, c, b, sum]")
 		st.applyOK(push1, 0, "[val, c, c, b, sum]")
 		st.applyOK(swap2, 0, "[c, c, val, b, sum]")
+	})
+	t.Run("numberZero", func(t *testing.T) {
+		st := newTest(t, "[a]")
+		st.applyOK(push0, 0, "[0, a]")
+		st.applyOK(pop, 0, "[a]")
 	})
 	t.Run("initWithDuplicates", func(t *testing.T) {
 		st := newTest(t, "[a, a, a]")
