@@ -581,18 +581,18 @@ func DecodeImmediatePair(x byte) (int, int) {
 }
 
 // EncodeImmediateArgs encodes the immediate byte for the opcode.
-func (op Op) EncodeImmediateArgs(args []byte) (byte, error) {
+func (op Op) EncodeImmediateArgs(args []int) (byte, error) {
 	switch op.Name {
 	case "DUPN", "SWAPN":
 		if len(args) != 1 {
 			return 0, fmt.Errorf("%s requires 1 immediate", op.Name)
 		}
-		return encodeImmediateSingle(int(args[0]))
+		return encodeImmediateSingle(args[0])
 	case "EXCHANGE":
 		if len(args) != 2 {
 			return 0, fmt.Errorf("%s requires 2 immediates", op.Name)
 		}
-		return encodeImmediatePair(int(args[0]), int(args[1]))
+		return encodeImmediatePair(args[0], args[1])
 	default:
 		return 0, fmt.Errorf("%s does not support immediates", op.Name)
 	}
@@ -613,25 +613,25 @@ func encodeImmediateSingle(depth int) (byte, error) {
 // encodeImmediatePair encodes two stack positions into EXCHANGE immediate byte.
 // n and m are 1-indexed positions. This reverses DecodeImmediatePair.
 func encodeImmediatePair(n, m int) (byte, error) {
-	// Reverse the decoding logic to find k, then encode to byte
-	var k int
-	if n < m {
-		q, r := n-1, m-1
-		k = q*16 + r
+	if n < 1 || n > 13 {
+		return 0, fmt.Errorf("first position %d out of range (1-13)", n)
+	}
+	if m < n || m > 29 {
+		return 0, fmt.Errorf("second position %d out of range (%d-29)", m, n)
+	}
+	if n+m > 30 {
+		return 0, fmt.Errorf("invalid positions %d, %d (n+m > 30)", n, m)
+	}
+
+	var q, r int
+	if m <= 16 {
+		q, r = n-1, m-1
 	} else {
-		r, q := n-1, 29-m
-		k = q*16 + r
+		q, r = 29-m, n-1
 	}
-	// Convert k back to byte
-	var x byte
-	if k <= 79 {
-		x = byte(k)
-	} else {
-		x = byte(k + 48)
+	k := q*16 + r
+	if k > 79 {
+		k = k + 48
 	}
-	// Validate result
-	if x > 0x4f && x < 0xd0 {
-		return 0, fmt.Errorf("positions (%d, %d) cannot be encoded", n, m)
-	}
-	return x, nil
+	return byte(k), nil
 }
