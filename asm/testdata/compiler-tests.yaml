@@ -855,10 +855,12 @@ immediates:
       add
       exchange[2, 3]
       exchange[1, 19]
+      sub
       swapn[19]
+      swapn[108]
       #pragma target "amsterdam"
   output:
-    bytecode: "e600 e601 01 e812 e8d0 e702"
+    bytecode: "e600 e601 01 e812 e8d0 03 e702 e780"
 
 immediate-swapn-range-errors:
   input:
