@@ -44,6 +44,14 @@ exchange[1, 19]
 	if output != expectedOutput {
 		t.Fatalf("wrong output:\ngot:\n%s\n\nwant:\n%s", output, expectedOutput)
 	}
+
+	// try round trip
+	a := asm.New(nil)
+	a.SetDefaultFork("amsterdam")
+	rtcode := a.CompileString(output)
+	if !bytes.Equal(rtcode, bytecode) {
+		t.Error("disassembly did not round-trip")
+	}
 }
 
 func TestImmediateOpcodeTruncated(t *testing.T) {
