@@ -1,6 +1,6 @@
 package evm
 
-var LatestFork = "cancun"
+var LatestFork = "osaka"
 
 var forkReg = map[string]*InstructionSetDef{
 	"frontier": {
