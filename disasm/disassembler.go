@@ -158,15 +158,15 @@ func (d *Disassembler) printImmediate(out io.Writer, op *evm.Op, code []byte) (d
 		return 0
 	}
 	d.printOp(out, op)
-	switch op.Name {
-	case "DUPN", "SWAPN":
-		fmt.Fprintf(out, "[%d]", evm.DecodeImmediateSingle(imm))
-	case "EXCHANGE":
-		n, m := evm.DecodeImmediatePair(imm)
-		fmt.Fprintf(out, "[%d, %d]", n, m)
-	default:
-		panic("unknown instruction with immediate")
+	args := op.DecodeImmediate(imm)
+	fmt.Fprint(out, "[")
+	for i, arg := range args {
+		if i > 0 {
+			fmt.Fprint(out, ", ")
+		}
+		fmt.Fprintf(out, "%d", arg)
 	}
+	fmt.Fprint(out, "]")
 	return 1
 }
 
