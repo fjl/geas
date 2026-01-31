@@ -485,10 +485,10 @@ func parseOpcode(p *Parser, tok token) *Opcode {
 	return st
 }
 
-func parseImmediates(p *Parser) []byte {
+func parseImmediates(p *Parser) []int {
 	const limit = 2 // how many immediates allowed
 
-	var args []byte
+	var args []int
 	for {
 		tok := p.next()
 		switch tok.typ {
@@ -497,7 +497,7 @@ func parseImmediates(p *Parser) []byte {
 			if n.IntegerBitLen() > 8 {
 				p.throwError(tok, "immediate value > 8 bits")
 			}
-			args = append(args, byte(n.Int().Uint64()))
+			args = append(args, int(n.Int().Int64()))
 		case lineEnd, eof, comment:
 			p.throwError(tok, "unexpected end of immediates")
 		default:
