@@ -490,8 +490,7 @@ func parseImmediates(p *Parser) []int {
 
 	var args []int
 	for {
-		tok := p.next()
-		switch tok.typ {
+		switch tok := p.next(); tok.typ {
 		case numberLiteral:
 			n, _ := lzint.ParseNumberLiteral(tok.text)
 			if n.IntegerBitLen() > 8 {
@@ -503,8 +502,7 @@ func parseImmediates(p *Parser) []int {
 		default:
 			p.throwError(tok, "expected number in immediates list")
 		}
-		tok = p.next()
-		switch tok.typ {
+		switch tok := p.next(); tok.typ {
 		case closeBracket:
 			return args
 		case comma:
