@@ -255,7 +255,7 @@ var forkReg = map[string]*InstructionSetDef{
 
 	"amsterdam": {
 		Names:  []string{"amsterdam"},
-		Parent: "prague",
+		Parent: "osaka",
 		Added: []*Op{
 			opm["DUPN"],
 			opm["SWAPN"],
