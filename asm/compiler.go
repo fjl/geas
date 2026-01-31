@@ -396,19 +396,20 @@ loop:
 				c.errorAt(inst.ast, fmt.Errorf("%w %s", ecUnknownOpcode, inst.op))
 				continue loop
 			}
+			output = append(output, op.Code)
+			if len(inst.data) > 0 && !op.HasImmediate {
+				panic(fmt.Sprintf("BUG: instruction at pc=%d has unexpected data", inst.pc))
+			}
+			output = append(output, inst.data...)
 			// Unreachable code check.
 			if !c.errors.hasError() {
 				unreachable.check(c, inst.ast, op)
 			}
-			output = append(output, op.Code)
-			if op.HasImmediate {
-				output = append(output, inst.immediate)
-			}
-			fallthrough
 
 		default:
+			// Empty op.
 			if len(inst.data) > 0 {
-				panic(fmt.Sprintf("BUG: instruction at pc=%d has unexpected data", inst.pc))
+				panic(fmt.Sprintf("BUG: empty instruction at pc=%d has unexpected data", inst.pc))
 			}
 		}
 	}

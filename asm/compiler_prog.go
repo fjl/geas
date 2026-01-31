@@ -187,9 +187,8 @@ func (p *compilerProg) computePC() {
 // instruction is a step of the compiler output program.
 type instruction struct {
 	// fields assigned during expansion:
-	ast       statement
-	op        string
-	immediate byte // immediate byte for DUPN/SWAPN/EXCHANGE
+	ast statement
+	op  string
 
 	// fields assigned during compilation:
 	pc          int    // pc at this instruction
@@ -241,15 +240,5 @@ func (inst *instruction) encodedSize() int {
 	if !isBytes(inst.op) {
 		size = 1
 	}
-	return size + inst.dataSize + inst.immediateSize()
-}
-
-// immediateSize returns 1 if the instruction has an immediate byte (DUPN/SWAPN/EXCHANGE).
-func (inst *instruction) immediateSize() int {
-	switch inst.op {
-	case "DUPN", "SWAPN", "EXCHANGE":
-		return 1
-	default:
-		return 0
-	}
+	return size + inst.dataSize
 }

@@ -97,10 +97,12 @@ func (op opcodeStatement) expand(c *Compiler, doc *ast.Document, prog *compilerP
 			if len(op.Immediates) == 0 {
 				return ecMissingImmediate
 			}
-			inst.immediate, err = evmOp.EncodeImmediateArgs(op.Immediates)
+			imm, err := evmOp.EncodeImmediateArgs(op.Immediates)
 			if err != nil {
 				return fmt.Errorf("%s %v", evmOp.Name, err)
 			}
+			inst.data = []byte{imm}
+			inst.dataSize = 1
 		} else if len(op.Immediates) > 0 {
 			return ecUnexpectedImmediate
 		}
