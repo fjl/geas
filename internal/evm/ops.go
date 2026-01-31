@@ -515,12 +515,12 @@ func init() {
 }
 
 func dupnStackIn(imm uint8) []string {
-	depth := DecodeImmediateSingle(imm)
+	depth := decodeImmediateSingle(imm)
 	return stackwords[:depth]
 }
 
 func dupnStackOut(imm uint8) []string {
-	depth := DecodeImmediateSingle(imm)
+	depth := decodeImmediateSingle(imm)
 	// DUPN duplicates the nth item to top: [x1...xn] -> [xn, x1...xn]
 	stk := make([]string, depth+1)
 	stk[0] = stackwords[depth-1] // duplicated item at top
@@ -529,12 +529,12 @@ func dupnStackOut(imm uint8) []string {
 }
 
 func swapnStackIn(imm uint8) []string {
-	depth := DecodeImmediateSingle(imm)
+	depth := decodeImmediateSingle(imm)
 	return stackwords[:depth]
 }
 
 func swapnStackOut(imm uint8) []string {
-	depth := DecodeImmediateSingle(imm)
+	depth := decodeImmediateSingle(imm)
 	// SWAPN swaps top with nth item
 	stk := make([]string, depth)
 	copy(stk, stackwords[:depth])
@@ -543,13 +543,13 @@ func swapnStackOut(imm uint8) []string {
 }
 
 func exchangeStackIn(imm uint8) []string {
-	n, m := DecodeImmediatePair(imm)
+	n, m := decodeImmediatePair(imm)
 	need := max(n, m)
 	return stackwords[:need]
 }
 
 func exchangeStackOut(imm uint8) []string {
-	n, m := DecodeImmediatePair(imm)
+	n, m := decodeImmediatePair(imm)
 	need := max(n, m)
 	stk := make([]string, need)
 	copy(stk, stackwords[:need])
@@ -557,16 +557,30 @@ func exchangeStackOut(imm uint8) []string {
 	return stk
 }
 
-// DecodeImmediateSingle decodes the immediate byte for DUPN/SWAPN into a stack depth.
-func DecodeImmediateSingle(x byte) int {
+// DecodeImmediate decodes the immediate byte into argument values.
+// Returns nil for opcodes that don't have immediates.
+func (op Op) DecodeImmediate(imm byte) []int {
+	switch op.Name {
+	case "DUPN", "SWAPN":
+		return []int{decodeImmediateSingle(imm)}
+	case "EXCHANGE":
+		n, m := decodeImmediatePair(imm)
+		return []int{n, m}
+	default:
+		return nil
+	}
+}
+
+// decodeImmediateSingle decodes the immediate byte for DUPN/SWAPN into a stack depth.
+func decodeImmediateSingle(x byte) int {
 	if x <= 90 {
 		return int(x) + 17
 	}
 	return int(x) - 20
 }
 
-// DecodeImmediatePair decodes the immediate byte for EXCHANGE into two stack positions.
-func DecodeImmediatePair(x byte) (int, int) {
+// decodeImmediatePair decodes the immediate byte for EXCHANGE into two stack positions.
+func decodeImmediatePair(x byte) (int, int) {
 	var k int
 	if x <= 79 {
 		k = int(x)
