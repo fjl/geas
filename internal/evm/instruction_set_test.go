@@ -126,3 +126,33 @@ func TestForksWhereOpAdded(t *testing.T) {
 		t.Fatalf("wrong list for BASEFEE: %v", f)
 	}
 }
+
+func TestImmediateEncoding(t *testing.T) {
+	tests := []struct {
+		op   string
+		args []int
+	}{
+		{"DUPN", []int{17}},
+		{"DUPN", []int{107}},
+		{"DUPN", []int{108}},
+		{"DUPN", []int{235}},
+		{"SWAPN", []int{17}},
+		{"SWAPN", []int{200}},
+		{"EXCHANGE", []int{1, 2}},
+		{"EXCHANGE", []int{1, 16}},
+		{"EXCHANGE", []int{5, 20}},
+		{"EXCHANGE", []int{13, 17}},
+	}
+	for _, tt := range tests {
+		op := opm[tt.op]
+		imm, err := op.EncodeImmediateArgs(tt.args)
+		if err != nil {
+			t.Errorf("%s%v: encode error: %v", tt.op, tt.args, err)
+			continue
+		}
+		got := op.DecodeImmediate(imm)
+		if !slices.Equal(got, tt.args) {
+			t.Errorf("%s%v: decode(encode) = %v", tt.op, tt.args, got)
+		}
+	}
+}

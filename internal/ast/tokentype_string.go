@@ -28,14 +28,16 @@ func _() {
 	_ = x[instMacroIdent-17]
 	_ = x[openBrace-18]
 	_ = x[closeBrace-19]
-	_ = x[equals-20]
-	_ = x[arith-21]
-	_ = x[comment-22]
+	_ = x[openBracket-20]
+	_ = x[closeBracket-21]
+	_ = x[equals-22]
+	_ = x[arith-23]
+	_ = x[comment-24]
 }
 
-const _tokenType_name = "end of filebeginning of lineend of lineinvalid characteridentifierdotted identifierparameter referencelabel referencedotted label referencelabel definitiondotted label definitionnumber literalstring literalopen parenthesisclose parenthesiscommadirectivemacro identifieropen braceclosing braceequals signarithmetic operationcomment"
+const _tokenType_name = "end of filebeginning of lineend of lineinvalid characteridentifierdotted identifierparameter referencelabel referencedotted label referencelabel definitiondotted label definitionnumber literalstring literalopen parenthesisclose parenthesiscommadirectivemacro identifieropen braceclosing braceopen bracketclose bracketequals signarithmetic operationcomment"
 
-var _tokenType_index = [...]uint16{0, 11, 28, 39, 56, 66, 83, 102, 117, 139, 155, 178, 192, 206, 222, 239, 244, 253, 269, 279, 292, 303, 323, 330}
+var _tokenType_index = [...]uint16{0, 11, 28, 39, 56, 66, 83, 102, 117, 139, 155, 178, 192, 206, 222, 239, 244, 253, 269, 279, 292, 304, 317, 328, 348, 355}
 
 func (i tokenType) String() string {
 	idx := int(i) - 0

@@ -61,6 +61,8 @@ const (
 	ecPragmaTargetInIncludeFile
 	ecPragmaTargetConflict
 	ecPragmaTargetUnknown
+	ecMissingImmediate
+	ecUnexpectedImmediate
 )
 
 func (e compilerError) Error() string {
@@ -115,6 +117,10 @@ func (e compilerError) Error() string {
 		return "duplicate '#pragma target ...' directive"
 	case ecPragmaTargetUnknown:
 		return "unknown #pragma target"
+	case ecMissingImmediate:
+		return "missing immediate for opcode"
+	case ecUnexpectedImmediate:
+		return "unexpected immediate"
 	default:
 		return fmt.Sprintf("invalid error %d", e)
 	}

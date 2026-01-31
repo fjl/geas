@@ -17,6 +17,7 @@
 package evm
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -36,23 +37,12 @@ type Op struct {
 	// - Jump is set for all jumps
 	// - Unconditional is set for unconditional jumps
 	// - JumpDest is set for JUMPDEST
-	Push, Term, Jump, Unconditional, JumpDest bool
-}
-
-func (op Op) PushSize() int {
-	n, _ := strconv.Atoi(strings.TrimPrefix(op.Name, "PUSH"))
-	return n
-}
-
-func (op Op) StackIn() []string {
-	return op.in
-}
-
-func (op Op) StackOut() []string {
-	return op.out
+	Push, Term, Jump, Unconditional, JumpDest, HasImmediate bool
 }
 
 type stack = []string
+
+var opm = computeOpsMap()
 
 // This is the list of all opcodes.
 var oplist = []*Op{
@@ -384,6 +374,11 @@ var oplist = []*Op{
 	{Name: "DELEGATERESOURCE", Code: 0xde, in: stack{"resourceType", "delegateBalance", "receiverAddress"}, out: stack{"ok"}},
 	{Name: "UNDELEGATERESOURCE", Code: 0xdf, in: stack{"resourceType", "unDelegateBalance", "receiverAddress"}, out: stack{"ok"}},
 
+	// EIP-8024
+	{Name: "DUPN", Code: 0xe6, HasImmediate: true},
+	{Name: "SWAPN", Code: 0xe7, HasImmediate: true},
+	{Name: "EXCHANGE", Code: 0xe8, HasImmediate: true},
+
 	// Call family
 	{
 		Name: "CREATE",
@@ -447,8 +442,6 @@ var oplist = []*Op{
 	},
 }
 
-var opm = computeOpsMap()
-
 func computeOpsMap() map[string]*Op {
 	stacknames := make(set.Set[string], 20)
 	m := make(map[string]*Op, len(oplist))
@@ -468,4 +461,191 @@ func computeOpsMap() map[string]*Op {
 		}
 	}
 	return m
+}
+
+func (op Op) PushSize() int {
+	n, _ := strconv.Atoi(strings.TrimPrefix(op.Name, "PUSH"))
+	return n
+}
+
+func (op Op) StackIn(imm byte) []string {
+	switch op.Name {
+	case "EXCHANGE":
+		return exchangeStackIn(imm)
+	case "SWAPN":
+		return swapnStackIn(imm)
+	case "DUPN":
+		return dupnStackIn(imm)
+	default:
+		return op.in
+	}
+}
+
+func (op Op) StackOut(imm byte) []string {
+	switch op.Name {
+	case "EXCHANGE":
+		return exchangeStackOut(imm)
+	case "SWAPN":
+		return swapnStackOut(imm)
+	case "DUPN":
+		return dupnStackOut(imm)
+	default:
+		return op.out
+	}
+}
+
+// ValidateImmediate reports whether imm is a valid immediate byte for this opcode.
+func (op Op) ValidateImmediate(imm byte) bool {
+	switch op.Name {
+	case "DUPN", "SWAPN":
+		return imm <= 0x5a || imm >= 0x80
+	case "EXCHANGE":
+		return imm <= 0x4f || imm >= 0xd0
+	default:
+		return false
+	}
+}
+
+var stackwords [255]string
+
+func init() {
+	for i := range stackwords {
+		stackwords[i] = fmt.Sprintf("v%d", i)
+	}
+}
+
+func dupnStackIn(imm uint8) []string {
+	depth := decodeImmediateSingle(imm)
+	return stackwords[:depth]
+}
+
+func dupnStackOut(imm uint8) []string {
+	depth := decodeImmediateSingle(imm)
+	// DUPN duplicates the nth item to top: [x1...xn] -> [xn, x1...xn]
+	stk := make([]string, depth+1)
+	stk[0] = stackwords[depth-1] // duplicated item at top
+	copy(stk[1:], stackwords[:depth])
+	return stk
+}
+
+func swapnStackIn(imm uint8) []string {
+	depth := decodeImmediateSingle(imm)
+	return stackwords[:depth]
+}
+
+func swapnStackOut(imm uint8) []string {
+	depth := decodeImmediateSingle(imm)
+	// SWAPN swaps top with nth item
+	stk := make([]string, depth)
+	copy(stk, stackwords[:depth])
+	stk[0], stk[depth-1] = stk[depth-1], stk[0]
+	return stk
+}
+
+func exchangeStackIn(imm uint8) []string {
+	n, m := decodeImmediatePair(imm)
+	need := max(n, m)
+	return stackwords[:need]
+}
+
+func exchangeStackOut(imm uint8) []string {
+	n, m := decodeImmediatePair(imm)
+	need := max(n, m)
+	stk := make([]string, need)
+	copy(stk, stackwords[:need])
+	stk[n-1], stk[m-1] = stk[m-1], stk[n-1]
+	return stk
+}
+
+// DecodeImmediate decodes the immediate byte into argument values.
+// Returns nil for opcodes that don't have immediates.
+func (op Op) DecodeImmediate(imm byte) []int {
+	switch op.Name {
+	case "DUPN", "SWAPN":
+		return []int{decodeImmediateSingle(imm)}
+	case "EXCHANGE":
+		n, m := decodeImmediatePair(imm)
+		return []int{n, m}
+	default:
+		return nil
+	}
+}
+
+// decodeImmediateSingle decodes the immediate byte for DUPN/SWAPN into a stack depth.
+func decodeImmediateSingle(x byte) int {
+	if x <= 90 {
+		return int(x) + 17
+	}
+	return int(x) - 20
+}
+
+// decodeImmediatePair decodes the immediate byte for EXCHANGE into two stack positions.
+func decodeImmediatePair(x byte) (int, int) {
+	var k int
+	if x <= 79 {
+		k = int(x)
+	} else {
+		k = int(x) - 48
+	}
+	q, r := k/16, k%16
+	if q < r {
+		return q + 1, r + 1
+	}
+	return r + 1, 29 - q
+}
+
+// EncodeImmediateArgs encodes the immediate byte for the opcode.
+func (op Op) EncodeImmediateArgs(args []int) (byte, error) {
+	switch op.Name {
+	case "DUPN", "SWAPN":
+		if len(args) != 1 {
+			return 0, fmt.Errorf("%s requires 1 immediate", op.Name)
+		}
+		return encodeImmediateSingle(args[0])
+	case "EXCHANGE":
+		if len(args) != 2 {
+			return 0, fmt.Errorf("%s requires 2 immediates", op.Name)
+		}
+		return encodeImmediatePair(args[0], args[1])
+	default:
+		return 0, fmt.Errorf("%s does not support immediates", op.Name)
+	}
+}
+
+// encodeImmediateSingle encodes a stack depth (17-235) into DUPN/SWAPN immediate byte.
+func encodeImmediateSingle(depth int) (byte, error) {
+	switch {
+	case depth >= 17 && depth <= 107:
+		return byte(depth - 17), nil
+	case depth >= 108 && depth <= 235:
+		return byte(depth + 20), nil
+	default:
+		return 0, fmt.Errorf("stack depth %d out of range (17-235)", depth)
+	}
+}
+
+// encodeImmediatePair encodes two stack positions into EXCHANGE immediate byte.
+// n and m are 1-indexed positions. This reverses DecodeImmediatePair.
+func encodeImmediatePair(n, m int) (byte, error) {
+	if n < 1 || n > 13 {
+		return 0, fmt.Errorf("first position %d out of range (1-13)", n)
+	}
+	if m < n || m > 29 {
+		return 0, fmt.Errorf("second position %d out of range (%d-29)", m, n)
+	}
+	if n+m > 30 {
+		return 0, fmt.Errorf("invalid positions %d, %d (n+m > 30)", n, m)
+	}
+
+	var q, r int
+	if m <= 16 {
+		q, r = n-1, m-1
+	} else {
+		q, r = 29-m, n-1
+	}
+	k := q*16 + r
+	if k > 79 {
+		k = k + 48
+	}
+	return byte(k), nil
 }

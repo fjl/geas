@@ -253,6 +253,16 @@ var forkReg = map[string]*InstructionSetDef{
 		},
 	},
 
+	"amsterdam": {
+		Names:  []string{"amsterdam"},
+		Parent: "osaka",
+		Added: []*Op{
+			opm["DUPN"],
+			opm["SWAPN"],
+			opm["EXCHANGE"],
+		},
+	},
+
 	"tron": {
 		Names:  []string{"tron"},
 		Parent: "shanghai",

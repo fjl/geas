@@ -847,6 +847,56 @@ instr-macro-variable-shadow:
   output:
     bytecode: "6001 6002"
 
+immediates:
+  input:
+    code: |
+      dupn[17]
+      dupn[18]
+      add
+      exchange[2, 3]
+      exchange[1, 19]
+      sub
+      swapn[19]
+      swapn[108]
+      #pragma target "amsterdam"
+  output:
+    bytecode: "e600 e601 01 e812 e8d0 03 e702 e780"
+
+immediate-swapn-range-errors:
+  input:
+    code: |
+      swapn[2]
+      swapn[245]
+      #pragma target "amsterdam"
+  output:
+    errors:
+      - ':1: SWAPN stack depth 2 out of range (17-235)'
+      - ':2: SWAPN stack depth 245 out of range (17-235)'
+
+immediate-dupn-range-errors:
+  input:
+    code: |
+      dupn[2]
+      dupn[245]
+      #pragma target "amsterdam"
+  output:
+    errors:
+      - ':1: DUPN stack depth 2 out of range (17-235)'
+      - ':2: DUPN stack depth 245 out of range (17-235)'
+
+immediate-exchange-range-errors:
+  input:
+    code: |
+      exchange[14, 15]
+      exchange[1, 30]
+      exchange[13, 29]
+      #pragma target "amsterdam"
+  output:
+    errors:
+      - ':1: EXCHANGE first position 14 out of range (1-13)'
+      - ':2: EXCHANGE second position 30 out of range (1-29)'
+      - ':3: EXCHANGE invalid positions 13, 29 (n+m > 30)'
+
 opcode-unknown-in-fork:
   input:
     code: |

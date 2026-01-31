@@ -81,14 +81,30 @@ func (op opcodeStatement) expand(c *Compiler, doc *ast.Document, prog *compilerP
 		}
 
 	default:
-		if _, err := prog.resolveOp(opcode); err != nil {
+		evmOp, err := prog.resolveOp(opcode)
+		if err != nil {
 			return err
 		}
+		// Arg is not expected.
 		if op.Arg != nil {
 			if opcode == "PUSH0" {
 				return ecPushzeroWithArgument
 			}
 			return ecUnexpectedArgument
+		}
+		// Handle immediates.
+		if evmOp.HasImmediate {
+			if len(op.Immediates) == 0 {
+				return ecMissingImmediate
+			}
+			imm, err := evmOp.EncodeImmediateArgs(op.Immediates)
+			if err != nil {
+				return fmt.Errorf("%s %v", evmOp.Name, err)
+			}
+			inst.data = []byte{imm}
+			inst.dataSize = 1
+		} else if len(op.Immediates) > 0 {
+			return ecUnexpectedImmediate
 		}
 	}
 
