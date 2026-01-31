@@ -85,6 +85,7 @@ func (op opcodeStatement) expand(c *Compiler, doc *ast.Document, prog *compilerP
 		if err != nil {
 			return err
 		}
+		// Arg is not expected.
 		if op.Arg != nil {
 			if opcode == "PUSH0" {
 				return ecPushzeroWithArgument
@@ -98,7 +99,7 @@ func (op opcodeStatement) expand(c *Compiler, doc *ast.Document, prog *compilerP
 			}
 			inst.immediate, err = evmOp.EncodeImmediateArgs(op.Immediates)
 			if err != nil {
-				return err
+				return fmt.Errorf("%s %v", evmOp.Name, err)
 			}
 		} else if len(op.Immediates) > 0 {
 			return ecUnexpectedImmediate
