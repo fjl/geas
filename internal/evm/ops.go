@@ -82,6 +82,7 @@ var oplist = []*Op{
 	{Name: "SHL", Code: 0x1b, in: stack{"shift", "x"}, out: stack{"z"}},
 	{Name: "SHR", Code: 0x1c, in: stack{"shift", "x"}, out: stack{"z"}},
 	{Name: "SAR", Code: 0x1d, in: stack{"shift", "x"}, out: stack{"z"}},
+	{Name: "CLZ", Code: 0x1e, in: stack{"x"}, out: stack{"z"}},
 
 	{Name: "KECCAK256", Code: 0x20, in: stack{"x"}, out: stack{"hash"}},
 	{Name: "ADDRESS", Code: 0x30, out: stack{"address"}},
