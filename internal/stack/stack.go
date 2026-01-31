@@ -112,7 +112,14 @@ func (s *Stack) Apply(op Op, imm byte, comment []string) error {
 			return ErrCommentUnderflows{Items: s.Items(), Want: len(comment)}
 		}
 		if item, ok := s.nameToItem[name]; ok && item != stackItem {
-			return ErrMismatch{Items: s.Items(), Slot: i, Want: name}
+			// Name is taken by a different item. Allow this if:
+			// - The current item is NEW (new items can reuse names for duplicate values
+			//   like multiple "push 0" with comment "[0, 0]"), OR
+			// - The current item already has this name (multiple items sharing a name), OR
+			// - The conflicting item is no longer on the stack (stale mapping)
+			if !s.opNewItems.Includes(stackItem) && s.itemToName[stackItem] != name && slices.Contains(s.stack, item) {
+				return ErrMismatch{Items: s.Items(), Slot: i, Want: name}
+			}
 		}
 		// The comment is not supposed to rename items that weren't produced by
 		// this operation.

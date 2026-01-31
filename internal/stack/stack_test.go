@@ -134,4 +134,57 @@ func TestStackAnalysis(t *testing.T) {
 		)
 	})
 
+	// Test that multiple new items can share the same name.
+	// This is common when pushing the same value multiple times,
+	// e.g., "push 0; push 0" with comment [0, 0].
+	t.Run("duplicateValueNames", func(t *testing.T) {
+		st := newTest(t, "[]")
+		st.applyOK(push0, 0, "[0]")
+		st.applyOK(push0, 0, "[0, 0]")
+		st.applyOK(push0, 0, "[0, 0, 0]")
+		// Verify the items are tracked correctly by consuming some
+		st.applyOK(add, 0, "[sum, 0]")
+		st.applyOK(add, 0, "[sum]")
+	})
+
+	// Test that a name can be reused after the original item is consumed.
+	// This is common when a value is pushed, used, and
+	// then the same name pushed again later.
+	t.Run("nameReuseAfterConsumption", func(t *testing.T) {
+		st := newTest(t, "[a]")
+		st.applyOK(push1, 0, "[x, a]")
+		st.applyOK(add, 0, "[sum]")
+		// Now "x" and "a" are consumed, we should be able to reuse those names
+		st.applyOK(push1, 0, "[x]")
+		st.applyOK(push1, 0, "[a, x]")
+		st.applyOK(add, 0, "[result]")
+	})
+
+	// Test combination: reuse name while another item with that name
+	// is still on the stack (but not at the position being checked).
+	t.Run("nameReuseWithExistingOnStack", func(t *testing.T) {
+		st := newTest(t, "[a]")
+		st.applyOK(push1, 0, "[b, a]")
+		// Push another item and name it "a" - this should work because
+		// the new item can share the name with the existing "a"
+		st.applyOK(push1, 0, "[a, b, a]")
+	})
+
+	// Test that existing items cannot claim names belonging to other
+	// items still on the stack. SWAP reorders without creating new items,
+	// so claiming a swapped position has the wrong name should fail.
+	t.Run("existingItemCannotStealName", func(t *testing.T) {
+		swap1 := vm.OpByName("SWAP1")
+		st := newTest(t, "[a, b]")
+		// After SWAP1, the stack is [b, a], not [a, b].
+		// Claiming it's still [a, b] should error at position 0.
+		st.applyErr(swap1, 0, "[a, b]",
+			ErrMismatch{
+				Items: []string{"b", "a"},
+				Slot:  0,
+				Want:  "a",
+			},
+		)
+	})
+
 }
