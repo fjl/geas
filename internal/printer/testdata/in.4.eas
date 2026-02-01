@@ -1,0 +1,6 @@
+;;; This is about printing immediates.
+
+    swapn[18]
+    swapn [18]
+    exchange[10, 20]
+    dupn[1] arg

@@ -21,6 +21,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"strconv"
 
 	"github.com/fjl/geas/internal/ast"
 )
@@ -294,6 +295,7 @@ func (p *Printer) statement(st ast.Statement) {
 		// TODO: add option to set lowercase/uppercase
 		p.string(p.indent)
 		p.string(st.Op)
+		p.immediatesList(st.Immediates)
 		if st.Arg != nil {
 			p.byte(' ')
 			p.expr(st.Arg, nil)
@@ -436,4 +438,18 @@ func (p *Printer) argumentList(args []ast.Expr) {
 		p.expr(arg, nil)
 	}
 	p.byte(')')
+}
+
+func (p *Printer) immediatesList(args []int) {
+	if len(args) == 0 {
+		return
+	}
+	p.byte('[')
+	for i, arg := range args {
+		if i > 0 {
+			p.string(", ")
+		}
+		p.string(strconv.Itoa(arg))
+	}
+	p.byte(']')
 }
