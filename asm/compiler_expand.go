@@ -18,12 +18,10 @@ package asm
 
 import (
 	"fmt"
-	"math"
 	"strings"
 
 	"github.com/fjl/geas/internal/ast"
 	"github.com/fjl/geas/internal/evm"
-	"github.com/fjl/geas/internal/lzint"
 )
 
 // expand appends a list of AST instructions to the program.
@@ -35,7 +33,7 @@ func (c *Compiler) expand(doc *ast.Document, prog *compilerProg) {
 		}
 		err := st.expand(c, doc, prog)
 		if err != nil {
-			c.errorAt(astSt, err)
+			c.errors.AddAt(astSt, err)
 			continue
 		}
 	}
@@ -44,13 +42,13 @@ func (c *Compiler) expand(doc *ast.Document, prog *compilerProg) {
 // expand creates an instruction for the label. For dotted labels, the instruction is
 // empty (i.e. has size zero). For regular labels, a JUMPDEST is created.
 func (li labelDefStatement) expand(c *Compiler, doc *ast.Document, prog *compilerProg) error {
-	if li.Global {
-		ast := li.LabelDefSt
+	if ast.IsGlobal(li.Ident) {
+		ast := li.LabelDef
 		if err := c.globals.setLabelDocument(ast, doc); err != nil {
 			return err
 		}
 	}
-	prog.addLabel(li.LabelDefSt, doc)
+	prog.addLabel(li.LabelDef, doc)
 	if !li.Dotted {
 		inst := newInstruction(li, "JUMPDEST")
 		prog.addInstruction(inst)
@@ -132,8 +130,8 @@ func (c *Compiler) validateJumpArg(doc *ast.Document, arg ast.Expr) error {
 		return fmt.Errorf("%w %v", ecJumpToDottedLabel, lref)
 	}
 
-	var li *ast.LabelDefSt
-	if lref.Global {
+	var li *ast.LabelDef
+	if ast.IsGlobal(lref.Ident) {
 		li = c.globals.label[lref.Ident]
 	} else {
 		li, _ = doc.LookupLabel(lref)
@@ -224,7 +222,7 @@ func (c *Compiler) exitMacro(m *ast.InstructionMacroDef) {
 // expand of #include appends the included file's instructions to the program.
 // Note this accesses the documents parsed by processIncludes.
 func (inst includeStatement) expand(c *Compiler, doc *ast.Document, prog *compilerProg) error {
-	incdoc := c.includes[inst.IncludeSt]
+	incdoc := c.includes[inst.Include]
 	if incdoc == nil {
 		// The document is not in doc.includes, so there must've been a parse error.
 		// We can just ignore the statement here since the error was already reported.
@@ -238,28 +236,18 @@ func (inst includeStatement) expand(c *Compiler, doc *ast.Document, prog *compil
 
 // expand of #assemble performs compilation of the given assembly file.
 func (inst assembleStatement) expand(c *Compiler, doc *ast.Document, prog *compilerProg) error {
-	subc := New(c.fsys)
-	subc.SetIncludeDepthLimit(c.maxIncDepth)
-	subc.SetMaxErrors(math.MaxInt)
-	subc.SetDefaultFork(prog.evm.Name())
-	subc.macroOverrides = c.macroOverrides
+	c.warnf(inst, "#assemble is deprecated, use #bytes assemble(...) instead")
 
-	file, err := resolveRelative(doc.File, inst.Filename)
-	if err != nil {
-		return err
-	}
-	bytecode := subc.CompileFile(file)
-	c.errors.add(subc.ErrorsAndWarnings()...)
-	if !subc.Failed() && len(bytecode) == 0 {
-		c.warnf(inst, "empty bytecode output")
-		return nil
-	}
-	// Here we turn #assemble into a #bytes statement with a literal argument.
+	// Turn "#assemble x" into "#bytes assemble(x)".
 	prog.addInstruction(&instruction{
 		op: "#bytes",
 		ast: bytesStatement{
-			&ast.BytesSt{
-				Value: ast.MakeNumber(lzint.FromBytes(bytecode)),
+			&ast.Bytes{
+				Value: &ast.MacroCallExpr{
+					Ident:   "assemble",
+					Builtin: true,
+					Args:    []ast.Expr{ast.MakeString(inst.Filename)},
+				},
 			},
 		},
 	})
@@ -268,6 +256,12 @@ func (inst assembleStatement) expand(c *Compiler, doc *ast.Document, prog *compi
 
 // expand of #bytes just adds a data instruction to the program.
 func (inst bytesStatement) expand(c *Compiler, doc *ast.Document, prog *compilerProg) error {
+	if inst.Label != nil {
+		err := labelDefStatement{inst.Label}.expand(c, doc, prog)
+		if err != nil {
+			return err
+		}
+	}
 	prog.addInstruction(newInstruction(inst, "#bytes"))
 	return nil
 }
