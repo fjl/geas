@@ -17,11 +17,11 @@
 package asm
 
 import (
-	"fmt"
 	"math/big"
 	"testing"
 
 	"github.com/fjl/geas/internal/ast"
+	"github.com/fjl/geas/internal/loader"
 )
 
 type evalTest struct {
@@ -146,12 +146,8 @@ Label3:
 }
 
 func evaluatorForTesting() *evaluator {
-	gs := newGlobalScope()
-	errs := gs.registerDefinitions(evalTestDoc)
-	if len(errs) > 0 {
-		panic(fmt.Errorf("error in registerDefinitions: %v", errs[0]))
-	}
-	e := newEvaluator(gs, new(Compiler))
+	c := New(nil)
+	e := newEvaluator(c, c.macroOverrides)
 	e.registerLabels([]*compilerLabel{
 		{
 			doc:   evalTestDoc,
@@ -178,7 +174,9 @@ func evaluatorForTesting() *evaluator {
 }
 
 func evalEnvironmentForTesting() *evalEnvironment {
-	return newEvalEnvironment(new(compilerProg), &compilerSection{doc: evalTestDoc})
+	lprog := loader.NewProgram(evalTestDoc)
+	prog := newCompilerProg(lprog)
+	return newEvalEnvironment(prog, &compilerSection{doc: evalTestDoc})
 }
 
 func TestExprEval(t *testing.T) {

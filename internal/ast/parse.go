@@ -43,11 +43,8 @@ func NewParser(file string, content []byte) *Parser {
 
 func newDocument(file string, parent *Document) *Document {
 	return &Document{
-		File:        file,
-		labels:      make(map[string]*LabelDef),
-		exprMacros:  make(map[string]*ExpressionMacroDef),
-		instrMacros: make(map[string]*InstructionMacroDef),
-		Parent:      parent,
+		File:   file,
+		Parent: parent,
 	}
 }
 
@@ -214,18 +211,11 @@ func parseStatement(p *Parser) (done bool) {
 }
 
 func parseLabelDef(p *Parser, tok token) *LabelDef {
-	name := tok.text
-	li := &LabelDef{
+	return &LabelDef{
 		stbase: stbase{src: p.doc, line: tok.line},
-		Ident:  name,
+		Ident:  tok.text,
 		Dotted: tok.typ == dottedLabel,
 	}
-	if firstDef, ok := p.doc.labels[name]; ok {
-		p.throwError(tok, "%w", ErrLabelAlreadyDef(firstDef, li))
-		return li
-	}
-	p.doc.labels[name] = li
-	return li
 }
 
 func parseDirective(p *Parser, tok token) Statement {
@@ -306,10 +296,6 @@ loop:
 		})
 	}
 	def.Body = parseExpr(p, bodyTok)
-
-	// Register the macro.
-	checkDuplicateMacro(p, name)
-	p.doc.exprMacros[name.text] = def
 	return def
 }
 
@@ -360,8 +346,6 @@ commentLoop:
 	for !parseStatement(p) {
 	}
 
-	// Register definition.
-	checkDuplicateMacro(p, nameTok)
 	def := &InstructionMacroDef{
 		stbase:       stbase{src: p.doc, line: nameTok.line},
 		Ident:        nameTok.text,
@@ -370,18 +354,7 @@ commentLoop:
 		StartComment: startComment,
 	}
 	doc.Creation = def
-	topdoc.instrMacros[nameTok.text] = def
 	return def
-}
-
-func checkDuplicateMacro(p *Parser, nameTok token) {
-	name := nameTok.text
-	if _, ok := p.doc.instrMacros[name]; ok {
-		p.throwError(nameTok, "instruction macro %s already defined", name)
-	}
-	if _, ok := p.doc.exprMacros[name]; ok {
-		p.throwError(nameTok, "expression macro %s already defined", name)
-	}
 }
 
 func parseInclude(p *Parser, d token) *Include {
@@ -445,15 +418,6 @@ func parseBytes(p *Parser, d token) *Bytes {
 
 		default:
 			st.Value = parseExpr(p, tok)
-
-			// For named bytes, register them as both a macro and label.
-			if st.Label != nil {
-				p.doc.labels[st.Label.Ident] = st.Label
-				p.doc.exprMacros[st.Label.Ident] = &ExpressionMacroDef{
-					Ident: st.Label.Ident,
-					Body:  st.Value,
-				}
-			}
 			return st
 		}
 	}

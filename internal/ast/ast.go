@@ -18,8 +18,6 @@ package ast
 
 import (
 	"fmt"
-	"maps"
-	"slices"
 	"strings"
 )
 
@@ -35,86 +33,12 @@ type Document struct {
 	// The statement that created this document.
 	// This is filled in for instruction macros, #include/#assemble, etc.
 	Creation Statement
-
-	labels      map[string]*LabelDef
-	exprMacros  map[string]*ExpressionMacroDef
-	instrMacros map[string]*InstructionMacroDef
 }
 
-// LookupLabel finds the definition of a label.
-func (doc *Document) LookupLabel(lref *LabelRefExpr) (*LabelDef, *Document) {
-	for doc != nil {
-		li, ok := doc.labels[lref.Ident]
-		if ok {
-			return li, doc
-		}
-		doc = doc.Parent
-	}
-	return nil, nil
-}
-
-// LookupInstrMacro finds the definition of an instruction macro.
-func (doc *Document) LookupInstrMacro(name string) (*InstructionMacroDef, *Document) {
-	for doc != nil {
-		if def, ok := doc.instrMacros[name]; ok {
-			return def, doc
-		}
-		doc = doc.Parent
-	}
-	return nil, nil
-}
-
-// LookupExprMacro finds the definition of an expression macro.
-func (doc *Document) LookupExprMacro(name string) (*ExpressionMacroDef, *Document) {
-	for doc != nil {
-		if def, ok := doc.exprMacros[name]; ok {
-			return def, doc
-		}
-		doc = doc.Parent
-	}
-	return nil, nil
-}
-
-// GlobalLabels returns the list of global label definitions in the docment.
-func (doc *Document) GlobalLabels() []*LabelDef {
-	result := make([]*LabelDef, 0)
-	for _, name := range slices.Sorted(maps.Keys(doc.labels)) {
-		if IsGlobal(name) {
-			result = append(result, doc.labels[name])
-		}
-	}
-	return result
-}
-
-// GlobalExprMacros returns the list of global expression macro definitions in the docment.
-func (doc *Document) GlobalExprMacros() []*ExpressionMacroDef {
-	result := make([]*ExpressionMacroDef, 0)
-	for _, name := range slices.Sorted(maps.Keys(doc.exprMacros)) {
-		if IsGlobal(name) {
-			result = append(result, doc.exprMacros[name])
-		}
-	}
-	return result
-}
-
-// GlobalInstrMacros returns the list of global instruction macro definitions in the docment.
-func (doc *Document) GlobalInstrMacros() []*InstructionMacroDef {
-	result := make([]*InstructionMacroDef, 0)
-	for _, name := range slices.Sorted(maps.Keys(doc.instrMacros)) {
-		if IsGlobal(name) {
-			result = append(result, doc.instrMacros[name])
-		}
-	}
-	return result
-}
-
-// InstrMacros returns the list of all instruction macro definitions in the docment.
-func (doc *Document) InstrMacros() []*InstructionMacroDef {
-	result := make([]*InstructionMacroDef, 0)
-	for _, name := range slices.Sorted(maps.Keys(doc.instrMacros)) {
-		result = append(result, doc.instrMacros[name])
-	}
-	return result
+// IsMacro reports whether the document is the body of an instruction macro.
+func (doc *Document) IsMacro() bool {
+	_, ok := doc.Creation.(*InstructionMacroDef)
+	return ok
 }
 
 // CreationString explains how the document got into the program.

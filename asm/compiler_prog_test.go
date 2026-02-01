@@ -21,13 +21,14 @@ import (
 	"testing"
 
 	"github.com/fjl/geas/internal/ast"
+	"github.com/fjl/geas/internal/loader"
 )
 
 func TestIterInstructions(t *testing.T) {
 	var (
 		doc     = make([]ast.Document, 4)
 		instr   = make([]*instruction, 8)
-		prog    = newCompilerProg(&doc[0])
+		prog    = newCompilerProg(&loader.Program{Toplevel: &doc[0]})
 		section = make([]*compilerSection, 4)
 	)
 	for i := range instr {

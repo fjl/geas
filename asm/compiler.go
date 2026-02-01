@@ -23,27 +23,26 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"math/big"
-	"path"
-	"strings"
+	"slices"
 
 	"github.com/fjl/geas/internal/ast"
 	"github.com/fjl/geas/internal/evm"
+	"github.com/fjl/geas/internal/loader"
 	"github.com/fjl/geas/internal/lzint"
 )
 
+// fake document used for macro overrides set via SetGlobal.
+var globalOverrideDoc = &ast.Document{File: "<override>"}
+
 // Compiler turns assembly source into bytecode.
 type Compiler struct {
-	fsys           fs.FS
-	maxIncDepth    int
-	maxErrors      int
-	defaultFork    string
-	macroOverrides map[string]*lzint.Value
+	macroOverrides map[string]*ast.ExpressionMacroDef
 
-	globals    *globalScope
 	macroStack map[*ast.InstructionMacroDef]struct{}
-	includes   map[*ast.Include]*ast.Document
-	errors     errorList
+	loader     *loader.Loader
+	errors     *loader.ErrorList
 }
 
 // NewCompiler creates a compiler.
@@ -56,45 +55,39 @@ func NewCompiler(fsys fs.FS) *Compiler {
 // The file system is used to resolve import file names. If a nil FS is given,
 // #import cannot be used.
 func New(fsys fs.FS) *Compiler {
+	l := loader.New(fsys)
 	return &Compiler{
-		fsys:           fsys,
-		maxIncDepth:    128,
-		maxErrors:      10,
-		defaultFork:    evm.LatestFork,
-		macroOverrides: make(map[string]*lzint.Value),
+		loader:         l,
+		errors:         l.Errors(),
+		macroOverrides: make(map[string]*ast.ExpressionMacroDef),
 	}
 }
 
 // reset prepares the compiler for the next run.
 func (c *Compiler) reset() {
-	c.globals = newGlobalScope()
 	c.macroStack = make(map[*ast.InstructionMacroDef]struct{})
-	c.includes = make(map[*ast.Include]*ast.Document)
-	c.errors = errorList{maxErrors: c.maxErrors}
+	c.errors.Clear()
 }
 
 // SetFilesystem sets the file system used for resolving #include files.
 // Note: if set to a nil FS, #include is not allowed.
 func (c *Compiler) SetFilesystem(fsys fs.FS) {
-	c.fsys = fsys
+	c.loader.SetFilesystem(fsys)
 }
 
 // SetDefaultFork sets the EVM instruction set used by default.
 func (c *Compiler) SetDefaultFork(f string) {
-	c.defaultFork = f
+	c.loader.SetDefaultFork(f)
 }
 
-// SetDebugLexer enables/disables printing of the token stream to stdout.
+// SetIncludeDepthLimit enables/disables printing of the token stream to stdout.
 func (c *Compiler) SetIncludeDepthLimit(limit int) {
-	c.maxIncDepth = limit
+	c.loader.SetMaxIncludeDepth(limit)
 }
 
 // SetMaxErrors sets the limit on the number of errors that can happen before the compiler gives up.
 func (c *Compiler) SetMaxErrors(limit int) {
-	if limit < 1 {
-		limit = 1
-	}
-	c.maxErrors = limit
+	c.errors.SetMaxErrors(limit)
 }
 
 // SetGlobal sets the value of a global expression macro.
@@ -106,7 +99,7 @@ func (c *Compiler) SetGlobal(name string, v *big.Int) {
 	if v == nil {
 		delete(c.macroOverrides, name)
 	} else {
-		c.macroOverrides[name] = lzint.FromInt(v)
+		c.macroOverrides[name] = ast.SimpleExprMacroDef(globalOverrideDoc, name, ast.MakeNumber(lzint.FromInt(v)))
 	}
 }
 
@@ -119,104 +112,82 @@ func (c *Compiler) ClearGlobals() {
 // If compilation fails, the returned slice is nil. Use the Errors method to get
 // parsing/compilation errors.
 func (c *Compiler) CompileString(input string) []byte {
-	defer c.errors.catchAbort()
+	defer c.errors.CatchAbort()
 
-	return c.compileSource("", []byte(input))
+	c.reset()
+	prog := c.loader.LoadSource("", []byte(input))
+	if prog == nil {
+		return nil
+	}
+	return c.compile(prog)
 }
 
-// CompileString compiles the given program text and returns the corresponding bytecode.
+// CompileFile compiles the given program text and returns the corresponding bytecode.
 // If compilation fails, the returned slice is nil. Use the Errors method to get
 // parsing/compilation errors.
 func (c *Compiler) CompileFile(filename string) []byte {
-	defer c.errors.catchAbort()
+	defer c.errors.CatchAbort()
 
-	content, err := fs.ReadFile(c.fsys, filename)
-	if err != nil {
-		c.errors.add(err)
+	c.reset()
+	prog := c.loader.LoadFile(filename)
+	if prog == nil {
 		return nil
 	}
-	return c.compileSource(filename, content)
+	return c.compile(prog)
 }
 
 // Errors returns errors that have accumulated during compilation.
 func (c *Compiler) Errors() []error {
-	return c.errors.errors()
+	return c.errors.Errors()
 }
 
 // Warnings returns all warnings that have accumulated during compilation.
 func (c *Compiler) Warnings() []error {
-	return c.errors.warnings()
+	return c.errors.Warnings()
 }
 
 // Failed reports whether compilation has failed.
 func (c *Compiler) Failed() bool {
-	return c.errors.numErrors > 0
+	return c.errors.HasError()
 }
 
 // ErrorsAndWarnings returns all errors and warnings which have accumulated during compilation.
 func (c *Compiler) ErrorsAndWarnings() []error {
-	return c.errors.list
-}
-
-// errorAt pushes an error to the compiler error list.
-func (c *Compiler) errorAt(inst ast.Statement, err error) {
-	if err == nil {
-		panic("BUG: errorAt(st, nil)")
-	}
-	c.errors.add(&statementError{inst: inst, err: err})
+	return c.errors.ErrorsAndWarnings()
 }
 
 // warnf pushes a warning to the error list.
 func (c *Compiler) warnf(inst ast.Statement, format string, args ...any) {
-	c.errors.add(&simpleWarning{pos: inst.Position(), str: fmt.Sprintf(format, args...)})
+	c.errors.Add(&simpleWarning{pos: inst.Position(), str: fmt.Sprintf(format, args...)})
 }
 
 // warnDeprecatedMacro warns about using a legacy macro.
 func (c *Compiler) warnDeprecatedMacro(expr ast.Expr, name, replacement string) {
-	c.errors.add(&simpleWarning{
+	c.errors.Add(&simpleWarning{
 		pos: expr.Position(),
 		str: fmt.Sprintf("macro %s() is deprecated, use %s()", name, replacement),
 	})
 }
 
-func (c *Compiler) compileSource(filename string, input []byte) []byte {
-	c.reset()
-	p := ast.NewParser(filename, input)
-	doc, errs := p.Parse()
-	if c.errors.addParseErrors(errs) {
-		return nil // abort compilation due to failed parse
-	}
-	return c.compileDocument(doc)
-}
-
 // compileDocument creates bytecode from the AST.
-func (c *Compiler) compileDocument(doc *ast.Document) (output []byte) {
-	prog := newCompilerProg(doc)
-
-	// First, load all #include files and register their definitions.
-	// This also configures the instruction set if specified by a #pragma.
-	c.processIncludes(doc, prog, nil)
-
-	// Apply macro overrides. This happens after include processing because macros
-	// get their definitions assigned then.
-	for name, val := range c.macroOverrides {
-		if def, _ := c.globals.lookupExprMacro(name); def != nil && len(def.Params) > 0 {
-			c.warnf(def, "overridden global macro %s has parameters", name)
-		}
-		c.globals.overrideExprMacroValue(name, val)
-	}
-
-	// Choose configured instruction set, but only if not configured by a pragma.
-	if prog.evm == nil {
-		prog.evm = evm.FindInstructionSet(c.defaultFork)
-	}
+func (c *Compiler) compile(lprog *loader.Program) (output []byte) {
+	prog := newCompilerProg(lprog)
 
 	// Next, the AST document tree is expanded into a flat list of instructions.
-	c.expand(doc, prog)
+	c.expand(lprog.Toplevel, prog)
 	prog.finishExpansion()
+	// Expansion is now done, and all further steps work on prog.
 
-	// Expansion of is now done, and all further steps work on prog.
-	e := newEvaluator(c.globals, c)
+	// Create the evaluator, applying global macro overrides.
+	// Here we also check
+	e := newEvaluator(c, c.macroOverrides)
+	for _, name := range slices.Sorted(maps.Keys(c.macroOverrides)) {
+		if def := prog.LookupExprMacro(name, nil); def != nil && len(def.Params) > 0 {
+			c.warnf(def, "overridden global macro %s has parameters", name)
+		}
+	}
+
+	// Pre-evaluate all arguments that don't depend on labels.
 	c.preEvaluateArgs(e, prog)
 	e.registerLabels(prog.labels)
 
@@ -240,12 +211,12 @@ func (c *Compiler) compileDocument(doc *ast.Document) (output []byte) {
 			failedInst.dataSize += 1
 			continue // recompute after bump
 		} else {
-			c.errorAt(failedInst.ast, err)
+			c.errors.AddAt(failedInst.ast, err)
 			break // there was some other error
 		}
 	}
 
-	if c.errors.hasError() {
+	if c.errors.HasError() {
 		return nil // no output if source has errors
 	}
 
@@ -255,94 +226,6 @@ func (c *Compiler) compileDocument(doc *ast.Document) (output []byte) {
 
 	// Create the bytecode.
 	return c.generateOutput(prog)
-}
-
-// processIncludes reads all #included documents.
-func (c *Compiler) processIncludes(doc *ast.Document, prog *compilerProg, stack []ast.Statement) {
-	errs := c.globals.registerDefinitions(doc)
-	c.errors.add(errs...)
-
-	var list []*ast.Include
-	for _, st := range doc.Statements {
-		switch st := st.(type) {
-		case *ast.Include:
-			file, err := resolveRelative(doc.File, st.Filename)
-			if err != nil {
-				c.errorAt(st, err)
-				continue
-			}
-			incdoc := c.parseIncludeFile(file, st, len(stack)+1)
-			if incdoc != nil {
-				c.includes[st] = incdoc
-				list = append(list, st)
-			}
-
-		case *ast.Pragma:
-			switch st.Option {
-			case "target":
-				if len(stack) != 0 {
-					c.errorAt(st, ecPragmaTargetInIncludeFile)
-				}
-				if prog.evm != nil {
-					c.errorAt(st, ecPragmaTargetConflict)
-				}
-				prog.evm = evm.FindInstructionSet(st.Value)
-				if prog.evm == nil {
-					c.errorAt(st, fmt.Errorf("%w %q", ecPragmaTargetUnknown, st.Value))
-				}
-			default:
-				c.errorAt(st, fmt.Errorf("%w %s", ecUnknownPragma, st.Option))
-			}
-		}
-	}
-
-	// Process includes in macros.
-	for _, m := range doc.InstrMacros() {
-		c.processIncludes(m.Body, prog, append(stack, m))
-	}
-
-	// Recurse.
-	for _, inst := range list {
-		incdoc := c.includes[inst]
-		c.processIncludes(incdoc, prog, append(stack, inst))
-	}
-}
-
-func resolveRelative(basepath string, filename string) (string, error) {
-	res := path.Clean(path.Join(path.Dir(basepath), filename))
-	if strings.Contains(res, "..") {
-		return "", fmt.Errorf("path %q escapes project root", filename)
-	}
-	return res, nil
-}
-
-func (c *Compiler) parseIncludeFile(file string, inst *ast.Include, depth int) *ast.Document {
-	if c.fsys == nil {
-		c.errorAt(inst, ecIncludeNoFS)
-		return nil
-	}
-	if depth > c.maxIncDepth {
-		c.errorAt(inst, ecIncludeDepthLimit)
-		return nil
-	}
-
-	content, err := fs.ReadFile(c.fsys, file)
-	if err != nil {
-		c.errorAt(inst, err)
-		return nil
-	}
-	p := ast.NewParser(file, content)
-	doc, errors := p.Parse()
-	if c.errors.addParseErrors(errors) {
-		return nil
-	}
-	// Note that included documents do NOT have the including document set as Parent.
-	// The parent relationship is used during lookup of labels, macros, etc. and
-	// such definitions should not be shared between include files.
-	//
-	// Included documents do have a Creation though.
-	doc.Creation = inst
-	return doc
 }
 
 // generateOutput creates the bytecode. This is also where instruction names get resolved.
@@ -370,16 +253,16 @@ loop:
 			// resolve the op
 			var op *evm.Op
 			if inst.op == "PUSH" {
-				op = prog.evm.PushBySize(inst.dataSize)
+				op = prog.Fork.PushBySize(inst.dataSize)
 			} else {
-				op = prog.evm.OpByName(inst.op)
+				op = prog.Fork.OpByName(inst.op)
 			}
 			if op == nil {
 				panic(fmt.Sprintf("BUG: opcode for %q (size %d) not found", inst.op, inst.dataSize))
 			}
 
 			// Unreachable code check.
-			if !c.errors.hasError() {
+			if !c.errors.HasError() {
 				unreachable.check(c, inst.ast, op)
 			}
 
@@ -391,9 +274,9 @@ loop:
 			output = append(output, inst.data...)
 
 		case inst.op != "":
-			op := prog.evm.OpByName(inst.op)
+			op := prog.Fork.OpByName(inst.op)
 			if op == nil {
-				c.errorAt(inst.ast, fmt.Errorf("%w %s", ecUnknownOpcode, inst.op))
+				c.errors.AddAt(inst.ast, fmt.Errorf("%w %s", ecUnknownOpcode, inst.op))
 				continue loop
 			}
 			output = append(output, op.Code)
@@ -402,7 +285,7 @@ loop:
 			}
 			output = append(output, inst.data...)
 			// Unreachable code check.
-			if !c.errors.hasError() {
+			if !c.errors.HasError() {
 				unreachable.check(c, inst.ast, op)
 			}
 

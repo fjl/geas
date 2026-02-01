@@ -29,10 +29,10 @@ import (
 
 // evaluator is for evaluating expressions.
 type evaluator struct {
+	overrides   map[string]*ast.ExpressionMacroDef // global macro overrides
 	inStack     map[*ast.ExpressionMacroDef]struct{}
 	labelInstr  map[evalLabelKey]*instruction
 	usedLabels  map[*ast.LabelDef]struct{}
-	globals     *globalScope
 	compiler    *Compiler // for assemble macro
 	cache       evalCache
 	labelsValid bool // while false, evaluating labels returns unassignedLabelErr
@@ -89,12 +89,12 @@ func (env *evalEnvironment) makeCallEnvironment(defdoc *ast.Document, def *ast.E
 	}
 }
 
-func newEvaluator(gs *globalScope, c *Compiler) *evaluator {
+func newEvaluator(c *Compiler, overrides map[string]*ast.ExpressionMacroDef) *evaluator {
 	return &evaluator{
+		overrides:  overrides,
 		inStack:    make(map[*ast.ExpressionMacroDef]struct{}),
 		labelInstr: make(map[evalLabelKey]*instruction),
 		usedLabels: make(map[*ast.LabelDef]struct{}),
-		globals:    gs,
 		compiler:   c,
 		cache:      newEvalCache(),
 	}
@@ -105,47 +105,51 @@ func newEvaluator(gs *globalScope, c *Compiler) *evaluator {
 // the arguments.
 func (e *evaluator) registerLabels(labels []*compilerLabel) {
 	for _, cl := range labels {
+		key := evalLabelKey{cl.doc, cl.def}
 		if ast.IsGlobal(cl.def.Ident) {
-			e.globals.setLabelInstr(cl.def.Ident, cl.instr)
-		} else {
-			e.labelInstr[evalLabelKey{cl.doc, cl.def}] = cl.instr
+			key.doc = nil
 		}
+		e.labelInstr[key] = cl.instr
 	}
 	e.labelsValid = true
 }
 
 // lookupExprMacro finds a macro definition in the document chain.
-func (e *evaluator) lookupExprMacro(env *evalEnvironment, name string) (*ast.ExpressionMacroDef, *ast.Document) {
-	if ast.IsGlobal(name) {
-		return e.globals.lookupExprMacro(name)
+// Overrides set via SetGlobal take precedence over definitions in the program.
+func (e *evaluator) lookupExprMacro(env *evalEnvironment, name string) *ast.ExpressionMacroDef {
+	if def := e.overrides[name]; def != nil {
+		return def
 	}
-	if e, doc := env.doc.LookupExprMacro(name); e != nil {
-		return e, doc
-	}
-	return nil, nil
+	return env.prog.LookupExprMacro(name, env.doc)
 }
 
 // lookupLabel resolves a label reference.
-func (e *evaluator) lookupLabel(doc *ast.Document, lref *ast.LabelRefExpr) (pc int, pcValid bool, err error) {
+func (e *evaluator) lookupLabel(env *evalEnvironment, lref *ast.LabelRefExpr) (pc int, pcValid bool, err error) {
 	if !e.labelsValid {
 		return 0, false, nil
 	}
 
-	var li *ast.LabelDef
-	var instr *instruction
-	if ast.IsGlobal(lref.Ident) {
-		instr, li = e.globals.lookupLabel(lref)
-	} else {
-		var srcdoc *ast.Document
-		li, srcdoc = doc.LookupLabel(lref)
-		instr = e.labelInstr[evalLabelKey{srcdoc, li}]
-	}
+	li := env.prog.LookupLabel(lref.Ident, env.doc)
 	if li == nil {
 		return 0, false, fmt.Errorf("undefined label %v", lref)
 	}
 	if lref.Dotted && !li.Dotted {
 		//lint:ignore ST1005 using : at the end of message here to refer to a label definition
 		return 0, false, fmt.Errorf("can't use %v to refer to label %s:", lref, li.Ident)
+	}
+
+	// Find the instruction associated with the label.
+	var instr *instruction
+	if ast.IsGlobal(lref.Ident) {
+		instr = e.labelInstr[evalLabelKey{nil, li}]
+	} else {
+		// For local labels, walk the document parent chain to find the matching key.
+		for doc := env.doc; doc != nil; doc = doc.Parent {
+			if inst, ok := e.labelInstr[evalLabelKey{doc, li}]; ok {
+				instr = inst
+				break
+			}
+		}
 	}
 	if instr == nil {
 		return 0, false, nil
@@ -192,7 +196,7 @@ func (e *evaluator) evalAsBytes(expr ast.Expr, env *evalEnvironment) ([]byte, er
 }
 
 func (e *evaluator) evalLabelRef(expr *ast.LabelRefExpr, env *evalEnvironment) (*lzint.Value, error) {
-	pc, pcValid, err := e.lookupLabel(env.doc, expr)
+	pc, pcValid, err := e.lookupLabel(env, expr)
 	if err != nil {
 		return nil, err
 	}
@@ -325,7 +329,7 @@ func (e *evaluator) evalMacroCall(expr *ast.MacroCallExpr, env *evalEnvironment)
 		}
 		return nil, fmt.Errorf("%w .%s", ecUndefinedBuiltinMacro, expr.Ident)
 	}
-	def, defdoc := e.lookupExprMacro(env, expr.Ident)
+	def := e.lookupExprMacro(env, expr.Ident)
 	if def == nil {
 		// There is no user-defined macro with the given name, try resolving
 		// as builtin macro.
@@ -346,7 +350,10 @@ func (e *evaluator) evalMacroCall(expr *ast.MacroCallExpr, env *evalEnvironment)
 	if err := checkArgCount(expr, len(def.Params)); err != nil {
 		return nil, err
 	}
-	macroEnv := env.makeCallEnvironment(defdoc, def)
+	macroEnv := env.makeCallEnvironment(def.Document(), def)
+	if len(expr.Args) != len(def.Params) {
+		return nil, fmt.Errorf("%w, macro %s takes %d", ecInvalidArgumentCount, expr.Ident, len(def.Params))
+	}
 	for i, param := range def.Params {
 		v, err := e.eval(expr.Args[i], env)
 		if err != nil {

@@ -69,6 +69,17 @@ type (
 	}
 )
 
+// SimpleExprMacroDef creates an expression macro definition that is not associated with a
+// source file. This is used for synthetic definitions such as global macro overrides and
+// implicit macros created by named #bytes directives.
+func SimpleExprMacroDef(doc *Document, name string, body Expr) *ExpressionMacroDef {
+	return &ExpressionMacroDef{
+		stbase: stbase{src: doc},
+		Ident:  name,
+		Body:   body,
+	}
+}
+
 // MakeNumber creates a number literal with the given value.
 func MakeNumber(v *lzint.Value) *LiteralExpr {
 	return &LiteralExpr{

@@ -111,3 +111,36 @@ func TestPrintDocument(t *testing.T) {
 		})
 	}
 }
+
+// TestPrintDuplicateMacros checks that the printer works correctly when the
+// input has duplicate macro definitions. Duplicate detection is not done by the
+// parser, so both definitions appear in the AST and should be printed.
+func TestPrintDuplicateMacros(t *testing.T) {
+	const input = `#define Dup = 1
+#define Dup = 2
+
+#define %dup(a) {
+    stop
+}
+#define %dup(b) {
+    revert
+}
+
+    push Dup
+`
+
+	parser := ast.NewParser("", []byte(input))
+	doc, errs := parser.Parse()
+	if len(errs) > 0 {
+		t.Fatal("unexpected parse errors:", errs)
+	}
+
+	var printer Printer
+	var buf bytes.Buffer
+	if err := printer.Document(&buf, doc); err != nil {
+		t.Fatal(err)
+	}
+	if buf.String() != input {
+		t.Errorf("output mismatch:\ngot:\n%s\nwant:\n%s", buf.String(), input)
+	}
+}

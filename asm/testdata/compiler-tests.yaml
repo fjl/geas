@@ -507,11 +507,25 @@ global-label-in-macro:
     errors:
       - ':2: @.GLOBAL already defined by invocation of %glob at :4'
 
+global-label-in-two-macros:
+  input:
+    code: |
+      #define %a() {
+      LABEL: add
+      }
+      #define %b() {
+      LABEL: mul
+      }
+      jump @LABEL
+      %a()
+  output:
+    bytecode: "6003565b01"
+
 global-label-redefine-toplevel:
   input:
     code: |
       .GLOBAL: add
-      .GLOBAL: add2
+      .GLOBAL: add
   output:
     errors:
       - ':2: @.GLOBAL already defined'

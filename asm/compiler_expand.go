@@ -33,7 +33,7 @@ func (c *Compiler) expand(doc *ast.Document, prog *compilerProg) {
 		}
 		err := st.expand(c, doc, prog)
 		if err != nil {
-			c.errorAt(astSt, err)
+			c.errors.AddAt(astSt, err)
 			continue
 		}
 	}
@@ -42,12 +42,17 @@ func (c *Compiler) expand(doc *ast.Document, prog *compilerProg) {
 // expand creates an instruction for the label. For dotted labels, the instruction is
 // empty (i.e. has size zero). For regular labels, a JUMPDEST is created.
 func (li labelDefStatement) expand(c *Compiler, doc *ast.Document, prog *compilerProg) error {
+	// Check for duplicate instantiation of global labels.
 	if ast.IsGlobal(li.Ident) {
-		ast := li.LabelDef
-		if err := c.globals.setLabelDocument(ast, doc); err != nil {
+		if firstDef := prog.globalLabels[li.Ident]; firstDef != nil {
+			err := ast.ErrLabelAlreadyDef(firstDef.def, li.LabelDef)
+			if loc := firstDef.doc.CreationString(); loc != "" {
+				err = fmt.Errorf("%w%s", err, loc)
+			}
 			return err
 		}
 	}
+
 	prog.addLabel(li.LabelDef, doc)
 	if !li.Dotted {
 		inst := newInstruction(li, "JUMPDEST")
@@ -68,7 +73,7 @@ func (op opcodeStatement) expand(c *Compiler, doc *ast.Document, prog *compilerP
 		}
 
 	case isJump(opcode):
-		if err := c.validateJumpArg(doc, op.Arg); err != nil {
+		if err := c.validateJumpArg(prog, doc, op.Arg); err != nil {
 			return err
 		}
 		if _, err := prog.resolveOp(opcode); err != nil {
@@ -114,12 +119,12 @@ func (op opcodeStatement) expand(c *Compiler, doc *ast.Document, prog *compilerP
 
 // resolveOp resolves an opcode name.
 func (prog *compilerProg) resolveOp(op string) (*evm.Op, error) {
-	if op := prog.evm.OpByName(op); op != nil {
+	if op := prog.Fork.OpByName(op); op != nil {
 		return op, nil
 	}
-	remFork := prog.evm.ForkWhereOpRemoved(op)
+	remFork := prog.Fork.ForkWhereOpRemoved(op)
 	if remFork != "" {
-		return nil, fmt.Errorf("%w %s (target = %q; removed in fork %q)", ecUnknownOpcode, op, prog.evm.Name(), remFork)
+		return nil, fmt.Errorf("%w %s (target = %q; removed in fork %q)", ecUnknownOpcode, op, prog.Fork.Name(), remFork)
 	}
 	addedForks := evm.ForksWhereOpAdded(op)
 	if len(addedForks) > 0 {
@@ -128,13 +133,13 @@ func (prog *compilerProg) resolveOp(op string) (*evm.Op, error) {
 		if len(addedForks) > 1 {
 			fork += "s"
 		}
-		return nil, fmt.Errorf("%w %s (target = %q; added in %s %q)", ecUnknownOpcode, op, prog.evm.Name(), fork, list)
+		return nil, fmt.Errorf("%w %s (target = %q; added in %s %q)", ecUnknownOpcode, op, prog.Fork.Name(), fork, list)
 	}
 	return nil, fmt.Errorf("%w %s", ecUnknownOpcode, op)
 }
 
 // validateJumpArg checks that argument to JUMP is a defined label.
-func (c *Compiler) validateJumpArg(doc *ast.Document, arg ast.Expr) error {
+func (c *Compiler) validateJumpArg(prog *compilerProg, doc *ast.Document, arg ast.Expr) error {
 	if arg == nil {
 		return nil // no argument is fine.
 	}
@@ -146,12 +151,7 @@ func (c *Compiler) validateJumpArg(doc *ast.Document, arg ast.Expr) error {
 		return fmt.Errorf("%w %v", ecJumpToDottedLabel, lref)
 	}
 
-	var li *ast.LabelDef
-	if ast.IsGlobal(lref.Ident) {
-		li = c.globals.label[lref.Ident]
-	} else {
-		li, _ = doc.LookupLabel(lref)
-	}
+	li := prog.LookupLabel(lref.Ident, doc)
 	if li == nil {
 		return fmt.Errorf("%w %v", ecJumpToUndefinedLabel, lref)
 	}
@@ -163,16 +163,8 @@ func (c *Compiler) validateJumpArg(doc *ast.Document, arg ast.Expr) error {
 
 // expand appends the output of an instruction macro call to the program.
 func (inst macroCallStatement) expand(c *Compiler, doc *ast.Document, prog *compilerProg) error {
-	var (
-		name   = inst.Ident
-		def    *ast.InstructionMacroDef
-		defdoc *ast.Document
-	)
-	if ast.IsGlobal(name) {
-		def, defdoc = c.globals.lookupInstrMacro(name)
-	} else {
-		def, defdoc = doc.LookupInstrMacro(name)
-	}
+	name := inst.Ident
+	def := prog.LookupInstrMacro(name, doc)
 	if def == nil {
 		return fmt.Errorf("%w %%%s", ecUndefinedInstrMacro, name)
 	}
@@ -191,7 +183,7 @@ func (inst macroCallStatement) expand(c *Compiler, doc *ast.Document, prog *comp
 	// document also means by-document caching does not treat all expansions of a macro as
 	// the same code.
 	macroDoc := *def.Body
-	macroDoc.Parent = defdoc
+	macroDoc.Parent = def.Document()
 	macroDoc.Creation = inst
 
 	// Arguments of instruction macros cannot be evaluated during expansion. They are
@@ -236,11 +228,11 @@ func (c *Compiler) exitMacro(m *ast.InstructionMacroDef) {
 }
 
 // expand of #include appends the included file's instructions to the program.
-// Note this accesses the documents parsed by processIncludes.
+// Note this accesses the documents parsed by the loader.
 func (inst includeStatement) expand(c *Compiler, doc *ast.Document, prog *compilerProg) error {
-	incdoc := c.includes[inst.Include]
+	incdoc := prog.Program.IncludeDoc(inst.Include)
 	if incdoc == nil {
-		// The document is not in doc.includes, so there must've been a parse error.
+		// The document is not in includes, so there must've been a parse error.
 		// We can just ignore the statement here since the error was already reported.
 		return nil
 	}

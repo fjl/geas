@@ -20,13 +20,13 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
-	"math"
 	"math/big"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/fjl/geas/internal/ast"
+	"github.com/fjl/geas/internal/loader"
 	"github.com/fjl/geas/internal/lzint"
 	"golang.org/x/crypto/sha3"
 )
@@ -203,18 +203,18 @@ func assembleMacro(e *evaluator, env *evalEnvironment, call *ast.MacroCallExpr) 
 
 	// Perform assembly. Note we take some settings from the current compiler here,
 	// like the selected instruction set and overrides.
-	subc := New(e.compiler.fsys)
-	subc.SetIncludeDepthLimit(e.compiler.maxIncDepth)
-	subc.SetMaxErrors(math.MaxInt)
-	subc.SetDefaultFork(env.prog.evm.Name())
-	subc.macroOverrides = e.compiler.macroOverrides
-
-	file, err := resolveRelative(env.doc.File, string(filename))
+	subc := New(e.compiler.loader.Filesystem())
+	subc.SetDefaultFork(env.prog.Fork.Name())
+	subc.SetIncludeDepthLimit(e.compiler.loader.MaxIncludeDepth())
+	subc.macroOverrides = e.overrides
+	file, err := loader.ResolveRelative(env.doc.File, string(filename))
 	if err != nil {
 		return nil, err
 	}
 	bytecode := subc.CompileFile(file)
-	e.compiler.errors.add(subc.ErrorsAndWarnings()...)
+
+	// Propagate errors/warnings from sub-compiler.
+	e.compiler.errors.Add(subc.ErrorsAndWarnings()...)
 
 	v := lzint.FromBytes(bytecode)
 	e.cache.assemble[cacheKey] = v // cache result

@@ -22,14 +22,15 @@ import (
 	"strings"
 
 	"github.com/fjl/geas/internal/ast"
-	"github.com/fjl/geas/internal/evm"
+	"github.com/fjl/geas/internal/loader"
 )
 
 // compilerProg is the output program of the compiler.
 // It contains sections of instructions.
 type compilerProg struct {
+	*loader.Program
+
 	elems []any
-	evm   *evm.InstructionSet
 
 	// Toplevel is the topmost section.
 	toplevel *compilerSection
@@ -44,6 +45,9 @@ type compilerProg struct {
 	// instruction yet. When the next instruction is added after a label, the
 	// instruction will be linked to the label.
 	currentLabels []*compilerLabel
+
+	// Here we track the instantiations of global labels.
+	globalLabels map[string]*compilerLabel
 }
 
 // compilerSection is a section of the output program.
@@ -82,10 +86,21 @@ type instrMacroArgs struct {
 	args     []ast.Expr
 }
 
-func newCompilerProg(topdoc *ast.Document) *compilerProg {
-	p := new(compilerProg)
-	p.toplevel = p.pushSection(topdoc, nil)
+func newCompilerProg(lprog *loader.Program) *compilerProg {
+	p := &compilerProg{
+		Program:      lprog,
+		globalLabels: make(map[string]*compilerLabel),
+	}
+	p.toplevel = p.pushSection(lprog.Toplevel, nil)
 	return p
+}
+
+func (p *compilerProg) LookupLabel(name string, in *ast.Document) *ast.LabelDef {
+	if cl := p.globalLabels[name]; cl != nil {
+		return cl.def
+	}
+	l, _ := p.Program.LookupLabel(name, in)
+	return l
 }
 
 // finishExpansion is called after the Compiler is done with expansion. Here we add an empty
@@ -128,10 +143,19 @@ func (p *compilerProg) currentSection() *compilerSection {
 }
 
 // addLabel appends a label definition to the program.
+// Duplicate instantiation of global labels is checked in labelDefStatement.expand,
+// so by the time this method is called the label is known to be unique.
 func (p *compilerProg) addLabel(l *ast.LabelDef, doc *ast.Document) {
 	cl := &compilerLabel{doc: doc, def: l}
 	p.currentLabels = append(p.currentLabels, cl)
 	p.labels = append(p.labels, cl)
+
+	if ast.IsGlobal(l.Ident) {
+		if _, ok := p.globalLabels[l.Ident]; ok {
+			panic("BUG: duplicate definition of global label")
+		}
+		p.globalLabels[l.Ident] = cl
+	}
 }
 
 // addInstruction appends an instruction to the current section. This returns the labels

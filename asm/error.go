@@ -23,9 +23,6 @@ import (
 	"github.com/fjl/geas/internal/ast"
 )
 
-// panic sentinel value:
-var errCancelCompilation = errors.New("end compilation")
-
 // PositionError is an error containing a file position.
 type PositionError interface {
 	error
@@ -54,13 +51,6 @@ const (
 	ecRecursiveCall
 	ecInvalidArgumentCount
 	ecNegativeResult
-	ecOddLengthBytesLiteral
-	ecIncludeNoFS
-	ecIncludeDepthLimit
-	ecUnknownPragma
-	ecPragmaTargetInIncludeFile
-	ecPragmaTargetConflict
-	ecPragmaTargetUnknown
 	ecMissingImmediate
 	ecUnexpectedImmediate
 )
@@ -103,20 +93,6 @@ func (e compilerError) Error() string {
 		return "invalid number of arguments"
 	case ecNegativeResult:
 		return "expression result is negative number"
-	case ecOddLengthBytesLiteral:
-		return "odd-length hex in bytes context"
-	case ecIncludeNoFS:
-		return "#include not allowed"
-	case ecIncludeDepthLimit:
-		return "#include depth limit reached"
-	case ecUnknownPragma:
-		return "unknown #pragma"
-	case ecPragmaTargetInIncludeFile:
-		return "#pragma target cannot be used in #include'd files"
-	case ecPragmaTargetConflict:
-		return "duplicate '#pragma target ...' directive"
-	case ecPragmaTargetUnknown:
-		return "unknown #pragma target"
 	case ecMissingImmediate:
 		return "missing immediate for opcode"
 	case ecUnexpectedImmediate:
@@ -124,24 +100,6 @@ func (e compilerError) Error() string {
 	default:
 		return fmt.Sprintf("invalid error %d", e)
 	}
-}
-
-// statementError is an error related to an assembler instruction.
-type statementError struct {
-	inst ast.Statement
-	err  error
-}
-
-func (e *statementError) Position() ast.Position {
-	return e.inst.Position()
-}
-
-func (e *statementError) Unwrap() error {
-	return e.err
-}
-
-func (e *statementError) Error() string {
-	return fmt.Sprintf("%v: %s", e.inst.Position(), e.err.Error())
 }
 
 // simpleWarning is a warning issued by the compiler.
@@ -177,79 +135,4 @@ type Warning interface {
 func IsWarning(err error) bool {
 	var w Warning
 	return errors.As(err, &w) && w.IsWarning()
-}
-
-// errorList maintains a list of errors and warnings. It also implements the mechanism
-// that aborts compilation when too many errors have accumulated.
-type errorList struct {
-	list        []error
-	numErrors   int
-	numWarnings int
-	maxErrors   int
-}
-
-// catchAbort traps the panic condition that gets thrown when too many errors have accumulated.
-// A call to catchAbort must be deferred around any code that uses [errorList.add].
-func (e *errorList) catchAbort() {
-	ok := recover()
-	if ok != nil && ok != errCancelCompilation {
-		panic(ok)
-	}
-}
-
-// add puts errors into the list.
-// This returns true if there were any actual errors in the arguments.
-func (e *errorList) add(errs ...error) (anyRealError bool) {
-	for _, err := range errs {
-		if err == nil {
-			continue
-		}
-		e.list = append(e.list, err)
-		if IsWarning(err) {
-			e.numWarnings++
-		} else {
-			e.numErrors++
-			anyRealError = true
-		}
-		if e.numErrors > e.maxErrors {
-			panic(errCancelCompilation)
-		}
-	}
-	return
-}
-
-// addParseErrors is like add, but for errors from the parser.
-func (e *errorList) addParseErrors(errs []*ast.ParseError) bool {
-	conv := make([]error, len(errs))
-	for i := range errs {
-		conv[i] = errs[i]
-	}
-	return e.add(conv...)
-}
-
-// warnings returns the current warning list.
-func (e *errorList) warnings() []error {
-	s := make([]error, 0, e.numWarnings)
-	for _, err := range e.list {
-		if IsWarning(err) {
-			s = append(s, err)
-		}
-	}
-	return s
-}
-
-// warnings returns the current error list.
-func (e *errorList) errors() []error {
-	s := make([]error, 0, e.numErrors)
-	for _, err := range e.list {
-		if !IsWarning(err) {
-			s = append(s, err)
-		}
-	}
-	return s
-}
-
-// hasError reports whether there were any actual errors.
-func (e *errorList) hasError() bool {
-	return e.numErrors > 0
 }
