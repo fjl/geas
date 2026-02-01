@@ -419,7 +419,7 @@ var oplist = []*Op{
 	{
 		Name: "STATICCALL",
 		Code: 0xfa,
-		in:   stack{"gas", "address", "value", "inOffset", "inLength", "returnOffset", "returnLength"},
+		in:   stack{"gas", "address", "inOffset", "inLength", "returnOffset", "returnLength"},
 		out:  stack{"ok"},
 	},
 	{
