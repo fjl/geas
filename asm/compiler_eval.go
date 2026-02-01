@@ -37,9 +37,9 @@ loop:
 			if errors.As(err, &labelErr) {
 				// Arg uses labels. This is not allowed in #bytes because their size
 				// depends on the output size of the program.
-				c.errorAt(inst.ast, ecLabelInBytes)
+				c.errors.AddAt(inst.ast, ecLabelInBytes)
 			} else if err != nil {
-				c.errorAt(inst.ast, err)
+				c.errors.AddAt(inst.ast, err)
 			} else {
 				inst.data = v
 				inst.dataSize = len(v)
@@ -62,11 +62,11 @@ loop:
 			}
 			inst.argNoLabels = true
 			if err != nil {
-				c.errorAt(inst.ast, err)
+				c.errors.AddAt(inst.ast, err)
 				continue loop
 			}
 			if err := prog.assignPushArg(inst, v.Int(), true); err != nil {
-				c.errorAt(inst.ast, err)
+				c.errors.AddAt(inst.ast, err)
 				continue loop
 			}
 		}
