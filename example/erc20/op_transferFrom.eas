@@ -52,7 +52,7 @@ TransferFrom:
     dup1             ; [amt, amt, from_balance, from]
 
     swap2            ; [from_balance, amt, amt, from]
-    sub              ; [from_balance - amt, amt from]
+    sub              ; [from_balance - amt, amt, from]
     swap1            ; [amt, from_balance - amt, from]
     swap2            ; [from, from_balance - amt, amt]]
     sstore           ; [amt]
