@@ -64,8 +64,7 @@ countLoop:
     push len(prefix) - 1        ; [plen, digitCount, msgLen, digitCount, msgLen]
     add                         ; [writePos, msgLen, digitCount, msgLen]
 
-writeLoop:
-    ;; Stack: [writePos, remaining, digitCount, msgLen]
+writeLoop:                      ; [writePos, remaining, digitCount, msgLen]
     swap1                       ; [remaining, writePos, digitCount, msgLen]
     dup1                        ; [remaining, remaining, writePos, ...]
     push 10                     ; [10, remaining, remaining, writePos, ...]
