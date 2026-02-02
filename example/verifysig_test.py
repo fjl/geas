@@ -62,11 +62,8 @@ def test_corrupted_signature(bytecode: str):
 
 def test_empty_message(bytecode: str):
     """Test with empty message (should fail - msgLen must be > 0)."""
-    # Use a dummy signature (r || s || v) since empty message won't verify anyway
-    r = "00" * 32
-    s = "00" * 32
-    v = "00"
-    calldata = r + s + v  # No message bytes
+    sig = sign_message(b"")
+    calldata = sig
 
     result = run_contract(bytecode, calldata)
     expected = "0x00"
@@ -95,6 +92,7 @@ def test_long_message(bytecode: str):
         print(f"FAIL: long message - expected {expected}, got {result}")
         return False
 
+
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(SCRIPT_DIR)
 
@@ -105,32 +103,34 @@ GEAS = ["go", "run", "./cmd/geas"]
 KEYFILE = os.path.join(SCRIPT_DIR, "testdata", "testkey.json")
 PASSFILE = os.path.join(SCRIPT_DIR, "testdata", "password.txt")
 
+
 def run_cmd(cmd, input_data=None):
-    result = subprocess.run(cmd, capture_output=True, text=True, input=input_data)
+    result = subprocess.run(cmd, capture_output=True, text=True, input=input_data, cwd=ROOT_DIR)
     if result.returncode != 0:
         print(f"Command failed: {' '.join(cmd)}")
         print(f"stderr: {result.stderr}")
         sys.exit(1)
     return result.stdout
 
+
 def compile_contract(file):
-    print("Compiling", file)
-    result = subprocess.run(GEAS + [file], capture_output=True, text=True, cwd=ROOT_DIR)
-    if result.returncode != 0:
-        print(f"Compilation failed: {result.stderr}")
-        sys.exit(1)
-    return result.stdout.strip()
+    return run_cmd(GEAS + ["-a", file])
+
+
+def run_contract(bytecode: str, calldata: str) -> str:
+    result = run_cmd(EVM + ["run", "--codefile", "/dev/stdin", "--input", calldata], bytecode)
+    return result.strip()
+
 
 def sign_message(message: bytes) -> str:
     """Sign a message using ethkey and return signature hex (r||s||v format)."""
-    # Write message to temp file
     import tempfile
     with tempfile.NamedTemporaryFile(mode='wb', delete=False) as f:
         f.write(message)
         msgfile = f.name
 
     try:
-        output = run_cmd(ETHKEY + ["signmessage", "--msgfile", msgfile, "--passwordfile", PASSFILE, KEYFILE,])
+        output = run_cmd(ETHKEY + ["signmessage", "--msgfile", msgfile, "--passwordfile", PASSFILE, KEYFILE])
     finally:
         os.unlink(msgfile)
 
@@ -142,15 +142,9 @@ def sign_message(message: bytes) -> str:
     print(f"Could not find signature in output: {output}")
     sys.exit(1)
 
-def run_contract(bytecode: str, calldata: str) -> str:
-    result = subprocess.run(EVM + ["run", "--codefile", "/dev/stdin", "--input", calldata],
-        capture_output=True,
-        text=True,
-        input=bytecode,
-    )
-    return result.stdout.strip()
 
 def main():
+    print("Compiling contract...")
     bytecode = compile_contract("example/verifysig.eas")
     print("Bytecode length:", len(bytecode))
 
@@ -166,6 +160,7 @@ def main():
         if not test(bytecode):
             failed += 1
     sys.exit(0 if failed == 0 else 1)
+
 
 if __name__ == "__main__":
     main()
