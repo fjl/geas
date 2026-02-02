@@ -348,6 +348,8 @@ the directive.
     #include "file.evm"
     .end:
 
+It is possible to use `#include` within macro definitions.
+
 ### Local and Global Scope
 
 Names of labels and macros are case-sensitive. Like in Go, the case of the first letter
