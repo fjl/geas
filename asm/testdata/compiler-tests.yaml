@@ -878,6 +878,23 @@ instr-macro-variable-in-include-file:
   output:
     bytecode: "6001 6001 01"
 
+instr-macro-variable-in-include-file-in-macro:
+  input:
+    code: |
+      #define %mac(param) {
+        #include "inc.eas"
+        %Gmac
+      }
+      %mac(1)
+    files:
+      inc.eas: |
+        #define %Gmac() {
+          push $param  ; does not work
+        }
+  output:
+    errors:
+      - "inc.eas:2: undefined macro parameter $param"
+
 immediates:
   input:
     code: |
