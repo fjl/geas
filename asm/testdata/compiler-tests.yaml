@@ -847,6 +847,37 @@ instr-macro-variable-shadow:
   output:
     bytecode: "6001 6002"
 
+instr-macro-variable-local:
+  input:
+    code: |
+      #define %inner(inner) {
+        push $inner
+        push $outer   ; not possible!
+      }
+      #define %outer(outer) {
+        push $outer
+        %inner(3)
+      }
+      %outer(1)
+  output:
+    errors:
+      - ":3: undefined macro parameter $outer"
+
+instr-macro-variable-in-include-file:
+  input:
+    code: |
+      #define %mac(param) {
+        #include "inc.eas"
+      }
+      %mac(1)
+    files:
+      inc.eas: |
+        push $param
+        push $param
+        add
+  output:
+    bytecode: "6001 6001 01"
+
 immediates:
   input:
     code: |

@@ -244,7 +244,7 @@ func (inst includeStatement) expand(c *Compiler, doc *ast.Document, prog *compil
 		// We can just ignore the statement here since the error was already reported.
 		return nil
 	}
-	prog.pushSection(incdoc, nil)
+	prog.pushSection(incdoc, prog.cur.macroArgs)
 	defer prog.popSection()
 	c.expand(incdoc, prog)
 	return nil
