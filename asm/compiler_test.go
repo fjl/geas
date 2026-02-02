@@ -140,6 +140,9 @@ func TestExamplePrograms(t *testing.T) {
 	t.Run("4788asm_ctor", func(t *testing.T) {
 		bytecodes["4788asm_ctor"] = compileExample(t, exampleDir, "4788asm_ctor.eas")
 	})
+	t.Run("verifysig", func(t *testing.T) {
+		bytecodes["verifysig"] = compileExample(t, exampleDir, "verifysig.eas")
+	})
 
 	if os.Getenv("WRITE_TEST_FILES") == "1" {
 		content, _ := yaml.Marshal(bytecodes)
