@@ -237,7 +237,7 @@ func (inst *instruction) expr() ast.Expr {
 // encodedSize gives the size of the instruction in bytecode.
 func (inst *instruction) encodedSize() int {
 	size := 0
-	if !isBytes(inst.op) {
+	if !isBytes(inst.op) && inst.op != "" {
 		size = 1
 	}
 	return size + inst.dataSize
