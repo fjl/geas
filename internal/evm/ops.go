@@ -76,7 +76,7 @@ var oplist = []*Op{
 
 	{Name: "KECCAK256", Code: 0x20, in: stack{"offset", "size"}, out: stack{"hash"}},
 	{Name: "ADDRESS", Code: 0x30, out: stack{"address"}},
-	{Name: "BALANCE", Code: 0x31, out: stack{"balance"}},
+	{Name: "BALANCE", Code: 0x31, in: stack{"address"}, out: stack{"balance"}},
 	{Name: "ORIGIN", Code: 0x32, out: stack{"origin"}},
 	{Name: "CALLER", Code: 0x33, out: stack{"caller"}},
 	{Name: "CALLVALUE", Code: 0x34, out: stack{"callvalue"}},
@@ -91,7 +91,7 @@ var oplist = []*Op{
 	{Name: "RETURNDATASIZE", Code: 0x3d, out: stack{"returndatasize"}},
 	{Name: "RETURNDATACOPY", Code: 0x3e, in: stack{"memOffset", "dataOffset", "length"}},
 	{Name: "EXTCODEHASH", Code: 0x3f, in: stack{"address"}, out: stack{"codehash"}},
-	{Name: "BLOCKHASH", Code: 0x40, out: stack{"blockhash"}},
+	{Name: "BLOCKHASH", Code: 0x40, in: stack{"blockNumber"}, out: stack{"blockHash"}},
 	{Name: "COINBASE", Code: 0x41, out: stack{"coinbase"}},
 	{Name: "TIMESTAMP", Code: 0x42, out: stack{"timestamp"}},
 	{Name: "NUMBER", Code: 0x43, out: stack{"blocknum"}},
@@ -109,7 +109,7 @@ var oplist = []*Op{
 	{Name: "SLOAD", Code: 0x54, in: stack{"slot"}, out: stack{"val"}},
 	{Name: "SSTORE", Code: 0x55, in: stack{"slot", "val"}},
 	{Name: "JUMP", Code: 0x56, in: stack{"label"}, Jump: true, Unconditional: true},
-	{Name: "JUMPI", Code: 0x57, in: stack{"cond", "label"}, Jump: true},
+	{Name: "JUMPI", Code: 0x57, in: stack{"label", "cond"}, Jump: true},
 	{Name: "PC", Code: 0x58, out: stack{"pc"}},
 	{Name: "MSIZE", Code: 0x59, out: stack{"memSize"}},
 	{Name: "GAS", Code: 0x5a, out: stack{"gas"}},
@@ -383,7 +383,7 @@ var oplist = []*Op{
 	{
 		Name: "CREATE",
 		Code: 0xf0,
-		in:   stack{"endowment", "inOffset", "inLength", "gas"},
+		in:   stack{"endowment", "inOffset", "inLength"},
 		out:  stack{"address"},
 	},
 	{
@@ -407,13 +407,13 @@ var oplist = []*Op{
 	{
 		Name: "DELEGATECALL",
 		Code: 0xf4,
-		in:   stack{"gas", "address", "value", "inOffset", "inLength", "returnOffset", "returnLength"},
+		in:   stack{"gas", "address", "inOffset", "inLength", "returnOffset", "returnLength"},
 		out:  stack{"ok"},
 	},
 	{
 		Name: "CREATE2",
 		Code: 0xf5,
-		in:   stack{"endowment", "inOffset", "inLength", "salt", "gas"},
+		in:   stack{"endowment", "inOffset", "inLength", "salt"},
 		out:  stack{"address"},
 	},
 	{
