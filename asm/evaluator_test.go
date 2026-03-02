@@ -115,6 +115,7 @@ var evalIntTests = []evalTest{
 
 var evalErrorTests = []evalErrorTest{
 	{expr: `20 / 0`, err: "division by zero"},
+	{expr: `20 % 0`, err: "modulo by zero"},
 	{expr: `1 << (1 << 64)`, err: "lshift amount 18446744073709551616 overflows uint"},
 	{expr: `1 >> (1 << 64)`, err: "rshift amount 18446744073709551616 overflows uint"},
 	{expr: `32 << -2`, err: "negative lshift amount"},

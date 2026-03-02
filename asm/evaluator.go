@@ -257,6 +257,9 @@ func (e *evaluator) evalArith(expr *ast.BinaryExpr, env *evalEnvironment) (*lzin
 		v = new(big.Int).Div(left, right)
 
 	case ast.ArithMod:
+		if right.Sign() == 0 {
+			return nil, errors.New("modulo by zero")
+		}
 		v = new(big.Int).Mod(left, right)
 
 	case ast.ArithAnd:
