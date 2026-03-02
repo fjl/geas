@@ -208,7 +208,7 @@ var forkReg = map[string]*InstructionSetDef{
 
 	"paris": {
 		Names:  []string{"paris", "merge"},
-		Parent: "istanbul",
+		Parent: "london",
 		Added: []*Op{
 			opm["RANDOM"],
 		},
