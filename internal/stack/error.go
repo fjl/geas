@@ -36,7 +36,7 @@ type nestingError struct {
 }
 
 func (e nestingError) Error() string {
-	return fmt.Sprintf("expected %c to close %c, found %c", e.opening, e.found, e.expected)
+	return fmt.Sprintf("expected %c to close %c, found %c", e.expected, e.opening, e.found)
 }
 
 // Analysis errors.
