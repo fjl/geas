@@ -21,6 +21,23 @@ import (
 	"unicode/utf8"
 )
 
+// Wildcard is the sentinel value representing a wildcard at the end of a parsed
+// stack comment. Both ".." and "..." in the source text are normalized to this value.
+const Wildcard = ".."
+
+// HasWildcard reports whether the parsed stack comment ends with a wildcard.
+func HasWildcard(items []string) bool {
+	return len(items) > 0 && items[len(items)-1] == Wildcard
+}
+
+// StripWildcard separates the wildcard from a parsed stack comment.
+func StripWildcard(items []string) (stripped []string, wild bool) {
+	if HasWildcard(items) {
+		return items[:len(items)-1], true
+	}
+	return items, false
+}
+
 // ParseComment parses a stack comment at the start of the given input string.
 // It checks for basic syntax errors, such as invalid parenthesis nesting.
 // Stack items are canonicalized, i.e. all whitespace in items is removed.
@@ -54,7 +71,15 @@ func ParseComment(text string) ([]string, error) {
 			// continue parsing next item
 			in.next()
 		case ']':
-			// end of stack comment
+			// Normalize and validate wildcards.
+			for i, item := range items {
+				if item == ".." || item == "..." {
+					if i != len(items)-1 {
+						return items, errWildcardNotLast
+					}
+					items[i] = Wildcard
+				}
+			}
 			return items, nil
 		}
 	}

@@ -48,8 +48,37 @@ var parseCommentTests = []struct {
 		input:  "[a == b, d', (x*y) + 1 - 2, arr[1:2], fn(a, b)]",
 		output: []string{"a==b", "d'", "(x*y)+1-2", "arr[1:2]", "fn(a,b)"},
 	},
-
-	// some errors
+	// wildcard
+	{
+		input:  "[a, b, ..]",
+		output: []string{"a", "b", ".."},
+	},
+	{
+		input:  "[..]",
+		output: []string{".."},
+	},
+	{
+		input:  "[...]",
+		output: []string{".."},
+	},
+	{
+		input:  "[ .. ]",
+		output: []string{".."},
+	},
+	// wildcard errors
+	{
+		input:   "[.., a]",
+		wantErr: errWildcardNotLast,
+	},
+	{
+		input:   "[..., a]",
+		wantErr: errWildcardNotLast,
+	},
+	{
+		input:   "[a, .., b]",
+		wantErr: errWildcardNotLast,
+	},
+	// errors
 	{
 		input:   "",
 		wantErr: ErrEmptyComment,

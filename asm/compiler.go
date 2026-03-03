@@ -31,6 +31,7 @@ import (
 	"github.com/fjl/geas/internal/evm"
 	"github.com/fjl/geas/internal/loader"
 	"github.com/fjl/geas/internal/lzint"
+	"github.com/fjl/geas/internal/stackcheck"
 )
 
 // fake document used for macro overrides set via SetGlobal.
@@ -43,6 +44,8 @@ type Compiler struct {
 	macroStack map[*ast.InstructionMacroDef]struct{}
 	loader     *loader.Loader
 	errors     *loader.ErrorList
+
+	doStackCheck bool
 }
 
 // NewCompiler creates a compiler.
@@ -88,6 +91,11 @@ func (c *Compiler) SetIncludeDepthLimit(limit int) {
 // SetMaxErrors sets the limit on the number of errors that can happen before the compiler gives up.
 func (c *Compiler) SetMaxErrors(limit int) {
 	c.errors.SetMaxErrors(limit)
+}
+
+// SetStackCheck enables or disables the stack checker.
+func (c *Compiler) SetStackCheck(on bool) {
+	c.doStackCheck = on
 }
 
 // SetGlobal sets the value of a global expression macro.
@@ -223,6 +231,9 @@ func (c *Compiler) compile(lprog *loader.Program) (output []byte) {
 	// Run analysis. Note this is also disabled if there are errors because there could
 	// be lots of useless warnings otherwise.
 	c.checkLabelsUsed(prog, e)
+	if c.doStackCheck {
+		stackcheck.Check(lprog, c.errors)
+	}
 
 	// Create the bytecode.
 	return c.generateOutput(prog)
@@ -242,7 +253,7 @@ loop:
 		case isBytes(inst.op):
 			output = append(output, inst.data...)
 
-		case isPush(inst.op):
+		case ast.IsPush(inst.op):
 			if inst.dataSize > 32 {
 				panic("BUG: push dataSize > 32")
 			}

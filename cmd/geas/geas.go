@@ -49,6 +49,7 @@ func usage() {
 	 -o <file>          output file name
 	 -bin               output binary instead of hex
 	 -no-nl             skip newline at end of hex output
+     -stackcheck        enable stack checker
 
  -d: DISASSEMBLER
 
@@ -112,11 +113,13 @@ func assembler(args []string) {
 		outputFile = fs.String("o", "", "")
 		binary     = fs.Bool("bin", false, "")
 		noNL       = fs.Bool("no-nl", false, "")
+		stackcheck = fs.Bool("stackcheck", false, "")
 	)
 	parseFlags(fs, args)
 
 	// Assemble.
-	var c = asm.New(nil)
+	c := asm.New(nil)
+	c.SetStackCheck(*stackcheck)
 	var bin []byte
 	switch file := fileArg(fs); file {
 	case "-", "/dev/stdin":

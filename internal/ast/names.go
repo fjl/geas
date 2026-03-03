@@ -16,9 +16,27 @@
 
 package ast
 
-import "unicode"
+import (
+	"strings"
+	"unicode"
+)
 
 // IsGlobal returns true when 'name' is a global identifier.
 func IsGlobal(name string) bool {
 	return len(name) > 0 && unicode.IsUpper([]rune(name)[0])
+}
+
+// IsPush reports whether an op is a push.
+func IsPush(op string) bool {
+	return strings.HasPrefix(op, "PUSH")
+}
+
+// IsPush0 reports whether an op is the PUSH0 instruction.
+func IsPush0(op string) bool {
+	return strings.EqualFold(op, "PUSH0")
+}
+
+// IsJump reports whether an op is a jump.
+func IsJump(op string) bool {
+	return strings.HasPrefix(op, "JUMP")
 }

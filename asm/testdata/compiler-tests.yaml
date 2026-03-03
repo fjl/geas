@@ -8,11 +8,13 @@ assemble-directive-deprecated:
       #assemble "file.eas"
     files:
       file.eas: |
+        push 2
+        push 2
         add
         label:
         jump @label
   output:
-    bytecode: '6001 6001 01 01 5b 6001 56'
+    bytecode: '6001 6001 01 6002 6002 01 5b 6005 56'
     warnings:
       - ":4: warning: #assemble is deprecated, use #bytes assemble(...) instead"
 
@@ -25,11 +27,11 @@ assemble-macro-simple:
       #bytes assemble("file.eas")
     files:
       file.eas: |
-        add
+        caller
         label:
         jump @label
   output:
-    bytecode: '6001 6001 01 01 5b 6001 56'
+    bytecode: '6001 6001 01 33 5b 6001 56'
 
 assemble-macro-and-globals:
   # this reproduces an issue where global definitions got destroyed by #assemble
@@ -42,11 +44,11 @@ assemble-macro-and-globals:
       #bytes assemble("file.eas")
     files:
       file.eas: |
-        add
+        caller
         label:
         jump @label
   output:
-    bytecode: '6001 6001 01 01 5b 6001 56'
+    bytecode: '6001 6001 01 33 5b 6001 56'
 
 assemble-macro-globals-not-shared:
   input:
@@ -389,16 +391,13 @@ expr-macro-legacy-syntax:
 expr-macro-deprecated:
   input:
     code: |
-      sub
-      add
       push bytelen("abc")
       push bitlen("abc")
   output:
-    bytecode:
-      "030160036017"
+    bytecode: "6003 6017"
     warnings:
-        - ':3: warning: macro bytelen() is deprecated, use len()'
-        - ':4: warning: macro bitlen() is deprecated, use intbits()'
+        - ':1: warning: macro bytelen() is deprecated, use len()'
+        - ':2: warning: macro bitlen() is deprecated, use intbits()'
 
 expr-macro-deprecated-dedup-warning:
   input:
@@ -678,19 +677,20 @@ include-macro-private:
       a.evm: |
         #define em(x) = 1
         #define %im(x) {
-          push em(5)
-          add
+          push em(5)   ; [x]
+          pop          ; []
         }
         %im(5)
       b.evm: |
         #define em(x) = 2
         #define %im(x) {
-          push em(5)
-          sub
+          push em(5)   ; [x]
+          push 3       ; [y, x]
+          sub          ; []
         }
         %im(5)
   output:
-    bytecode: "6001 01 6002 03"
+    bytecode: "6001 50 6002 6003 03"
 
 include-relative-path:
   input:
@@ -715,11 +715,11 @@ instr-macro-def-with-params:
         add
       }
 
-      div
+      caller
       %myInstrMacro(1, 2)
-      mul
+      pop
   output:
-    bytecode: "04 6002 6004 01 02"
+    bytecode: "33 6002 6004 01 50"
 
 instr-macro-def-missing-percent:
   input:
@@ -743,11 +743,11 @@ instr-macro-def-without-params:
         add
       }
 
-      div
+      caller
       %myInstrMacro
-      mul
+      pop
   output:
-    bytecode: "04 6001 6002 01 02"
+    bytecode: "33 6001 6002 01 50"
 
 instr-macro-include:
   input:
@@ -942,7 +942,7 @@ expr-macro-duplicate-param-triple:
 immediates:
   input:
     code: |
-      dupn[17]
+      dupn[17]         ; [...]  (infinite stack...)
       dupn[18]
       add
       exchange[2, 3]
@@ -1105,37 +1105,35 @@ macro-call:
   input:
     code: |
       #define myMacro(a, b) = (100 + $a) / $b
-      ADD
       PUSH myMacro(4, 2)
+      PUSH 2
+      ADD
   output:
-    bytecode: "01 6034"
+    bytecode: "6034 6002 01"
 
 macro-ref:
   input:
     code: |
       #define myMacro = 100
-      ADD
       PUSH myMacro
   output:
-    bytecode: "01 60 64"
+    bytecode: "6064"
 
 macro-ref-call-empty:
   input:
     code: |
       #define myMacro() = 100
-      ADD
       PUSH myMacro
   output:
-    bytecode: "01 6064"
+    bytecode: "6064"
 
 macro-ref-call-empty-2:
   input:
     code: |
       #define myMacro = 100
-      ADD
       PUSH myMacro()
   output:
-    bytecode: 01 6064
+    bytecode: 6064
 
 push-expression:
   input:
@@ -1259,12 +1257,13 @@ unused-label-warning:
         push 1
         push 2
         add
+        pop
         jump @top
       end:
   output:
-    bytecode: "5b60016002016000565b"
+    bytecode: "5b 6001 6002 01 50 6000 56 5b"
     warnings:
-      - ':6: warning: label @end unused in program'
+      - ':7: warning: label @end unused in program'
 
 unused-label-in-include:
   input:
@@ -1273,16 +1272,18 @@ unused-label-in-include:
         push 1
         push 2
         add
+        pop
       #include "label.evm"
         jump @top
     files:
       label.evm: |
         push 3
+        pop
         label:
   output:
-    bytecode: "5b600160020160035b600056"
+    bytecode: "5b 6001 6002 01 50 6003 50 5b 6000 56"
     warnings:
-      - 'label.evm:2: warning: label @label unused in program'
+      - 'label.evm:3: warning: label @label unused in program'
 
 unused-label-in-macroexpansion:
   input:

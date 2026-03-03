@@ -19,7 +19,6 @@ package asm
 import (
 	"fmt"
 	"iter"
-	"strings"
 
 	"github.com/fjl/geas/internal/ast"
 	"github.com/fjl/geas/internal/loader"
@@ -225,16 +224,8 @@ func newInstruction(ast statement, op string) *instruction {
 	return &instruction{ast: ast, op: op}
 }
 
-func isPush(op string) bool {
-	return strings.HasPrefix(op, "PUSH")
-}
-
 func isBytes(op string) bool {
 	return op == "#bytes"
-}
-
-func isJump(op string) bool {
-	return strings.HasPrefix(op, "JUMP")
 }
 
 // explicitPushSize returns the declared PUSH size.

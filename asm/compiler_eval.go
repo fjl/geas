@@ -19,6 +19,8 @@ package asm
 import (
 	"errors"
 	"math/big"
+
+	"github.com/fjl/geas/internal/ast"
 )
 
 // preEvaluateArgs computes the initial argument values of instructions.
@@ -45,7 +47,7 @@ loop:
 				inst.dataSize = len(v)
 			}
 
-		case isPush(inst.op):
+		case ast.IsPush(inst.op):
 			if inst.expr() == nil {
 				continue loop // push0
 			}
@@ -84,7 +86,7 @@ loop:
 		case isBytes(inst.op):
 			panic("BUG: unevaluated #bytes in evaluateArgs")
 
-		case isPush(inst.op):
+		case ast.IsPush(inst.op):
 			if inst.expr() == nil {
 				continue loop // push0
 			}

@@ -49,7 +49,15 @@ type compilerTestYAML struct {
 }
 
 func TestCompiler(t *testing.T) {
-	content, err := os.ReadFile(filepath.Join("testdata", "compiler-tests.yaml"))
+	runCompilerTests(t, "compiler-tests.yaml")
+}
+
+func TestStackCheck(t *testing.T) {
+	runCompilerTests(t, "stackcheck-tests.yaml")
+}
+
+func runCompilerTests(t *testing.T, file string) {
+	content, err := os.ReadFile(filepath.Join("testdata", file))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,6 +83,8 @@ func TestCompiler(t *testing.T) {
 			for name, val := range test.Input.Globals {
 				c.SetGlobal(name, val)
 			}
+			c.SetStackCheck(true)
+
 			output := c.CompileString(test.Input.Code)
 
 			if len(test.Output.Errors) > 0 {

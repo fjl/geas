@@ -29,6 +29,7 @@ var (
 	errIncompleteComment = errors.New("incomplete stack comment")
 	errEmptyItem         = errors.New("empty item in stack comment")
 	errDoubleQuote       = errors.New("double-quote not allowed in stack comment")
+	errWildcardNotLast   = errors.New("wildcard (..) must be last item in stack comment")
 )
 
 type nestingError struct {
@@ -85,4 +86,35 @@ type ErrCommentRenamesItem struct {
 
 func (e ErrCommentRenamesItem) Error() string {
 	return fmt.Sprintf("comment introduces new name %s for existing stack item %s", e.NewName, e.Item)
+}
+
+// ErrMergeDepth is reported when predecessors of a merge point have different stack depths.
+type ErrMergeDepth struct {
+	Depths []int // distinct depths across predecessors
+}
+
+func (e ErrMergeDepth) Error() string {
+	return fmt.Sprintf("predecessors have inconsistent stack depth %v", e.Depths)
+}
+
+// ErrPushLiteralMismatch is reported when a push instruction has a literal number
+// argument and the stack comment names a different number for the pushed value.
+type ErrPushLiteralMismatch struct {
+	CommentValue string // number written in the comment
+	PushValue    string // number from the push argument
+}
+
+func (e ErrPushLiteralMismatch) Error() string {
+	return fmt.Sprintf("number %s in comment does not match pushed value %s", e.CommentValue, e.PushValue)
+}
+
+// ErrLoopUnbalanced is reported when a loop's back-edge arrives with a different
+// stack depth than the entry, meaning the loop grows or shrinks the stack each iteration.
+type ErrLoopUnbalanced struct {
+	EntryDepth    int
+	BackedgeDepth int
+}
+
+func (e ErrLoopUnbalanced) Error() string {
+	return fmt.Sprintf("loop has unbalanced stack: entry depth %d, back-edge depth %d", e.EntryDepth, e.BackedgeDepth)
 }
