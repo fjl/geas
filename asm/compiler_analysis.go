@@ -17,6 +17,8 @@
 package asm
 
 import (
+	"fmt"
+
 	"github.com/fjl/geas/internal/ast"
 	"github.com/fjl/geas/internal/evm"
 	"github.com/fjl/geas/internal/set"
@@ -33,6 +35,17 @@ func (c *Compiler) checkLabelsUsed(prog *compilerProg, e *evaluator) {
 		if !e.isLabelUsed(l.def) {
 			c.warnf(l.def, "label %v unused in program", l.def.Ref())
 		}
+	}
+}
+
+// checkDuplicateParams reports an error if the parameter list contains a repeated name.
+func (c *Compiler) checkDuplicateParams(st ast.Statement, params []string) {
+	seen := make(set.Set[string])
+	for _, p := range params {
+		if seen.Includes(p) {
+			c.errors.AddAt(st, fmt.Errorf("%w $%s in %s", ecDuplicateParam, p, st.Description()))
+		}
+		seen.Add(p)
 	}
 }
 

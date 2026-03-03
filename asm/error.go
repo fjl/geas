@@ -53,6 +53,7 @@ const (
 	ecNegativeResult
 	ecMissingImmediate
 	ecUnexpectedImmediate
+	ecDuplicateParam
 )
 
 func (e compilerError) Error() string {
@@ -97,6 +98,8 @@ func (e compilerError) Error() string {
 		return "missing immediate for opcode"
 	case ecUnexpectedImmediate:
 		return "unexpected immediate"
+	case ecDuplicateParam:
+		return "duplicate parameter"
 	default:
 		return fmt.Sprintf("invalid error %d", e)
 	}

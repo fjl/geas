@@ -909,6 +909,36 @@ instr-macro-variable-in-include-file-in-macro:
     errors:
       - "inc.eas:2: undefined macro parameter $param"
 
+instr-macro-duplicate-param:
+  input:
+    code: |
+      #define %mac(a, b, a) {
+        push $a
+      }
+      %mac(1, 2, 3)
+  output:
+    errors:
+      - ":1: duplicate parameter $a in definition of %mac"
+
+expr-macro-duplicate-param:
+  input:
+    code: |
+      #define dup(x, x) = $x
+      push dup(1, 2)
+  output:
+    errors:
+      - ":1: duplicate parameter $x in definition of dup"
+
+expr-macro-duplicate-param-triple:
+  input:
+    code: |
+      #define f(a, b, a, b) = $a + $b
+      push f(1, 2, 3, 4)
+  output:
+    errors:
+      - ":1: duplicate parameter $a in definition of f"
+      - ":1: duplicate parameter $b in definition of f"
+
 immediates:
   input:
     code: |

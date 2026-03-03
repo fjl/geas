@@ -27,6 +27,14 @@ import (
 // expand appends a list of AST instructions to the program.
 func (c *Compiler) expand(doc *ast.Document, prog *compilerProg) {
 	for _, astSt := range doc.Statements {
+		// Check for duplicate parameters in macro definitions.
+		switch astSt := astSt.(type) {
+		case *ast.ExpressionMacroDef:
+			c.checkDuplicateParams(astSt, astSt.Params)
+		case *ast.InstructionMacroDef:
+			c.checkDuplicateParams(astSt, astSt.Params)
+		}
+
 		st := statementFromAST(astSt)
 		if st == nil {
 			continue
