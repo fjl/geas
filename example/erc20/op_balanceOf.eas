@@ -20,7 +20,7 @@ BalanceOf:
     sload            ; [balance, ret_offset, ret_len]
 
     ;; prepare balance to return
-    dup2             ; [0, balance, ret_offset, ret_len]
+    dup2             ; [ret_offset, balance, ret_offset, ret_len]
     mstore           ; [ret_offset, ret_len]
 
     return           ; []
