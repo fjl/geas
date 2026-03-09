@@ -119,18 +119,18 @@ func assembler(args []string) {
 	// Assemble.
 	var c = asm.New(nil)
 	var bin []byte
-	file := fileArg(fs)
-	if file != "-" {
-		wd, _ := os.Getwd()
-		c.SetFilesystem(os.DirFS(wd))
-		fp := path.Clean(filepath.ToSlash(file))
-		bin = c.CompileFile(fp)
-	} else {
+	switch file := fileArg(fs); file {
+	case "-", "/dev/stdin":
 		source, err := io.ReadAll(io.LimitReader(os.Stdin, inputLimit))
 		if err != nil {
 			exit(1, err)
 		}
 		bin = c.CompileString(string(source))
+	default:
+		wd, _ := os.Getwd()
+		c.SetFilesystem(os.DirFS(wd))
+		fp := path.Clean(filepath.ToSlash(file))
+		bin = c.CompileFile(fp)
 	}
 
 	// Show errors.
@@ -180,10 +180,10 @@ func disassembler(args []string) {
 	// Read input.
 	var err error
 	var infd io.ReadCloser
-	file := fileArg(fs)
-	if file == "-" {
+	switch file := fileArg(fs); file {
+	case "-", "/dev/stdin":
 		infd = os.Stdin
-	} else {
+	default:
 		infd, err = os.Open(file)
 		if err != nil {
 			exit(1, err)
@@ -243,12 +243,13 @@ func formatter(args []string) {
 	var err error
 	var infd io.ReadCloser
 	file := fileArg(fs)
-	if file == "-" {
+	switch file {
+	case "-", "/dev/stdin":
 		infd = os.Stdin
 		if *writeBack {
-			exit(2, fmt.Errorf("can't use -w with stdout"))
+			exit(2, fmt.Errorf("can't use -w with stdin"))
 		}
-	} else {
+	default:
 		infd, err = os.Open(file)
 		if err != nil {
 			exit(1, err)
