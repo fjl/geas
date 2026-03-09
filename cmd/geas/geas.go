@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path"
 	"path/filepath"
 	"runtime/debug"
 	"slices"
@@ -123,14 +122,20 @@ func assembler(args []string) {
 	case "-", "/dev/stdin":
 		source, err := io.ReadAll(io.LimitReader(os.Stdin, inputLimit))
 		if err != nil {
-			exit(1, err)
+			exit(2, err)
 		}
 		bin = c.CompileString(string(source))
 	default:
-		wd, _ := os.Getwd()
-		c.SetFilesystem(os.DirFS(wd))
-		fp := path.Clean(filepath.ToSlash(file))
-		bin = c.CompileFile(fp)
+		root, err := os.OpenRoot(".")
+		if err != nil {
+			exit(2, err)
+		}
+		path, err := convertToRelativePath(file)
+		if err != nil {
+			exit(2, err)
+		}
+		c.SetFilesystem(root.FS())
+		bin = c.CompileFile(path)
 	}
 
 	// Show errors.
@@ -424,4 +429,25 @@ func version() string {
 		gitVersion += "-dirty"
 	}
 	return "git:" + gitVersion
+}
+
+// convertToRelativePath makes a filepath relative to the current directory
+// and encodes it as a slash-delimited path.
+func convertToRelativePath(input string) (string, error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	absInput, err := filepath.Abs(input)
+	if err != nil {
+		return "", err
+	}
+	rel, err := filepath.Rel(cwd, absInput)
+	if err != nil {
+		return "", err
+	}
+	if strings.HasPrefix(rel, "..") || filepath.IsAbs(rel) {
+		return "", fmt.Errorf("path %s escapes current directory", input)
+	}
+	return filepath.ToSlash(rel), nil
 }
