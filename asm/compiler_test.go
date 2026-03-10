@@ -179,9 +179,10 @@ func TestExamplePrograms(t *testing.T) {
 
 func compileExample(t *testing.T, exampleDir string, file string) string {
 	c := New(os.DirFS(exampleDir))
+	c.SetStackCheck(true)
 	output := c.CompileFile(file)
 	for _, err := range c.ErrorsAndWarnings() {
-		t.Log(err)
+		t.Error(err)
 	}
 	if c.Failed() {
 		t.Error("compilation failed:")
