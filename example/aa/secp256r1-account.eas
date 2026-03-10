@@ -1,0 +1,136 @@
+;;; -*- mode: asm -*-
+;;;
+;;; secp256r1 account contract
+;;;
+;;; This contract is an example account for EIP-8141. It verifies the signature
+;;; against a secp256r1 public key which is placed at the end of code by the
+;;; constructor.
+
+#pragma target "bogota"
+
+;;; MACROS ---------------------------------------------------------------------
+
+#define P256VERIFY = address(0x0000000000000000000000000000000000000100)
+
+;;; APPROVE scopes
+
+#define approveExecution = 0
+#define approvePayment = 1
+#define approveBoth = 2
+
+;;; frame modes
+
+#define defaultMode = 0
+#define verifyMode = 1
+#define senderMode = 2
+
+;;; frame parameter access
+
+#define %getSignatureHash {            ; []
+    push 0                             ; [offset]
+    push 0                             ; [in2, offset]
+    push 0x08                          ; [in1, in2, offset]
+    txparamload                        ; [sighash]
+}
+
+#define %getCurrentFrame {             ; []
+    push 0                             ; [offset]
+    push 0                             ; [in2, offset]
+    push 0x10                          ; [in1, in2, offset]
+    txparamload                        ; [frameIndex]
+}
+
+#define %getFrameMode {                ; [frameIndex]
+    push 0                             ; [offset, frameIndex]
+    swap1                              ; [frameIndex, offset]
+    push 0x14                          ; [in1, frameIndex, offset]
+    txparamload                        ; [mode]
+}
+
+;;; validation macro
+
+#define %checkEq(expected, errcode) {  ; [v]
+    push $errcode                      ; [err, v]
+    swap1                              ; [v, err]
+    push $expected                     ; [expected, v, err]
+    eq                                 ; [v==expected, err]
+    iszero                             ; [v!=expected, err]
+    jumpi @fail                        ; [err]
+    pop                                ; []
+}
+
+;;; contract error codes (for debugging)
+
+#define invalidFrameStructure = 0
+#define invalidSignatureSize = 1
+#define invalidSignature = 2
+
+;;; PROGRAM START --------------------------------------------------------------
+
+    ;; Check this is the first frame, and it must be a VERIFY frame.
+    %getCurrentFrame                   ; [frame]
+    %checkEq(0, invalidFrameStructure)
+    push 0                             ; [frame]
+    %getFrameMode                      ; [mode]
+    %checkEq(verifyMode, invalidFrameStructure)
+
+    ;; Check that a signature of length 64 bytes has been provided.
+    calldatasize                       ; [size]
+    %checkEq(64, invalidSignatureSize)
+
+    ;; Check the signature.
+    ;; The memory layout expected by the precompile is:
+    ;;
+    ;;   hash::32 || r::32 || s::32 || qx::32 || qx::32
+    ;;
+    ;; Build that payload.
+    %getSignatureHash                  ; [hash]
+    push 0                             ; [offset, hash]
+    mstore                             ; []
+    push 64                            ; [length]
+    push 0                             ; [dataOffset, length]
+    push 32                            ; [memOffset, dataOffset, length]
+    calldatacopy                       ; []
+    push 64                            ; [length]
+    push @pubkeyData                   ; [codeOffset, length]
+    push (32 + 64)                     ; [memOffset, codeOffset, length]
+    codecopy                           ; []
+    ;; Now call the precompile.
+    push 0                             ; [retLength]
+    push 0                             ; [retOffset, retLength]
+    push (32 + 64*2)                   ; [inLength, retOffset, retLength]
+    push 0                             ; [inOffset, inLength, retOffset, retLength]
+    push P256VERIFY                    ; [address, inOffset, inLength, retOffset, retLength]
+    gas                                ; [gas, address, inOffset, inLength, retOffset, retLength]
+    staticcall                         ; [ok]
+    %checkEq(0, invalidSignature)      ; []
+    ;; The signature is valid.
+
+    ;; Be default, we approve both execution and payment.
+    push approveBoth                   ; [scope]
+
+    ;; However, if the next frame is a VERIFY frame, it must be a sponsored transaction,
+    ;; so we approve execution only, and leave approval of payment open to next frame.
+    push 1                             ; [frame, scope]
+    %getFrameMode                      ; [mode, scope]
+    push verifyMode                    ; [vfy, mode, scope]
+    eq                                 ; [mode==vfy, scope]
+    iszero                             ; [mode!=vfy, scope]
+    jumpi @approve                     ; [scope]
+    pop                                ; []
+    push approveExecution              ; [scope]
+
+approve:                               ; [scope]
+    push 0                             ; [length, scope]
+    push 0                             ; [offset, length, scope]
+    approve                            ; []
+
+fail:                                  ; [errorcode]
+    push 0                             ; [ptr, errorcode]
+    mstore8                            ; []
+    push 1                             ; [length]
+    push 0                             ; [offset, length]
+    revert                             ; []
+
+;;; The constructor places a 64-byte pubkey at the end of code.
+.pubkeyData:
