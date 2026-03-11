@@ -17,6 +17,7 @@
 package stack
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -88,7 +89,7 @@ func (t *stackTest) applyErr(op *evm.Op, imm byte, comment string, wantErr error
 	if err == nil {
 		t.t.Fatalf("expected error, got none")
 	}
-	if !reflect.DeepEqual(err, wantErr) {
+	if err.Error() != wantErr.Error() {
 		t.t.Fatalf("wrong error: %v\n         want: %v", err, wantErr)
 	}
 }
@@ -106,12 +107,12 @@ func TestStackAnalysis(t *testing.T) {
 	)
 	t.Run("ok", func(t *testing.T) {
 		st := newTest(t, "[a, b, c, d]")
-		st.applyOK(dup2, 0, "[b, a, b, c]")
-		st.applyOK(add, 0, "[sum, b, c]")
-		st.applyOK(swap2, 0, "[c, b, sum]")
-		st.applyOK(dup1, 0, "[c, c, b, sum]")
-		st.applyOK(push1, 0, "[val, c, c, b, sum]")
-		st.applyOK(swap2, 0, "[c, c, val, b, sum]")
+		st.applyOK(dup2, 0, "[b, a, b, c, d]")
+		st.applyOK(add, 0, "[sum, b, c, d]")
+		st.applyOK(swap2, 0, "[c, b, sum, d]")
+		st.applyOK(dup1, 0, "[c, c, b, sum, d]")
+		st.applyOK(push1, 0, "[val, c, c, b, sum, d]")
+		st.applyOK(swap2, 0, "[c, c, val, b, sum, d]")
 	})
 	t.Run("numberZero", func(t *testing.T) {
 		st := newTest(t, "[a]")
@@ -125,39 +126,26 @@ func TestStackAnalysis(t *testing.T) {
 	t.Run("commentMismatch", func(t *testing.T) {
 		st := newTest(t, "[a, b, c, d]")
 		st.applyErr(add, 0, "[sum, d, c]",
-			ErrMismatch{
-				Items: []string{"sum", "c", "d"},
-				Slot:  1,
-				Want:  "d",
-			},
+			fmt.Errorf("%w: item %d differs (expected %q, have %q) in [sum, c, d]", ErrMismatch, 1, "d", "c"),
 		)
 	})
 	t.Run("opUnderflows", func(t *testing.T) {
 		st := newTest(t, "[a]")
 		st.applyErr(add, 0, "[sum]",
-			ErrOpUnderflows{
-				Want: 2,
-				Have: 1,
-			},
+			fmt.Errorf("%w: op requires %d items, stack has %d", ErrOpUnderflow, 2, 1),
 		)
 	})
 	t.Run("commentUnderflows", func(t *testing.T) {
 		st := newTest(t, "[a, b]")
 		st.applyErr(add, 0, "[sum, b]",
-			ErrCommentUnderflows{
-				Items: []string{"sum"},
-				Want:  2,
-			},
+			fmt.Errorf("%w: stack has %d items, comment declares %d", ErrCommentUnderflow, 1, 2),
 		)
 	})
 	t.Run("stackItemRenamed", func(t *testing.T) {
 		st := newTest(t, "[a, b]")
 		st.applyOK(push1, 0, "[x, a, b]")
 		st.applyErr(add, 0, "[sum, c]",
-			ErrCommentRenamesItem{
-				Item:    "b",
-				NewName: "c",
-			},
+			fmt.Errorf("%w: %s renamed to %s", ErrRename, "b", "c"),
 		)
 	})
 
@@ -181,10 +169,10 @@ func TestStackAnalysis(t *testing.T) {
 		st := newTest(t, "[a]")
 		st.applyOK(push1, 0, "[x, a]")
 		st.applyOK(add, 0, "[sum]")
-		// Now "x" and "a" are consumed, we should be able to reuse those names
-		st.applyOK(push1, 0, "[x]")
-		st.applyOK(push1, 0, "[a, x]")
-		st.applyOK(add, 0, "[result]")
+		// Now "x" and "a" are consumed, we should be able to reuse those names.
+		st.applyOK(push1, 0, "[x, sum]")
+		st.applyOK(push1, 0, "[a, x, sum]")
+		st.applyOK(add, 0, "[result, sum]")
 	})
 
 	// Test combination: reuse name while another item with that name
@@ -206,11 +194,7 @@ func TestStackAnalysis(t *testing.T) {
 		// After SWAP1, the stack is [b, a], not [a, b].
 		// Claiming it's still [a, b] should error at position 0.
 		st.applyErr(swap1, 0, "[a, b]",
-			ErrMismatch{
-				Items: []string{"b", "a"},
-				Slot:  0,
-				Want:  "a",
-			},
+			fmt.Errorf("%w: item %d differs (expected %q, have %q) in [b, a]", ErrMismatch, 0, "a", "b"),
 		)
 	})
 }
@@ -240,7 +224,7 @@ func TestMergeInit(t *testing.T) {
 		if err == nil {
 			t.Fatal("expected error, got none")
 		}
-		want := ErrCommentRenamesItem{Item: "a", NewName: "renamed"}
+		want := fmt.Errorf("%w: %s renamed to %s", ErrRename, "a", "renamed")
 		if err.Error() != want.Error() {
 			t.Fatalf("wrong error: %v\n         want: %v", err, want)
 		}
@@ -333,11 +317,7 @@ func TestInferred(t *testing.T) {
 		// After SWAP1, the stack is [a, b]. Claiming [a, a] should fail
 		// because position 1 contains b, not a.
 		st.applyErr(swap1, 0, "[a, a]",
-			ErrMismatch{
-				Items: []string{"a", "b"},
-				Slot:  1,
-				Want:  "a",
-			},
+			fmt.Errorf("%w: item %d differs (expected %q, have %q) in [a, b]", ErrMismatch, 1, "a", "b"),
 		)
 	})
 
@@ -508,11 +488,7 @@ func TestWildcard(t *testing.T) {
 	t.Run("wildcardCommentChecksMismatch", func(t *testing.T) {
 		st := newTest(t, "[a, b, ..]")
 		st.applyErr(swap1, 0, "[a, a, ..]",
-			ErrMismatch{
-				Items: []string{"b", "a"},
-				Slot:  0,
-				Want:  "a",
-			},
+			fmt.Errorf("%w: item %d differs (expected %q, have %q) in [b, a, ..]", ErrMismatch, 0, "a", "b"),
 		)
 	})
 

@@ -7,7 +7,7 @@ name-mismatch:
   output:
     bytecode: "6001 6002 90"
     warnings:
-      - ':3: stack comment: stack item 1 differs (expected "a", have "b") in [a, b]'
+      - ':3: stack comment item mismatch: item 1 differs (expected "a", have "b") in [a, b]'
 
 # This checks that a mismatch error on line 3 doesn't produce
 # additional warnings on line 4, where the mismatched name is used again.
@@ -21,7 +21,7 @@ name-mismatch-no-cascade:
   output:
     bytecode: "6001 6002 90 50"
     warnings:
-      - ':3: stack comment: stack item 1 differs (expected "a", have "b") in [a, b]'
+      - ':3: stack comment item mismatch: item 1 differs (expected "a", have "b") in [a, b]'
 
 rename-error:
   input:
@@ -32,7 +32,7 @@ rename-error:
   output:
     bytecode: "6001 6002 90"
     warnings:
-      - ":3: stack comment: comment introduces new name renamed for existing stack item b"
+      - ":3: stack comment renames item: b renamed to renamed"
 
 # This checks that a rename error on line 3 doesn't produce
 # additional warnings on subsequent lines using the renamed item.
@@ -47,7 +47,7 @@ rename-no-cascade:
   output:
     bytecode: "6001 6002 80 50 50"
     warnings:
-      - ":3: stack comment: comment introduces new name renamed for existing stack item a"
+      - ":3: stack comment renames item: a renamed to renamed"
 
 # Here, a comment has more items than the virtual stack.
 comment-overflow:
@@ -59,7 +59,7 @@ comment-overflow:
   output:
     bytecode: "6001 6002 01"
     warnings:
-      - ":3: stack comment: stack has 1 items, comment declares 2"
+      - ":3: stack comment underflow: stack has 1 items, comment declares 2"
 
 # At a control-flow merge point, names that disagree across predecessors should
 # be freely renameable by the label comment without warnings.
@@ -85,7 +85,7 @@ merge-rename-no-label-comment:
       push 1        ; [a]
       push 0        ; [cond, a]
       jumpi @target ; [a]
-      push 2        ; [b]
+      push 2        ; [b, a]
       add           ; [a+b]
       target:
       dup1          ; [x, x]
@@ -121,7 +121,7 @@ merge-loop-rename:
 loop-overflow:
   input:
     code: |
-      loop:        ; []
+      loop:
       push 1       ; [x]
       gas          ; [gas, x]
       push 100     ; [tv, gas, x]
@@ -130,7 +130,7 @@ loop-overflow:
   output:
     bytecode: "5b 6001 5a 6064 10 6000 57"
     warnings:
-      - ':1: stack comment: loop has unbalanced stack: entry depth 0, back-edge depth 1'
+      - ':1: loop unbalanced: entry depth 0, back-edge depth 1'
 
 jump-with-arg:
   input:
@@ -183,7 +183,7 @@ macro-mismatch:
   output:
     bytecode: "6001 6002 90"
     warnings:
-      - ':4: stack comment: stack item 1 differs (expected "a", have "b") in [a, b]'
+      - ':4: stack comment item mismatch: item 1 differs (expected "a", have "b") in [a, b]'
 
 # Loop with a label comment that agrees with both the forward edge
 # and the back-edge. Should produce no warnings.
@@ -214,16 +214,14 @@ loop-backedge-rename:
   input:
     code: |
       push 1       ; [x]
-      loop:          ; [v]
+      loop:        ; [v]
       dup1         ; [v, v]
-      push 0       ; [cond, v, v]
-      jumpi @loop  ; [v, v]
-      pop          ; [v]
-      stop
+      mul          ; [v*v]
+      push 0       ; [cond, v*v]
+      jumpi @loop  ; [v*v]
+      pop          ; []
   output:
-    bytecode: "6001 5b 80 5f 6002 57 50 00"
-    warnings:
-      - ':2: stack comment: loop has unbalanced stack: entry depth 1, back-edge depth 2'
+    bytecode: "6001 5b 80 02 5f 6002 57 50"
 
 # Loop where the back-edge contradicts the label comment.
 # The forward edge has [x] and the back-edge has [sum]. The label
@@ -233,32 +231,32 @@ loop-backedge-rename:
 loop-backedge-disagree:
   input:
     code: |
-      push 1       ; [x]
-      loop:          ; [x]
-      push 2       ; [y, x]
-      add          ; [sum]
-      dup1         ; [sum, sum]
-      jumpi @loop  ; [sum]
-      stop
+      push 1       ; [v]     <- difference to prev test is here
+      loop:        ; [v]
+      dup1         ; [v, v]
+      mul          ; [v*v]
+      push 0       ; [cond, v*v]
+      jumpi @loop  ; [v*v]
+      pop          ; []
   output:
-    bytecode: "6001 5b 6002 01 80 6002 57 00"
+    bytecode: "6001 5b 80 02 5f 6002 57 50"
 
 # Both predecessors of the loop header agree on "x", so the name
 # is confirmed. The label comment tries to rename it, which is an error.
 loop-confirmed-rename:
   input:
     code: |
-      push 1       ; [x]
-      loop:          ; [wrong]
-      dup1         ; [x, x]
-      pop          ; [x]
-      push 0       ; [cond, x]
-      jumpi @loop  ; [x]
-      stop
+      push 1       ; [v]
+      loop:        ; [wrong]
+      dup1         ; [v, v]
+      mul          ; [v]
+      push 0       ; [cond, v]
+      jumpi @loop  ; [v]
+      pop          ; []
   output:
-    bytecode: "6001 5b 80 50 5f 6002 57 00"
+    bytecode: "6001 5b 80 02 5f 6002 57 50"
     warnings:
-      - ':2: stack comment: comment introduces new name wrong for existing stack item x'
+      - ':2: stack comment renames item: v renamed to wrong'
 
 # Inside a loop body, the swap1 comment claims [a, a] but the stack is
 # actually [a, b]. This mismatch is caught because the iterative analysis
@@ -277,7 +275,7 @@ loop-body-mismatch:
   output:
     bytecode: "6001 6002 5b 90 90 5f 6004 57 00"
     warnings:
-      - ':4: stack comment: stack item 1 differs (expected "a", have "b") in [a, b]'
+      - ':4: stack comment item mismatch: item 1 differs (expected "a", have "b") in [a, b]'
 
 # The label comment at the loop header declares more items than
 # available. Both predecessors have depth 1, so declaring 2 items
@@ -286,7 +284,7 @@ loop-label-underflow:
   input:
     code: |
       push 1       ; [x]
-      loop:          ; [x, extra]
+      loop:        ; [x, extra]
       dup1         ; [x, x]
       pop          ; [x]
       push 0       ; [cond, x]
@@ -295,7 +293,7 @@ loop-label-underflow:
   output:
     bytecode: "6001 5b 80 50 5f 6002 57 00"
     warnings:
-      - ':2: stack comment: stack has 1 items, comment declares 2'
+      - ':2: stack comment underflow: stack has 1 items, comment declares 2'
 
 # Nested loops: outer loop contains an inner loop. Both loops have
 # balanced stack effects and label comments. Verifies convergence.
@@ -303,9 +301,9 @@ nested-loops:
   input:
     code: |
       push 0       ; [outer]
-      outer:         ; [outer]
+      outer:       ; [outer]
       push 0       ; [inner, outer]
-      inner:         ; [inner, outer]
+      inner:       ; [inner, outer]
       push 1       ; [1, inner, outer]
       add          ; [inner+1, outer]
       dup1         ; [inner+1, inner+1, outer]
@@ -401,7 +399,7 @@ loop-no-label-comment-mismatch:
   output:
     bytecode: "6001 6002 5b 90 90 5f 6004 57 00"
     warnings:
-      - ':4: stack comment: stack item 1 differs (expected "a", have "b") in [a, b]'
+      - ':4: stack comment item mismatch: item 1 differs (expected "a", have "b") in [a, b]'
 
 # Nested loops without label comments. Body comments are correct.
 nested-loops-no-label-comments:
@@ -454,7 +452,7 @@ nested-loops-no-label-comments-inner-mismatch:
   output:
     bytecode: "5f 5b 5f 5b 6001 01 80 600a 10 6003 57 50 6001 01 80 6003 10 6001 57 00"
     warnings:
-      - ':6: stack comment: comment introduces new name wrong for existing stack item outer'
+      - ':6: stack comment renames item: outer renamed to wrong'
 
 # Nested loops without label comments. The pop comment in the outer
 # loop body tries to rename "outer" to "wrong". Since both the forward
@@ -483,7 +481,7 @@ nested-loops-no-label-comments-outer-mismatch:
   output:
     bytecode: "5f 5b 5f 5b 6001 01 80 600a 10 6003 57 50 6001 01 80 6003 10 6001 57 00"
     warnings:
-      - ':11: stack comment: comment introduces new name wrong for existing stack item outer'
+      - ':11: stack comment renames item: outer renamed to wrong'
 
 # Nested loops with label comments. The inner loop label comment
 # declares more items than available on the stack (underflow).
@@ -491,9 +489,9 @@ nested-loop-inner-label-underflow:
   input:
     code: |
       push 0       ; [outer]
-      outer:         ; [outer]
+      outer:       ; [outer]
       push 0       ; [inner, outer]
-      inner:         ; [inner, outer, extra]
+      inner:       ; [inner, outer, extra]     <- issue is here
       push 1       ; [1, inner, outer]
       add          ; [inner+1, outer]
       dup1         ; [inner+1, inner+1, outer]
@@ -511,7 +509,7 @@ nested-loop-inner-label-underflow:
   output:
     bytecode: "5f 5b 5f 5b 6001 01 80 600a 10 6003 57 50 6001 01 80 6003 10 6001 57 00"
     warnings:
-      - ':4: stack comment: stack has 2 items, comment declares 3'
+      - ':4: stack comment underflow: stack has 2 items, comment declares 3'
 
 # Nested loops with label comments. The outer label comment tries to
 # rename the confirmed name "x". Both the initial push and the
@@ -520,9 +518,9 @@ nested-loop-outer-confirmed-rename:
   input:
     code: |
       push 1       ; [x]
-      outer:         ; [wrong]
+      outer:       ; [wrong]
       dup1         ; [x, x]
-      inner:         ; [x, x]
+      inner:       ; [x, x]
       pop          ; [x]
       dup1         ; [x, x]
       push 0       ; [cond, x, x]
@@ -534,7 +532,7 @@ nested-loop-outer-confirmed-rename:
   output:
     bytecode: "6001 5b 80 5b 50 80 5f 6004 57 50 5f 6002 57 00"
     warnings:
-      - ':2: stack comment: comment introduces new name wrong for existing stack item x'
+      - ':2: stack comment renames item: x renamed to wrong'
 
 # Nested loops with label comments. The swap1 comment inside the inner
 # loop body claims [outer, outer] but the stack is [outer, inner].
@@ -544,9 +542,9 @@ nested-loop-inner-body-mismatch:
   input:
     code: |
       push 0       ; [outer]
-      outer:         ; [outer]
+      outer:       ; [outer]
       push 0       ; [inner, outer]
-      inner:         ; [inner, outer]
+      inner:       ; [inner, outer]
       swap1        ; [outer, outer]
       swap1        ; [inner, outer]
       push 1       ; [1, inner, outer]
@@ -566,7 +564,7 @@ nested-loop-inner-body-mismatch:
   output:
     bytecode: "5f 5b 5f 5b 90 90 6001 01 80 600a 10 6003 57 50 6001 01 80 6003 10 6001 57 00"
     warnings:
-      - ':5: stack comment: stack item 1 differs (expected "outer", have "inner") in [outer, inner]'
+      - ':5: stack comment item mismatch: item 1 differs (expected "outer", have "inner") in [outer, inner]'
 
 # Four-way merge where two branches arrive with depth 1 and two with
 # depth 2. The warning reports the inconsistent depths.
@@ -591,7 +589,9 @@ merge-four-way-depth-mismatch:
   output:
     bytecode: "6001 5f 600f 57 5f 6016 57 6002 6016 56 5b 5f 6016 57 6003 5b 00"
     warnings:
-      - ':14: stack comment: predecessors have inconsistent stack depth [1 2]'
+      - ':14: stack depth mismatch at merge point: predecessors have depths [1 2]'
+      - ':7: stack comment depth mismatch: label @target expects 1 items, jump sends 2'
+      - ':12: stack comment depth mismatch: label @target expects 1 items, jump sends 2'
 
 # Wildcard in a label comment at a merge point suppresses the depth
 # mismatch warning. Two predecessors arrive with different depths,
@@ -636,7 +636,7 @@ wildcard-name-mismatch:
   output:
     bytecode: "6001 6002 90"
     warnings:
-      - ':3: stack comment: stack item 1 differs (expected "a", have "b") in [a, b]'
+      - ':3: stack comment item mismatch: item 1 differs (expected "a", have "b") in [a, b, ..]'
 
 # Loop overflow at block 0, without a label comment. The loop body
 # pushes one extra item per iteration.
@@ -652,7 +652,7 @@ loop-overflow-no-label-comment:
   output:
     bytecode: "5b 6001 5a 6064 10 6000 57"
     warnings:
-      - ':1: stack comment: loop has unbalanced stack: entry depth 0, back-edge depth 1'
+      - ':1: loop unbalanced: entry depth 0, back-edge depth 1'
 
 # Loop at block 0 with balanced stack effect. No warning should
 # be produced since the back-edge depth matches the entry depth.
@@ -707,7 +707,7 @@ push-literal-mismatch:
   output:
     bytecode: "6001"
     warnings:
-      - ':1: stack comment: number 2 in comment does not match pushed value 1'
+      - ':1: push literal mismatch in stack comment: number 2 in comment does not match pushed value 1'
 
 push-literal-mismatch-hex:
   input:
@@ -716,7 +716,7 @@ push-literal-mismatch-hex:
   output:
     bytecode: "60ff"
     warnings:
-      - ':1: stack comment: number 256 in comment does not match pushed value 0xff'
+      - ':1: push literal mismatch in stack comment: number 256 in comment does not match pushed value 0xff'
 
 push0-literal-mismatch:
   input:
@@ -725,4 +725,176 @@ push0-literal-mismatch:
   output:
     bytecode: "5f"
     warnings:
-      - ':1: stack comment: number 1 in comment does not match pushed value 0'
+      - ':1: push literal mismatch in stack comment: number 1 in comment does not match pushed value 0'
+
+# A macro jumps to a label in the outer document. The stack at the jump
+# matches the label comment. No warnings should be produced.
+macro-external-jump:
+  input:
+    code: |
+      #define %check() { ; [cond, err]
+          jumpi @fail    ; [err]
+      }
+      push 1         ; [err]
+      push 0         ; [cond, err]
+      %check()       ; [err]
+      pop            ; []
+      stop
+      fail:          ; [err]
+      stop
+  output:
+    bytecode: "6001 5f 6008 57 50 00 5b 00"
+
+# A macro jumps to a label in the outer document, but the macro has an
+# extra item on the stack at the jump point. The label comment declares
+# one item, but two arrive. The checker detects the depth mismatch.
+macro-external-jump-depth-mismatch:
+  input:
+    code: |
+      #define %check() { ; [cond, err]
+          push 99        ; [junk, cond, err]
+          swap1          ; [cond, junk, err]
+          jumpi @fail    ; [junk, err]
+          pop            ; [err]
+      }
+      push 1         ; [err]
+      push 0         ; [cond, err]
+      %check()       ; [err]
+      pop            ; []
+      stop
+      fail:          ; [err]
+      stop
+  output:
+    bytecode: "6001 5f 6063 90 600c 57 50 50 00 5b 00"
+    warnings:
+      - ':4: stack comment depth mismatch: label @fail expects 1 items, jump sends 2'
+
+# Same as macro-external-jump-depth-mismatch, but the label uses a
+# wildcard comment. The wildcard suppresses the depth warning.
+macro-external-jump-wildcard-suppresses:
+  input:
+    code: |
+      #define %check() { ; [cond, err]
+          push 99        ; [junk, cond, err]
+          swap1          ; [cond, junk, err]
+          jumpi @fail    ; [junk, err]
+          pop            ; [err]
+      }
+      push 1         ; [err]
+      push 0         ; [cond, err]
+      %check()       ; [err]
+      pop            ; []
+      stop
+      fail:          ; [err, ..]
+      stop
+  output:
+    bytecode: "6001 5f 6063 90 600c 57 50 50 00 5b 00"
+
+# Non-wildcard comment declares fewer items than the stack has.
+comment-depth-mismatch:
+  input:
+    code: |
+      push 1    ; [a]
+      push 2    ; [b]
+  output:
+    bytecode: "6001 6002"
+    warnings:
+      - ':2: stack comment depth mismatch: stack has 2 items, comment declares 1'
+
+# An empty comment on a non-empty stack warns.
+comment-depth-empty:
+  input:
+    code: |
+      push 1    ; [a]
+      push 2    ; [b, a]
+      pop       ; []
+  output:
+    bytecode: "6001 6002 50"
+    warnings:
+      - ':3: stack comment depth mismatch: stack has 1 items, comment declares 0'
+
+# Correct full-stack comment: no warning.
+comment-depth-ok:
+  input:
+    code: |
+      push 1    ; [a]
+      push 2    ; [b, a]
+      pop       ; [a]
+  output:
+    bytecode: "6001 6002 50"
+
+# Wildcard comment opts out of depth checking.
+comment-depth-wildcard-ok:
+  input:
+    code: |
+      push 1    ; [a]
+      push 2    ; [b, ..]
+  output:
+    bytecode: "6001 6002"
+
+# A depth mismatch should not cascade: after the first warning, the stack
+# is truncated to match the comment so subsequent comments stay consistent.
+comment-depth-no-cascade:
+  input:
+    code: |
+      push 1    ; [a]
+      push 2    ; [b]
+      push 3    ; [c, b]
+      pop       ; [b]
+      pop       ; []
+      stop
+  output:
+    bytecode: "6001 6002 6003 50 50 00"
+    warnings:
+      - ':2: stack comment depth mismatch: stack has 2 items, comment declares 1'
+
+# When a macro jumps to an external label with the wrong depth,
+# the error should be reported at the macro call site, not the label.
+# Error is reported on the jump inside the macro, not at the call site.
+macro-external-jump-error-at-jump:
+  input:
+    code: |
+      #define %check() { ; [cond, err]
+          push 99        ; [junk, cond, err]
+          swap1          ; [cond, junk, err]
+          jumpi @fail    ; [junk, err]
+          pop            ; [err]
+      }
+      push 1         ; [err]
+      push 0         ; [cond, err]
+      %check()       ; [err]
+      pop            ; []
+      stop
+      fail:          ; [err]
+      stop
+  output:
+    bytecode: "6001 5f 6063 90 600c 57 50 50 00 5b 00"
+    warnings:
+      - ':4: stack comment depth mismatch: label @fail expects 1 items, jump sends 2'
+
+# Multiple call sites of the same macro: error reported once on the jump.
+macro-external-jump-multiple-callsites:
+  input:
+    code: |
+      #define %check() { ; [cond, err]
+          push 99        ; [junk, cond, err]
+          swap1          ; [cond, junk, err]
+          jumpi @fail    ; [junk, err]
+          pop            ; [err]
+      }
+      push 1         ; [err]
+      push 0         ; [cond, err]
+      %check()       ; [err]
+      push 2         ; [err2, err]
+      push 0         ; [cond, err2, err]
+      %check()       ; [err2, err]
+      pop            ; [err]
+      pop            ; []
+      stop
+      fail:          ; [err]
+      stop
+  output:
+    bytecode: "60015f6063906017575060025f606390601757505050005b00"
+    warnings:
+      - ':16: stack depth mismatch at merge point: predecessors have depths [2 3]'
+      - ':4: stack comment depth mismatch: label @fail expects 1 items, jump sends 3'

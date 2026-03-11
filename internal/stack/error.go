@@ -40,81 +40,18 @@ func (e nestingError) Error() string {
 	return fmt.Sprintf("expected %c to close %c, found %c", e.expected, e.opening, e.found)
 }
 
-// Analysis errors.
+// Analysis errors raised by [Stack.Apply] and [Stack.CheckComment].
+var (
+	ErrOpUnderflow      = errors.New("stack underflow")
+	ErrCommentUnderflow = errors.New("stack comment underflow")
+	ErrCommentDepth     = errors.New("stack comment depth mismatch")
+	ErrMismatch         = errors.New("stack comment item mismatch")
+	ErrRename           = errors.New("stack comment renames item")
+)
 
-// ErrOpUnderflows is reported when an operation uses more items than are currently
-// available on the stack.
-type ErrOpUnderflows struct {
-	Want int // how many slots the op consumes
-	Have int // current stack depth
-}
-
-func (e ErrOpUnderflows) Error() string {
-	return fmt.Sprintf("stack underflow: op requires %d items, stack has %d", e.Want, e.Have)
-}
-
-// ErrCommentUnderflows is reported when a stack comment declares more items than
-// are currently available on the stack.
-type ErrCommentUnderflows struct {
-	Items []string // computed stack
-	Want  int      // how many slots the comment declares
-}
-
-func (e ErrCommentUnderflows) Error() string {
-	return fmt.Sprintf("stack has %d items, comment declares %d", len(e.Items), e.Want)
-}
-
-// ErrMismatch is reported when a stack comment declares a specific item should be
-// contained in a stack slot, but the stack is known to contain a different one at the
-// same position.
-type ErrMismatch struct {
-	Items []string // computed stack
-	Slot  int      // stack slot index
-	Want  string   // what the comment has at that index
-}
-
-func (e ErrMismatch) Error() string {
-	return fmt.Sprintf("stack item %d differs (expected %q, have %q) in %s", e.Slot, e.Want, e.Items[e.Slot], render(e.Items))
-}
-
-// ErrCommentRenamesItem is raised when the stack comment changes the name of an existing
-// item, i.e. one that wasn't produced by the current operation.
-type ErrCommentRenamesItem struct {
-	Item    string
-	NewName string
-}
-
-func (e ErrCommentRenamesItem) Error() string {
-	return fmt.Sprintf("comment introduces new name %s for existing stack item %s", e.NewName, e.Item)
-}
-
-// ErrMergeDepth is reported when predecessors of a merge point have different stack depths.
-type ErrMergeDepth struct {
-	Depths []int // distinct depths across predecessors
-}
-
-func (e ErrMergeDepth) Error() string {
-	return fmt.Sprintf("predecessors have inconsistent stack depth %v", e.Depths)
-}
-
-// ErrPushLiteralMismatch is reported when a push instruction has a literal number
-// argument and the stack comment names a different number for the pushed value.
-type ErrPushLiteralMismatch struct {
-	CommentValue string // number written in the comment
-	PushValue    string // number from the push argument
-}
-
-func (e ErrPushLiteralMismatch) Error() string {
-	return fmt.Sprintf("number %s in comment does not match pushed value %s", e.CommentValue, e.PushValue)
-}
-
-// ErrLoopUnbalanced is reported when a loop's back-edge arrives with a different
-// stack depth than the entry, meaning the loop grows or shrinks the stack each iteration.
-type ErrLoopUnbalanced struct {
-	EntryDepth    int
-	BackedgeDepth int
-}
-
-func (e ErrLoopUnbalanced) Error() string {
-	return fmt.Sprintf("loop has unbalanced stack: entry depth %d, back-edge depth %d", e.EntryDepth, e.BackedgeDepth)
-}
+// Checker errors raised by the stackcheck package.
+var (
+	ErrMergeDepth     = errors.New("stack depth mismatch at merge point")
+	ErrPushLiteral    = errors.New("push literal mismatch in stack comment")
+	ErrLoopUnbalanced = errors.New("loop unbalanced")
+)

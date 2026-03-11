@@ -439,7 +439,7 @@ func TestSplitBlocks(t *testing.T) {
 			// Normalize indentation.
 			input = strings.ReplaceAll(input, "\t", "")
 			prog := parseDoc(t, input)
-			blocks := splitBlocks(prog.Toplevel, prog)
+			blocks, _ := splitBlocks(prog.Toplevel, prog)
 			got := toBlockInfos(blocks)
 
 			if len(got) != len(test.blocks) {

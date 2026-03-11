@@ -16,15 +16,30 @@
 
 package stackcheck
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/fjl/geas/internal/ast"
+)
 
 // stackEffect represents the stack effect of a code sequence (macro body, included document).
 type stackEffect struct {
 	in, out []string
+	jumps   []externalJump // jumps to labels not defined in the code sequence
 }
 
 func (e *stackEffect) StackIn(imm byte) []string  { return e.in }
 func (e *stackEffect) StackOut(imm byte) []string { return e.out }
+
+// externalJump records a jump from inside a macro/include to a label defined in an
+// enclosing document. The items represent the stack state at the jump point, relative
+// to the code sequence's input stack.
+type externalJump struct {
+	target string        // label name
+	items  []string      // stack items at the jump point
+	wild   bool          // whether the stack has a wildcard
+	jumpSt ast.Statement // the jump statement (set from block during collection)
+}
 
 // effectFromStack computes the effect of an inferred stack run.
 // Both inferredInputs and items are in top-first order.

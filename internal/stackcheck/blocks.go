@@ -29,11 +29,13 @@ type basicBlock struct {
 	label        string          // non-empty if the block starts with a JUMPDEST label definition
 	labelComment *ast.Comment    // the stack comment on the label, if any
 	jumpTarget   string          // label name if the block ends with a jump to a known label
+	jumpSt       ast.Statement   // the jump statement (last in block)
 	successors   []int           // indices of successor blocks (fall-through and/or jump target)
 
 	isJumpTarget              bool // whether this block is the target of a known jump
 	endsWithTerminal          bool // block ends with a terminal instruction
 	endsWithUnconditionalJump bool // block ends with JUMP (unconditional)
+	hasExternalJump           bool // jump target is not defined in this document
 	// true when the previous block can fall through to this one
 	// (i.e. its last instruction is not a terminal or unconditional jump).
 	canFallThrough bool
@@ -44,7 +46,7 @@ type basicBlock struct {
 //   - non-dotted label definitions (JUMPDEST boundaries)
 //   - after terminal instructions (STOP, RETURN, REVERT, etc.)
 //   - after jumps
-func splitBlocks(doc *ast.Document, prog *loader.Program) []*basicBlock {
+func splitBlocks(doc *ast.Document, prog *loader.Program) ([]*basicBlock, map[string]int) {
 	var blocks []*basicBlock
 	cur := &basicBlock{canFallThrough: true}
 
@@ -82,6 +84,7 @@ func splitBlocks(doc *ast.Document, prog *loader.Program) []*basicBlock {
 				if evmOp.Jump {
 					if lref, ok := st.Arg.(*ast.LabelRefExpr); ok && !lref.Dotted {
 						cur.jumpTarget = lref.Ident
+						cur.jumpSt = st
 					}
 				}
 				cur.endsWithTerminal = evmOp.Term
@@ -92,6 +95,7 @@ func splitBlocks(doc *ast.Document, prog *loader.Program) []*basicBlock {
 				// Conditional jump (JUMPI): record target, end block.
 				if lref, ok := st.Arg.(*ast.LabelRefExpr); ok && !lref.Dotted {
 					cur.jumpTarget = lref.Ident
+					cur.jumpSt = st
 				}
 				blocks = append(blocks, cur)
 				cur = &basicBlock{canFallThrough: true}
@@ -123,9 +127,11 @@ func splitBlocks(doc *ast.Document, prog *loader.Program) []*basicBlock {
 		if blk.jumpTarget != "" {
 			if j, ok := labelIndex[blk.jumpTarget]; ok {
 				blk.successors = append(blk.successors, j)
+			} else {
+				blk.hasExternalJump = true
 			}
 		}
 	}
 
-	return blocks
+	return blocks, labelIndex
 }

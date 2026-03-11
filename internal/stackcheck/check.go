@@ -18,7 +18,9 @@
 package stackcheck
 
 import (
+	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"sort"
 	"strings"
@@ -61,9 +63,11 @@ func (a *analyzer) analyzeDocument(doc *ast.Document, inferred bool) *stackEffec
 	a.analyzeDefs(doc)
 	result := a.analyzeBlocks(doc, nil, inferred)
 	if inferred {
-		return effectFromStack(result.inferredInputs, result.exitItems)
+		eff := effectFromStack(result.inferredInputs, result.exitItems)
+		eff.jumps = result.externalJumps
+		return eff
 	}
-	return &stackEffect{out: result.exitItems}
+	return &stackEffect{out: result.exitItems, jumps: result.externalJumps}
 }
 
 // analyzeDefs pre-analyzes all instruction macro definitions and include statements
@@ -115,6 +119,7 @@ func (a *analyzer) analyzeMacro(def *ast.InstructionMacroDef) {
 	} else {
 		eff = effectFromStack(result.inferredInputs, result.exitItems)
 	}
+	eff.jumps = result.externalJumps
 	a.macroEffects[def] = eff
 }
 
@@ -133,21 +138,27 @@ func (a *analyzer) analyzeInclude(inc *ast.Include) {
 
 // analysisResult holds the output of analyzeBlocks.
 type analysisResult struct {
-	exitItems      []string // stack items after the last reachable block
-	inferredInputs []string // inferred inputs (only for inferred mode)
+	exitItems      []string       // stack items after the last reachable block
+	inferredInputs []string       // inferred inputs (only for inferred mode)
+	externalJumps  []externalJump // jumps to labels not defined in this document
 }
 
 // blockState holds the per-block state computed during worklist propagation.
 type blockState struct {
-	entry     []string         // merged entry state (nil = not yet reached)
-	exit      []string         // exit state after processing
-	predExits map[int][]string // predecessor block index → exit state (-1 = initial)
-	predWild  map[int]bool     // predecessor block index → exit wildcard flag
-	entryWild bool             // merged entry has wildcard (any predecessor has wildcard)
-	exitWild  bool             // exit state has wildcard
+	entry      []string              // merged entry state (nil = not yet reached)
+	exit       []string              // exit state after processing
+	predExits  map[int][]string      // predecessor block index → exit state (-1 = initial)
+	predWild   map[int]bool          // predecessor block index → exit wildcard flag
+	predSource map[int]ast.Statement // predecessor → source statement (for error reporting)
+	entryWild  bool                  // merged entry has wildcard (any predecessor has wildcard)
+	exitWild   bool                  // exit state has wildcard
 }
 
-const initialPred = -1 // virtual predecessor index for the initial stack state
+// Predecessor keys in predExits:
+//   - initialPred (-1): the virtual predecessor representing the document's initial stack
+//   - >= 0: real block indices
+//   - < initialPred: virtual predecessors from external jumps (macro/include calls)
+const initialPred = -1
 
 // analyzeBlocks splits the document into basic blocks and performs stack analysis
 // using an iterative worklist algorithm.
@@ -159,16 +170,17 @@ const initialPred = -1 // virtual predecessor index for the initial stack state
 //   - Phase 2 (checking): walk all reachable blocks once with the stable entry
 //     states and report warnings for comment mismatches.
 func (a *analyzer) analyzeBlocks(doc *ast.Document, initialItems []string, inferred bool) analysisResult {
-	blocks := splitBlocks(doc, a.prog)
+	blocks, labelIndex := splitBlocks(doc, a.prog)
 	if len(blocks) == 0 {
 		return analysisResult{exitItems: initialItems}
 	}
 
 	// Phase 1: compute stable entry/exit states.
-	states, inferredInputs := a.propagateStates(blocks, doc, initialItems, inferred)
+	states, inferredInputs := a.propagateStates(blocks, labelIndex, doc, initialItems, inferred)
 
 	// Phase 2: check comments.
 	a.checkComments(blocks, doc, states, initialItems, inferred)
+	a.checkJumpDepths(blocks, states)
 
 	// Return the exit state of the last reachable block.
 	var exit []string
@@ -178,14 +190,70 @@ func (a *analyzer) analyzeBlocks(doc *ast.Document, initialItems []string, infer
 			break
 		}
 	}
-	return analysisResult{exitItems: exit, inferredInputs: inferredInputs}
+
+	// Collect external jumps from blocks with unresolved jump targets.
+	var extJumps []externalJump
+	for i, blk := range blocks {
+		if blk.hasExternalJump && states[i].exit != nil {
+			extJumps = append(extJumps, externalJump{
+				target: blk.jumpTarget,
+				items:  states[i].exit,
+				wild:   states[i].exitWild,
+				jumpSt: blk.jumpSt,
+			})
+		}
+	}
+	return analysisResult{exitItems: exit, inferredInputs: inferredInputs, externalJumps: extJumps}
 }
 
 // propagateStates runs the worklist to compute stable entry/exit states for all
 // reachable blocks. It returns the block states and, for inferred mode, the
 // inferred input items.
-func (a *analyzer) propagateStates(blocks []*basicBlock, doc *ast.Document, initialItems []string, inferred bool) ([]blockState, []string) {
+func (a *analyzer) propagateStates(blocks []*basicBlock, labelIndex map[string]int, doc *ast.Document, initialItems []string, inferred bool) ([]blockState, []string) {
 	states := make([]blockState, len(blocks))
+
+	// nextVPred allocates virtual predecessor keys for external jumps.
+	nextVPred := initialPred
+
+	worklist := make([]int, 0, len(blocks))
+	queued := make([]bool, len(blocks))
+	enqueue := func(idx int) {
+		if !queued[idx] {
+			worklist = append(worklist, idx)
+			queued[idx] = true
+		}
+	}
+
+	// setPredSource records the source statement for a predecessor edge.
+	setPredSource := func(succ *blockState, predKey int, src ast.Statement) {
+		if succ.predSource == nil {
+			succ.predSource = make(map[int]ast.Statement)
+		}
+		succ.predSource[predKey] = src
+	}
+
+	// mergeSuccessors propagates the exit state of block idx to its successors,
+	// and propagates external jump edges from macro/include calls to their targets.
+	mergeSuccessors := func(idx int, edges []externalJump) {
+		lastSt := blocks[idx].statements[len(blocks[idx].statements)-1]
+		for _, succ := range blocks[idx].successors {
+			if mergePredecessor(&states[succ], idx, states[idx].exit, states[idx].exitWild) {
+				enqueue(succ)
+			}
+			setPredSource(&states[succ], idx, lastSt)
+		}
+		for _, edge := range edges {
+			if targetIdx, ok := labelIndex[edge.target]; ok {
+				nextVPred--
+				if mergePredecessor(&states[targetIdx], nextVPred, edge.items, edge.wild) {
+					enqueue(targetIdx)
+				}
+				if edge.jumpSt != nil {
+					setPredSource(&states[targetIdx], nextVPred, edge.jumpSt)
+				}
+			}
+		}
+	}
 
 	// Process block 0 with the initial stack.
 	var inferredInputs []string
@@ -193,7 +261,7 @@ func (a *analyzer) propagateStates(blocks []*basicBlock, doc *ast.Document, init
 	if inferred {
 		s.SetInferred()
 	}
-	a.walkBlock(blocks[0], doc, s, false)
+	edges := a.walkBlock(blocks[0], doc, s, false)
 	if inferred {
 		inferredInputs = s.InferredInputs()
 	}
@@ -211,15 +279,8 @@ func (a *analyzer) propagateStates(blocks []*basicBlock, doc *ast.Document, init
 	states[0].exit = s.Items()
 	states[0].exitWild = s.HasWildcard()
 
-	// Seed the worklist with block 0's successors.
-	worklist := make([]int, 0, len(blocks))
-	queued := make([]bool, len(blocks))
-	for _, succ := range blocks[0].successors {
-		if a.mergeIntoSuccessor(states, 0, succ) && !queued[succ] {
-			worklist = append(worklist, succ)
-			queued[succ] = true
-		}
-	}
+	// Seed the worklist with block 0's successors and external jumps.
+	mergeSuccessors(0, edges)
 
 	// Run the worklist until all entry states are stable.
 	for len(worklist) > 0 {
@@ -233,36 +294,27 @@ func (a *analyzer) propagateStates(blocks []*basicBlock, doc *ast.Document, init
 		}
 		s := stack.New(entry, nil)
 		a.applyLabelComment(blocks[idx], s)
-		a.walkBlock(blocks[idx], doc, s, false)
+		edges := a.walkBlock(blocks[idx], doc, s, false)
 		states[idx].exit = s.Items()
 		states[idx].exitWild = s.HasWildcard()
 
-		for _, succ := range blocks[idx].successors {
-			if a.mergeIntoSuccessor(states, idx, succ) && !queued[succ] {
-				worklist = append(worklist, succ)
-				queued[succ] = true
-			}
-		}
+		mergeSuccessors(idx, edges)
 	}
 	return states, inferredInputs
 }
 
-// mergeIntoSuccessor merges the exit state of block predIdx into the entry state of
-// block succIdx. It returns true if the successor's entry state changed.
-func (a *analyzer) mergeIntoSuccessor(states []blockState, predIdx, succIdx int) bool {
-	succ := &states[succIdx]
+// mergePredecessor merges a predecessor's exit state into a successor block's entry.
+// It returns true if the successor's entry state changed.
+func mergePredecessor(succ *blockState, predKey int, items []string, wild bool) bool {
 	if succ.predExits == nil {
 		succ.predExits = make(map[int][]string)
 		succ.predWild = make(map[int]bool)
 	}
-
-	exitItems := states[predIdx].exit
-	exitWild := states[predIdx].exitWild
-	if slices.Equal(succ.predExits[predIdx], exitItems) && succ.predWild[predIdx] == exitWild {
+	if slices.Equal(succ.predExits[predKey], items) && succ.predWild[predKey] == wild {
 		return false // no change
 	}
-	succ.predExits[predIdx] = exitItems
-	succ.predWild[predIdx] = exitWild
+	succ.predExits[predKey] = items
+	succ.predWild[predKey] = wild
 
 	// Recompute the merged entry state from all predecessor exits.
 	newEntry := succ.baseNames()
@@ -305,14 +357,14 @@ func (a *analyzer) checkComments(blocks []*basicBlock, doc *ast.Document, states
 			// initial virtual predecessor), check for unbalanced stack effects.
 			if len(states[0].predExits) > 1 {
 				a.checkLoopBalance(blk, &states[0], 0)
-				a.checkLabelComment(blk, s)
+				a.checkLabelComment(blk, &states[0], s)
 			}
 		} else {
 			names, confirmed := states[i].computeConfirmed()
 			s = stack.New(names, confirmed)
 			a.checkMergeDepth(blk, &states[i], i)
 			a.checkLoopBalance(blk, &states[i], i)
-			a.checkLabelComment(blk, s)
+			a.checkLabelComment(blk, &states[i], s)
 		}
 
 		a.walkBlock(blk, doc, s, true)
@@ -345,7 +397,7 @@ func (a *analyzer) checkMergeDepth(blk *basicBlock, bs *blockState, blockIdx int
 		depths = append(depths, d)
 	}
 	sort.Ints(depths)
-	a.errors.AddAt(blk.statements[0], &stackWarning{stack.ErrMergeDepth{Depths: depths}})
+	a.errors.AddAt(blk.statements[0], &stackWarning{fmt.Errorf("%w: predecessors have depths %v", stack.ErrMergeDepth, depths)})
 }
 
 // checkLoopBalance reports a warning if any back-edge predecessor has a different stack
@@ -372,10 +424,7 @@ func (a *analyzer) checkLoopBalance(blk *basicBlock, bs *blockState, blockIdx in
 	// Check back-edge depths.
 	for pred, items := range bs.predExits {
 		if pred >= blockIdx && len(items) != entryDepth {
-			a.errors.AddAt(blk.statements[0], &stackWarning{stack.ErrLoopUnbalanced{
-				EntryDepth:    entryDepth,
-				BackedgeDepth: len(items),
-			}})
+			a.errors.AddAt(blk.statements[0], &stackWarning{fmt.Errorf("%w: entry depth %d, back-edge depth %d", stack.ErrLoopUnbalanced, entryDepth, len(items))})
 			return
 		}
 	}
@@ -390,16 +439,95 @@ func (a *analyzer) hasLabelWildcard(blk *basicBlock) bool {
 	return err == nil && stack.HasWildcard(comment)
 }
 
-// checkLabelComment verifies the block's label comment and reports warnings.
-func (a *analyzer) checkLabelComment(blk *basicBlock, s *stack.Stack) {
+// checkLabelComment verifies the block's label comment against the merged stack state.
+func (a *analyzer) checkLabelComment(blk *basicBlock, bs *blockState, s *stack.Stack) {
 	if blk.labelComment == nil {
 		return
 	}
 	comment, err := stack.ParseComment(blk.labelComment.InnerText())
 	if err != nil {
 		a.errors.AddAt(blk.statements[0], &stackWarning{err})
-	} else if err := s.CheckComment(comment); err != nil {
-		a.errors.AddAt(blk.statements[0], &stackWarning{err})
+		return
+	}
+	if err := s.CheckComment(comment); err != nil {
+		if errors.Is(err, stack.ErrCommentDepth) {
+			// Depth errors are reported here only when the comment is wrong, i.e.
+			// no predecessor matches the declared depth. For virtual-only labels,
+			// the comment is trusted as ground truth and checkJumpDepths reports
+			// per-jump errors instead.
+			if !bs.onlyVirtualPreds() {
+				commentItems, _ := stack.StripWildcard(comment)
+				anyMatch := false
+				for _, items := range bs.predExits {
+					if len(items) == len(commentItems) {
+						anyMatch = true
+						break
+					}
+				}
+				if !anyMatch {
+					a.errors.AddAt(blk.statements[0], &stackWarning{err})
+				}
+			}
+		} else if !bs.onlyVirtualPreds() {
+			// Name errors from virtual predecessors are suppressed because the names
+			// come from external jumps and are not meaningful in this scope.
+			a.errors.AddAt(blk.statements[0], &stackWarning{err})
+		}
+	}
+}
+
+// checkJumpDepths verifies that each predecessor of a labeled block sends the
+// correct number of stack items. This runs as a second pass after all label comments
+// have been validated, and only checks labels whose comments are correct.
+func (a *analyzer) checkJumpDepths(blocks []*basicBlock, states []blockState) {
+	for i, blk := range blocks {
+		if states[i].entry == nil || blk.labelComment == nil {
+			continue
+		}
+		comment, err := stack.ParseComment(blk.labelComment.InnerText())
+		if err != nil {
+			continue
+		}
+		commentItems, commentWild := stack.StripWildcard(comment)
+		if commentWild {
+			continue
+		}
+		// Only report jump depth errors when the label comment is plausibly correct.
+		// This is the case when at least one predecessor agrees with the declared
+		// depth, or when all predecessors are virtual (external jumps from
+		// macros/includes), in which case the comment is trusted as ground truth.
+		// When all real predecessors disagree, the comment itself is wrong and
+		// checkLabelComment already reported it.
+		if !states[i].onlyVirtualPreds() {
+			anyMatch := false
+			for _, items := range states[i].predExits {
+				if len(items) == len(commentItems) {
+					anyMatch = true
+					break
+				}
+			}
+			if !anyMatch {
+				continue
+			}
+		}
+
+		var labelName string
+		if ld, ok := blk.statements[0].(*ast.LabelDef); ok {
+			labelName = ld.Ident
+		}
+		reported := make(map[ast.Statement]bool)
+		preds := slices.Sorted(maps.Keys(states[i].predExits))
+		for _, pred := range preds {
+			items := states[i].predExits[pred]
+			if len(items) != len(commentItems) {
+				if src, ok := states[i].predSource[pred]; ok && !reported[src] {
+					reported[src] = true
+					a.errors.AddAt(src, &stackWarning{fmt.Errorf(
+						"%w: label @%s expects %d items, jump sends %d",
+						stack.ErrCommentDepth, labelName, len(commentItems), len(items))})
+				}
+			}
+		}
 	}
 }
 
@@ -433,8 +561,9 @@ func (bs *blockState) baseNames() []string {
 }
 
 // computeConfirmed computes the merged entry state and a confirmed mask from all
-// predecessor exit states. A position is confirmed only if all predecessors agree on
-// the name at that position.
+// predecessor exit states. A position is confirmed only if all non-virtual predecessors
+// agree on the name at that position. Virtual predecessors from external jumps (macro
+// and include calls) do not confirm names because their names come from a different scope.
 func (bs *blockState) computeConfirmed() (names []string, confirmed []bool) {
 	names = bs.baseNames()
 	if names == nil {
@@ -444,9 +573,9 @@ func (bs *blockState) computeConfirmed() (names []string, confirmed []bool) {
 	for i := range confirmed {
 		confirmed[i] = true
 	}
-	for _, items := range bs.predExits {
+	for pred, items := range bs.predExits {
 		for j := range len(names) {
-			if items[j] != names[j] {
+			if pred < initialPred || items[j] != names[j] {
 				confirmed[j] = false
 			}
 		}
@@ -460,47 +589,73 @@ func (bs *blockState) computeConfirmed() (names []string, confirmed []bool) {
 	return names, confirmed
 }
 
-// walkBlock applies all statements in a basic block to the stack.
-func (a *analyzer) walkBlock(blk *basicBlock, doc *ast.Document, s *stack.Stack, report bool) {
-	for _, st := range blk.statements {
-		a.applyStatement(st, doc, s, report)
+// onlyVirtualPreds reports whether all predecessors are virtual, i.e. from
+// external jumps in macro/include calls.
+func (bs *blockState) onlyVirtualPreds() bool {
+	for pred := range bs.predExits {
+		if pred >= initialPred {
+			return false
+		}
 	}
+	return true
+}
+
+// walkBlock applies all statements in a basic block to the stack.
+// It returns external jump edges discovered from macro/include calls within the block.
+func (a *analyzer) walkBlock(blk *basicBlock, doc *ast.Document, s *stack.Stack, report bool) []externalJump {
+	var edges []externalJump
+	for _, st := range blk.statements {
+		edges = append(edges, a.applyStatement(st, doc, s, report)...)
+	}
+	return edges
 }
 
 // applyStatement applies a single statement's stack effect to the virtual stack.
-// If report is true, warnings are added to the error list.
-func (a *analyzer) applyStatement(st ast.Statement, doc *ast.Document, s *stack.Stack, report bool) {
+// If the statement is a macro or include call with external jumps, the returned edges
+// represent those jumps translated to the caller's stack context.
+func (a *analyzer) applyStatement(st ast.Statement, doc *ast.Document, s *stack.Stack, report bool) []externalJump {
 	var (
-		op  stack.Op
-		imm byte
+		op    stack.Op
+		imm   byte
+		jumps []externalJump // external jumps from macro/include effect
 	)
 	switch st := st.(type) {
 	case *ast.Opcode:
 		op, imm = a.resolveOpcode(st)
 		if op == nil {
-			return
+			return nil
 		}
 
 	case *ast.InstructionMacroCall:
 		def := a.prog.LookupInstrMacro(st.Ident, doc)
 		if def == nil {
-			return
+			return nil
 		}
 		eff := a.macroEffects[def]
 		if eff == nil {
-			return
+			return nil
 		}
 		op = eff
+		jumps = eff.jumps
 
 	case *ast.Include:
 		eff := a.includeEffects[st]
 		if eff == nil {
-			return
+			return nil
 		}
 		op = eff
+		jumps = eff.jumps
 
 	default:
-		return // skip other statements
+		return nil // skip other statements
+	}
+
+	// Compute external jump edges before applying the operation, since we need
+	// the pre-application stack state to determine the caller's context below
+	// the macro's input.
+	var edges []externalJump
+	if len(jumps) > 0 {
+		edges = externalJumpEdges(s, op, jumps)
 	}
 
 	// Parse the comment.
@@ -511,7 +666,7 @@ func (a *analyzer) applyStatement(st ast.Statement, doc *ast.Document, s *stack.
 			if report {
 				a.errors.AddAt(st, &stackWarning{err})
 			}
-			return
+			return edges
 		}
 	}
 
@@ -524,6 +679,32 @@ func (a *analyzer) applyStatement(st ast.Statement, doc *ast.Document, s *stack.
 	if report && comment != nil {
 		a.checkPushLiteral(st, comment)
 	}
+
+	return edges
+}
+
+// externalJumpEdges translates a macro/include's external jumps into edges for the
+// calling context. Each jump's items are combined with the caller's stack items below
+// the macro input to produce the actual stack at each external jump target.
+func externalJumpEdges(s *stack.Stack, op stack.Op, jumps []externalJump) []externalJump {
+	callerItems := s.Items()
+	inputDepth := len(op.StackIn(0))
+
+	edges := make([]externalJump, len(jumps))
+	for i, j := range jumps {
+		actual := make([]string, 0, len(j.items)+len(callerItems)-inputDepth)
+		actual = append(actual, j.items...)
+		if len(callerItems) > inputDepth {
+			actual = append(actual, callerItems[inputDepth:]...)
+		}
+		edges[i] = externalJump{
+			target: j.target,
+			items:  actual,
+			wild:   j.wild || s.HasWildcard(),
+			jumpSt: j.jumpSt,
+		}
+	}
+	return edges
 }
 
 // checkPushLiteral verifies that when a push instruction has a literal number argument
@@ -549,10 +730,7 @@ func (a *analyzer) checkPushLiteral(st ast.Statement, comment []string) {
 		return // not a number, no check
 	}
 	if pushValue.Int().Cmp(commentValue.Int()) != 0 {
-		a.errors.AddAt(st, &stackWarning{stack.ErrPushLiteralMismatch{
-			CommentValue: comment[0],
-			PushValue:    pushValue.String(),
-		}})
+		a.errors.AddAt(st, &stackWarning{fmt.Errorf("%w: number %s in comment does not match pushed value %s", stack.ErrPushLiteral, comment[0], pushValue.String())})
 	}
 }
 
@@ -634,7 +812,7 @@ type stackWarning struct {
 }
 
 func (w *stackWarning) Error() string {
-	return fmt.Sprintf("stack comment: %s", w.err)
+	return w.err.Error()
 }
 
 func (w *stackWarning) Unwrap() error {

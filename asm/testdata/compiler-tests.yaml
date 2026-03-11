@@ -686,7 +686,7 @@ include-macro-private:
         #define %im(x) {
           push em(5)   ; [x]
           push 3       ; [y, x]
-          sub          ; []
+          sub          ; [x-y]
         }
         %im(5)
   output:

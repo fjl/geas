@@ -131,7 +131,7 @@ func (s *Stack) Apply(op Op, imm byte, comment []string) error {
 		}
 		val, ok := s.get(i)
 		if !ok {
-			return ErrOpUnderflows{Want: len(inputs), Have: len(s.stack)}
+			return fmt.Errorf("%w: op requires %d items, stack has %d", ErrOpUnderflow, len(inputs), len(s.stack))
 		}
 		s.opItems[name] = val
 	}
@@ -189,7 +189,7 @@ func (s *Stack) checkComment(comment []string) error {
 			if s.inferred {
 				break // can't verify deeper items
 			}
-			return ErrCommentUnderflows{Items: s.Items(), Want: len(comment)}
+			return fmt.Errorf("%w: stack has %d items, comment declares %d", ErrCommentUnderflow, len(s.stack), len(comment))
 		}
 		// Name is taken by a different item. Allow this if:
 		// - The current item is NEW (new items can reuse names for duplicate values
@@ -199,7 +199,7 @@ func (s *Stack) checkComment(comment []string) error {
 		if item, ok := s.nameToItem[name]; ok && item != stackItem {
 			if !s.opNewItems.Includes(stackItem) && s.itemToName[stackItem] != name && slices.Contains(s.stack, item) {
 				if namingError == nil {
-					namingError = ErrMismatch{Items: s.Items(), Slot: i, Want: name}
+					namingError = fmt.Errorf("%w: item %d differs (expected %q, have %q) in %s", ErrMismatch, i, name, s.getName(stackItem), s)
 				}
 			}
 		}
@@ -210,7 +210,7 @@ func (s *Stack) checkComment(comment []string) error {
 		if !s.opNewItems.Includes(stackItem) && s.nameToItem[name] == 0 {
 			if s.confirmedNames.Includes(stackItem) {
 				if namingError == nil {
-					namingError = ErrCommentRenamesItem{NewName: name, Item: s.itemToName[stackItem]}
+					namingError = fmt.Errorf("%w: %s renamed to %s", ErrRename, s.itemToName[stackItem], name)
 				}
 			}
 		}
@@ -221,19 +221,14 @@ func (s *Stack) checkComment(comment []string) error {
 		s.confirmedNames.Add(stackItem)
 	}
 
-	// By now the comment is known not to have more items than the stack, and all declared
-	// names match the stack. Notably, there is no expectation that comments are complete,
-	// i.e. it's OK if comments elide some items at the end.
-	// Unfortunately, this also permits a situation where items can be 'added back' if they
-	// were dropped from the comment before.
-	// Consider this example:
-	//
-	//     push 1    ; [a]
-	//     push 2    ; [b, a]
-	//     push 3    ; [c, b]    <-- a is lost here...
-	//     add       ; [sum, a]  <-- but now it's back! confusing!
-	//
-	// I'm not sure if this should be prevented somehow.
+	// A non-wildcard comment declares the full stack contents. If it names fewer
+	// items than the stack has, the user has lost track of something. Truncate the
+	// stack to match the comment so that subsequent checks don't cascade.
+	if !wild && len(comment) < len(s.stack) {
+		depth := len(s.stack)
+		s.stack = s.stack[depth-len(comment):]
+		return fmt.Errorf("%w: stack has %d items, comment declares %d", ErrCommentDepth, depth, len(comment))
+	}
 
 	return namingError
 }
