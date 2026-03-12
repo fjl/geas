@@ -358,9 +358,9 @@ var oplist = []*Op{
 
 	// EIP-8141
 	{Name: "APPROVE", Code: 0xaa, in: stack{"offset", "length", "scope"}, Term: true},
-	{Name: "TXPARAMLOAD", Code: 0xb0, in: stack{"in1", "in2", "offset"}, out: stack{"word"}},
-	{Name: "TXPARAMSIZE", Code: 0xb1, in: stack{"in1", "in2"}, out: stack{"size"}},
-	{Name: "TXPARAMCOPY", Code: 0xb2, in: stack{"in1", "in2", "memOffset", "dataOffset", "length"}},
+	{Name: "TXPARAM", Code: 0xb0, in: stack{"in1", "in2"}, out: stack{"txparam"}},
+	{Name: "FRAMEDATALOAD", Code: 0xb1, in: stack{"offset", "frameIndex"}, out: stack{"word"}},
+	{Name: "FRAMEDATACOPY", Code: 0xb2, in: stack{"memOffset", "dataOffset", "length", "frameIndex"}},
 
 	// TRON-specific opcodes
 	{Name: "CALLTOKEN", Code: 0xd0, in: stack{"gas", "address", "value", "tokenId", "argOffset", "argLength", "returnOffset", "returnLength"}, out: stack{"ok"}},

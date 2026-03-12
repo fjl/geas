@@ -268,9 +268,9 @@ var forkReg = map[string]*InstructionSetDef{
 		Parent: "amsterdam",
 		Added: []*Op{
 			opm["APPROVE"],
-			opm["TXPARAMLOAD"],
-			opm["TXPARAMSIZE"],
-			opm["TXPARAMCOPY"],
+			opm["TXPARAM"],
+			opm["FRAMEDATALOAD"],
+			opm["FRAMEDATACOPY"],
 		},
 	},
 
