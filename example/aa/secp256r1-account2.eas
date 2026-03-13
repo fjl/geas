@@ -20,13 +20,13 @@
 
 #define P256VERIFY = address(0x0000000000000000000000000000000000000100)
 
-#define %checkEq(errcode) {          ; [expected, v]
-    push $errcode                    ; [err, expected, v]
-    swap2                            ; [v, expected, err]
-    eq                               ; [v==expected, err]
-    iszero                           ; [v!=expected, err]
-    jumpi @fail                      ; [err]
-    pop                              ; []
+#define %checkEq(errcode) {         ; [expected, v]
+    push $errcode                   ; [err, expected, v]
+    swap2                           ; [v, expected, err]
+    eq                              ; [v==expected, err]
+    iszero                          ; [v!=expected, err]
+    jumpi @fail                     ; [err]
+    pop                             ; []
 }
 
 ;;; contract error codes (for debugging)
@@ -44,75 +44,75 @@
     ;;   r::32 || s::32
 
     ;; First, check the size.
-    push 0                           ; [frameIndex]
-    %TxFrameDataSize                 ; [size]
-    push 64                          ; [expectedSize, size]
-    %checkEq(invalidSignatureSize)   ; []
+    push 0                          ; [frameIndex]
+    %TxFrameDataSize                ; [size]
+    push 64                         ; [expectedSize, size]
+    %checkEq(invalidSignatureSize)  ; []
 
     ;; The memory layout expected by the precompile is:
     ;;
     ;;   hash::32 || r::32 || s::32 || qx::32 || qy::32
     ;;
     ;; So we put the hash first, and then the signature.
-    %TxSignatureHash                 ; [hash]
-    push 0                           ; [offset, hash]
-    mstore                           ; []
-    push 0                           ; [frame]
-    push 64                          ; [length, frame]
-    push 0                           ; [dataOffset, length, frame]
-    push 32                          ; [memOffset, dataOffset, length, frame]
-    framedatacopy                    ; []
+    %TxSignatureHash                ; [hash]
+    push 0                          ; [offset, hash]
+    mstore                          ; []
+    push 0                          ; [frame]
+    push 64                         ; [length, frame]
+    push 0                          ; [dataOffset, length, frame]
+    push 32                         ; [memOffset, dataOffset, length, frame]
+    framedatacopy                   ; []
 
     ;; Now load the public key from storage and place it.
-    push 0                           ; [0]
-    sload                            ; [qx]
-    push 96                          ; [offset, qx]
-    mstore                           ; []
-    push 1                           ; [1]
-    sload                            ; [qy]
-    push 128                         ; [offset, qy]
-    mstore                           ; []
+    push 0                          ; [0]
+    sload                           ; [qx]
+    push 96                         ; [offset, qx]
+    mstore                          ; []
+    push 1                          ; [1]
+    sload                           ; [qy]
+    push 128                        ; [offset, qy]
+    mstore                          ; []
 
     ;; Call the precompile.
-    push 0                           ; [retLength]
-    push 0                           ; [retOffset, retLength]
-    push (32 + 128)                  ; [inLength, retOffset, retLength]
-    push 0                           ; [inOffset, inLength, retOffset, retLength]
-    push P256VERIFY                  ; [address, inOffset, inLength, retOffset, retLength]
-    gas                              ; [gas, address, inOffset, inLength, retOffset, retLength]
-    staticcall                       ; [ok]
-    push 0                           ; [0, ok]
-    %checkEq(invalidSignature)       ; []
+    push 0                          ; [retLength]
+    push 0                          ; [retOffset, retLength]
+    push (32 + 128)                 ; [inLength, retOffset, retLength]
+    push 0                          ; [inOffset, inLength, retOffset, retLength]
+    push P256VERIFY                 ; [address, inOffset, inLength, retOffset, retLength]
+    gas                             ; [gas, address, inOffset, inLength, retOffset, retLength]
+    staticcall                      ; [ok]
+    push 0                          ; [0, ok]
+    %checkEq(invalidSignature)      ; []
     ;; The signature is valid.
 
     ;; Determine the approval scope from the mode bits.
-    %TxCurrentFrame                  ; [frame]
-    %TxFrameMode                     ; [mode]
-    push 8                           ; [8, mode]
-    shr                              ; [mode>>8]
-    push 3                           ; [3, mode>>8]
-    and                              ; [bits]
+    %TxCurrentFrame                 ; [frame]
+    %TxFrameMode                    ; [mode]
+    push 8                          ; [8, mode]
+    shr                             ; [mode>>8]
+    push 3                          ; [3, mode>>8]
+    and                             ; [bits]
 
     ;; If approval bits are zero, we aren't allowed to approve at all. The APPROVE op
     ;; would catch this, because we would try to invoke it with a very large scope
     ;; operand, but it's better to report the error explicitly.
-    push invalidModeBits             ; [err, bits]
-    dup2                             ; [bits, err, bits]
-    iszero                           ; [bits==0, err, bits]
-    jumpi @fail                      ; [err, bits]
-    pop                              ; [bits]
+    push invalidModeBits            ; [err, bits]
+    dup2                            ; [bits, err, bits]
+    iszero                          ; [bits==0, err, bits]
+    jumpi @fail                     ; [err, bits]
+    pop                             ; [bits]
 
     ;; bits is 1, 2, or 3 here. Convert it to the appropriate scope operand by
     ;; subtracting one.
-    push 1                           ; [1, bits]
-    sub                              ; [scope]
-    push 0                           ; [length, scope]
-    push 0                           ; [offset, length, scope]
-    approve                          ; []
+    push 1                          ; [1, bits]
+    sub                             ; [scope]
+    push 0                          ; [length, scope]
+    push 0                          ; [offset, length, scope]
+    approve                         ; []
 
-fail:                                ; [errorcode, ...]
-    push 0                           ; [ptr, errorcode]
-    mstore8                          ; []
-    push 1                           ; [length]
-    push 0                           ; [offset, length]
-    revert                           ; []
+fail:                               ; [errorcode, ...]
+    push 0                          ; [ptr, errorcode]
+    mstore8                         ; []
+    push 1                          ; [length]
+    push 0                          ; [offset, length]
+    revert                          ; []
