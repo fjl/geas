@@ -1,0 +1,43 @@
+;;; -*- mode: asm -*-
+
+;;; APPROVE scopes
+
+#define ApproveExecution = 0
+#define ApprovePayment = 1
+#define ApproveBoth = 2
+
+;;; frame modes
+
+#define DefaultMode = 0
+#define VerifyMode = 1
+#define SenderMode = 2
+
+;;; transaction values access
+
+#define %TxSignatureHash {  ; []
+    push 0                  ; [in2]
+    push 0x08               ; [param, in2]
+    txparam                 ; [sighash]
+}
+
+#define %TxSender {         ; []
+    push 0                  ; [in2]
+    push 0x02               ; [param, in2]
+    txparam                 ; [sender]
+}
+
+#define %TxCurrentFrame {   ; []
+    push 0                  ; [in2]
+    push 0x10               ; [param, in2]
+    txparam                 ; [frameIndex]
+}
+
+#define %TxFrameMode {      ; [frameIndex]
+    push 0x13               ; [param, frameIndex]
+    txparam                 ; [mode]
+}
+
+#define %TxFrameDataSize {  ; [frameIndex]
+    push 0x14               ; [param, frameIndex]
+    txparam                 ; [size]
+}
