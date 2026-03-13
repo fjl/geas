@@ -71,7 +71,7 @@
     push 1                           ; [1]
     sload                            ; [qy]
     push 128                         ; [offset, qy]
-    mstore
+    mstore                           ; []
 
     ;; Call the precompile.
     push 0                           ; [retLength]
