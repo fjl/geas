@@ -6,8 +6,7 @@
 ;;; linked to an existing account via EIP-7702.
 ;;;
 ;;; It accepts signatures over the transaction sighash which are made by a secp256r1
-;;; public key. The public key itself is also provided in the signature, and the account
-;;; verifies that the public key hash matches the address that sends the transaction.
+;;; public key. The public key itself is held in the account's storage, in slots 0 and 1.
 ;;;
 ;;; The account supports sponsoring and self-sponsoring. The approval scope is
 ;;; selected via the frame mode approval bits.
@@ -32,10 +31,8 @@
 
 ;;; contract error codes (for debugging)
 
-#define invalidFrameStructure = 0
 #define invalidSignatureSize = 1
 #define invalidSignature = 2
-#define invalidSender = 3
 #define invalidModeBits = 4
 
 ;;; ----------------------------------------------------------------------------
@@ -44,43 +41,39 @@
     ;; Check the signature.
     ;; The input is:
     ;;
-    ;;   r::32 || s::32 || qx::32 || qy::32
+    ;;   r::32 || s::32
 
     ;; First, check the size.
     push 0                           ; [frameIndex]
     %TxFrameDataSize                 ; [size]
-    push 128                         ; [expectedSize, size]
+    push 64                          ; [expectedSize, size]
     %checkEq(invalidSignatureSize)   ; []
-
-    ;; Now compute the key's sender address...
-    push 0                           ; [frame]
-    push 64                          ; [length, frame]
-    push 64                          ; [dataOffset, length, frame]
-    push 0                           ; [memOffset, dataOffset, length, frame]
-    framedatacopy                    ; []
-    push 64                          ; [size]
-    push 0                           ; [offset, size]
-    keccak256                        ; [hash]
-    push 12 * 8                      ; [s, hash]
-    shr                              ; [pubkeyAddr]
-    ;; ....and check it against tx.sender.
-    %TxSender                        ; [sender, pubkeyAddr]
-    %checkEq(invalidSender)
 
     ;; The memory layout expected by the precompile is:
     ;;
     ;;   hash::32 || r::32 || s::32 || qx::32 || qy::32
     ;;
-    ;; So we put the hash first, and then just copy over signature input.
+    ;; So we put the hash first, and then the signature.
     %TxSignatureHash                 ; [hash]
     push 0                           ; [offset, hash]
     mstore                           ; []
     push 0                           ; [frame]
-    push 128                         ; [length, frame]
+    push 64                          ; [length, frame]
     push 0                           ; [dataOffset, length, frame]
     push 32                          ; [memOffset, dataOffset, length, frame]
     framedatacopy                    ; []
-    ;; Now call the precompile.
+
+    ;; Now load the public key from storage and place it.
+    push 0                           ; [0]
+    sload                            ; [qx]
+    push 96                          ; [offset, qx]
+    mstore                           ; []
+    push 1                           ; [1]
+    sload                            ; [qy]
+    push 128                         ; [offset, qy]
+    mstore
+
+    ;; Call the precompile.
     push 0                           ; [retLength]
     push 0                           ; [retOffset, retLength]
     push (32 + 128)                  ; [inLength, retOffset, retLength]
