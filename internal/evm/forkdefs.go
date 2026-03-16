@@ -230,6 +230,7 @@ var forkReg = map[string]*InstructionSetDef{
 		Parent: "shanghai",
 		Added: []*Op{
 			opm["BLOBHASH"],
+			opm["BLOBBASEFEE"],
 			opm["TSTORE"],
 			opm["TLOAD"],
 			opm["MCOPY"],
