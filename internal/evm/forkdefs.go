@@ -261,6 +261,7 @@ var forkReg = map[string]*InstructionSetDef{
 			opm["DUPN"],
 			opm["SWAPN"],
 			opm["EXCHANGE"],
+			opm["SLOTNUM"],
 		},
 	},
 

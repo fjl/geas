@@ -103,6 +103,7 @@ var oplist = []*Op{
 	{Name: "BASEFEE", Code: 0x48, out: stack{"basefee"}},
 	{Name: "BLOBHASH", Code: 0x49, in: stack{"index"}, out: stack{"blobhash"}},
 	{Name: "BLOBBASEFEE", Code: 0x4a, out: stack{"blobbasefee"}},
+	{Name: "SLOTNUM", Code: 0x4b, out: stack{"slotnum"}},
 	{Name: "POP", Code: 0x50, in: stack{"x"}},
 	{Name: "MLOAD", Code: 0x51, in: stack{"offset"}, out: stack{"word"}},
 	{Name: "MSTORE", Code: 0x52, in: stack{"memOffset", "x"}},
