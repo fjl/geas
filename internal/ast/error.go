@@ -18,14 +18,15 @@ package ast
 
 import "fmt"
 
-// Position represents a line in a file.
+// Position represents a location in a file.
 type Position struct {
-	File string
-	Line int
+	File   string
+	Line   int
+	Column int
 }
 
 func (p Position) String() string {
-	return fmt.Sprintf("%s:%d", p.File, p.Line)
+	return fmt.Sprintf("%s:%d:%d", p.File, p.Line, p.Column)
 }
 
 // ParseError is an error that happened during parsing.
@@ -41,11 +42,11 @@ func (e *ParseError) Error() string {
 	if e.warning {
 		warn = "warning: "
 	}
-	return fmt.Sprintf("%s:%d: %s%v", e.file, e.tok.line, warn, e.err)
+	return fmt.Sprintf("%s:%d:%d: %s%v", e.file, e.tok.line, e.tok.column, warn, e.err)
 }
 
 func (e *ParseError) Position() Position {
-	return Position{File: e.file, Line: e.tok.line}
+	return Position{File: e.file, Line: e.tok.line, Column: e.tok.column}
 }
 
 func (e *ParseError) IsWarning() bool {

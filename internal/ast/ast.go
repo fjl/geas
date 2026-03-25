@@ -74,6 +74,7 @@ type Statement interface {
 type stbase struct {
 	src         *Document
 	line        int
+	column      int
 	comment     *Comment
 	startsBlock bool
 }
@@ -83,7 +84,7 @@ func (st *stbase) base() *stbase {
 }
 
 func (st *stbase) Position() Position {
-	return Position{st.src.File, st.line}
+	return Position{st.src.File, st.line, st.column}
 }
 
 func (st *stbase) Document() *Document {
