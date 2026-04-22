@@ -49,7 +49,7 @@ func usage() {
 	 -o <file>          output file name
 	 -bin               output binary instead of hex
 	 -no-nl             skip newline at end of hex output
-     -stackcheck        enable stack checker
+	 -stackcheck        enable stack checker
 
  -d: DISASSEMBLER
 
