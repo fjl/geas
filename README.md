@@ -332,6 +332,66 @@ you must use explicit PUSH and JUMP.
         jumpi                   ; []
     }
 
+### Structs
+
+The `#defstruct` directive defines a struct, a named collection of sized fields. It is
+useful for documenting the memory layout of inputs or data structures, and for inserting
+computed field offsets and sizes into the program. A struct is just a shortcut for
+defining several expression macros giving access to the sizes and offsets of its fields.
+
+    #defstruct signature {
+        r: 32
+        s: 32
+        qx: 32
+        qy: 32
+    }
+
+The definition above is equivalent to the following expression macros. The offsets are
+added up, while the sizes are also made available.
+
+    #define signature.size = 128
+    #define signature.r.offset = 0
+    #define signature.r.size = 32
+    #define signature.s.offset = 32
+    #define signature.s.size = 32
+    #define signature.qx.offset = 64
+    #define signature.qx.size = 32
+    #define signature.qy.offset = 96
+    #define signature.qy.size = 32
+
+You can use these in expressions like any other macro:
+
+        push signature.qx.offset  ; [64]
+        push signature.size       ; [128]
+
+A field size may also be a computed expression, including references to other macros. Size
+expressions must be wrapped in parentheses to keep them distinct from struct names, and
+they may not contain `@label` references.
+
+    #define WORD = 32
+
+    #defstruct buffer {
+        header: 4
+        body: (8 * WORD)
+    }
+
+Structs can also embed other structs. To do this, give the name of another struct as the
+field type instead of a size. The offsets and sizes of the embedded struct's fields become
+available under the field name.
+
+    #defstruct item {
+        name: 10
+        text: 90
+    }
+
+    #defstruct input {
+        s: signature   ; embeds the 'signature' struct defined earlier
+        i: item        ; embeds the 'item' struct
+    }
+
+Here, `input.size` is 228 (`signature.size` + `item.size`), `input.s.offset` is 0,
+`input.i.offset` is 128, `input.s.qx.offset` is 64, and `input.i.name.offset` is 128.
+
 ### #include
 
 Other Geas source files can be included into the current program using the `#include`
