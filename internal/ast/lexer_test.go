@@ -81,6 +81,20 @@ func TestLexer(t *testing.T) {
 			input:  "@label123 ;; comment",
 			tokens: []token{{typ: lineStart, line: 1, column: 0}, {typ: labelRef, text: "label123", line: 1, column: 1}, {typ: comment, text: ";; comment", line: 1, column: 10}, {typ: eof, line: 1, column: 20}},
 		},
+		// identifiers may contain internal dots (struct field accessors)
+		{
+			input:  "signature.r.offset",
+			tokens: []token{{typ: lineStart, line: 1, column: 0}, {typ: identifier, text: "signature.r.offset", line: 1, column: 0}, {typ: eof, line: 1, column: 18}},
+		},
+		// an identifier may not end in a dot
+		{
+			input:  "foo.",
+			tokens: []token{{typ: lineStart, line: 1, column: 0}, {typ: invalidToken, text: "foo.", line: 1, column: 0}, {typ: eof, line: 1, column: 4}},
+		},
+		{
+			input:  "foo.bar. baz",
+			tokens: []token{{typ: lineStart, line: 1, column: 0}, {typ: invalidToken, text: "foo.bar.", line: 1, column: 0}, {typ: identifier, text: "baz", line: 1, column: 9}, {typ: eof, line: 1, column: 12}},
+		},
 		// comment after instruction
 		{
 			input:  "push 3 ;; comment\nadd",

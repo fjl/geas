@@ -1,0 +1,19 @@
+;;; This document tests printing of struct definitions.
+
+#define WORD = 32
+
+#defstruct signature {
+    r: 32
+    s: 32
+    qx: 32
+    qy: 32
+}
+
+#defstruct input {
+    s: signature
+    n: (2 * WORD)
+    p: 4
+}
+
+    push input.size
+    push input.s.qx.offset

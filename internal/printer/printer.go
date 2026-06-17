@@ -351,6 +351,9 @@ func (p *Printer) statement(st ast.Statement) {
 		}
 		p.byte('}')
 
+	case *ast.StructDef:
+		p.structDef(st)
+
 	case *ast.InstructionMacroCall:
 		p.string(p.indent)
 		p.byte('%')
@@ -370,6 +373,26 @@ func (p *Printer) statement(st ast.Statement) {
 
 func macroHasIndentedStartComment(st *ast.InstructionMacroDef) bool {
 	return st.StartComment != nil && (st.StartComment.Level() == 1 || st.StartComment.IsStackComment())
+}
+
+// structDef writes a struct definition.
+func (p *Printer) structDef(st *ast.StructDef) {
+	p.string("#defstruct ")
+	p.string(st.Ident)
+	p.string(" {")
+	for _, f := range st.Fields {
+		p.newline()
+		p.string(p.indent)
+		p.string(f.Name)
+		p.string(": ")
+		if f.Type != "" {
+			p.string(f.Type)
+		} else {
+			p.expr(f.Size, nil)
+		}
+	}
+	p.newline()
+	p.byte('}')
 }
 
 // macroDefinitionHead writes the beginning of a macro definition.

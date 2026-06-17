@@ -18,10 +18,34 @@ package asm
 
 import (
 	"errors"
+	"fmt"
 	"math/big"
 
 	"github.com/fjl/geas/internal/ast"
 )
+
+// preEvaluateStructs computes the constant values of all macros generated from struct
+// definitions. Because this runs before labels are assigned, any field size that references
+// a label (directly or transitively through another macro) is reported as an error here.
+func (c *Compiler) preEvaluateStructs(e *evaluator, prog *compilerProg) {
+	for _, group := range prog.StructMacros() {
+		for _, def := range group {
+			err := e.evalStructMacro(prog, def)
+			if err == nil {
+				continue
+			}
+			// Report the first faulty field and skip the rest of this struct, since a bad
+			// field size would otherwise be reported again via the aggregate '.size' macro.
+			var labelErr unassignedLabelError
+			if errors.As(err, &labelErr) {
+				c.errors.AddAt(def, fmt.Errorf("label %v not allowed in struct field size", labelErr.lref))
+			} else {
+				c.errors.AddAt(def, err)
+			}
+			break
+		}
+	}
+}
 
 // preEvaluateArgs computes the initial argument values of instructions.
 //

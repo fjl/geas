@@ -1341,3 +1341,151 @@ unreachable-code-warning-in-macro:
     bytecode: "00 6001 6002 01"
     warnings:
       - ":3:4: warning: unreachable code (previous instruction is STOP at foo.eas:1:0)"
+
+defstruct-basic:
+  input:
+    code: |
+      #defstruct signature {
+          r: 32
+          s: 32
+          qx: 32
+          qy: 32
+      }
+      push signature.size
+      push signature.r.offset
+      push signature.s.offset
+      push signature.qx.offset
+      push signature.qy.offset
+      push signature.qy.size
+  output:
+    bytecode: "6080 5f 6020 6040 6060 6020"
+
+defstruct-nested:
+  input:
+    code: |
+      #defstruct signature {
+          r: 32
+          s: 32
+          qx: 32
+          qy: 32
+      }
+      #defstruct item {
+          name: 10
+          text: 90
+      }
+      #defstruct input {
+          s: signature
+          i: item
+      }
+      push input.size
+      push input.s.size
+      push input.s.offset
+      push input.s.qx.offset
+      push input.i.offset
+      push input.i.name.offset
+      push input.i.text.offset
+  output:
+    bytecode: "60e4 6080 5f 6040 6080 6080 608a"
+
+defstruct-duplicate-field:
+  input:
+    code: |
+      #defstruct a {
+          x: 1
+          x: 2
+      }
+  output:
+    errors:
+      - ':1:11: duplicate field "x" in struct a'
+
+defstruct-undefined-embed:
+  input:
+    code: |
+      #defstruct a {
+          x: b
+      }
+  output:
+    errors:
+      - ':1:11: undefined struct b embedded by field "x"'
+
+defstruct-redefine:
+  input:
+    code: |
+      #defstruct a {
+          x: 1
+      }
+      #defstruct a {
+          y: 2
+      }
+      push a.x.size
+  output:
+    errors:
+      - ':4:11: struct a already defined'
+
+defstruct-size-expression:
+  input:
+    code: |
+      #define WORD = 32
+      #defstruct a {
+          x: (2 * WORD)
+          y: 4
+          z: (WORD)
+      }
+      push a.size
+      push a.x.size
+      push a.y.offset
+      push a.z.offset
+  output:
+    bytecode: "6064 6040 6040 6044"
+
+defstruct-size-expression-nested:
+  input:
+    code: |
+      #define W = 8
+      #defstruct sig {
+          r: 32
+          s: 32
+      }
+      #defstruct inp {
+          s: sig
+          n: (W * 2)
+      }
+      push inp.size
+      push inp.s.s.offset
+      push inp.n.offset
+  output:
+    bytecode: "6050 6020 6040"
+
+defstruct-size-label-error:
+  input:
+    code: |
+      #defstruct a {
+          x: (@foo)
+      }
+  output:
+    errors:
+      - ':2:4: label @foo not allowed in struct field size'
+
+defstruct-size-unparenthesized-error:
+  input:
+    code: |
+      #defstruct a {
+          x: 2 * 32
+      }
+  output:
+    errors:
+      - ':2:9: unexpected * after field size, wrap expressions in parentheses'
+      - ':3:0: unexpected closing brace }'
+
+defstruct-size-label-transitive-error:
+  input:
+    code: |
+      #define BAD = @foo + 1
+      #defstruct a {
+          x: (BAD)
+      }
+      .foo:
+      push a.size
+  output:
+    errors:
+      - ':3:4: label @foo not allowed in struct field size'

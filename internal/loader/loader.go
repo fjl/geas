@@ -126,6 +126,11 @@ func (l *Loader) loadDocument(p *Program, doc *ast.Document, incStack []ast.Stat
 			}
 			instrMacros = append(instrMacros, st)
 
+		case *ast.StructDef:
+			for _, err := range p.defineStruct(doc, st) {
+				l.errors.AddAt(st, err)
+			}
+
 		case *ast.Bytes:
 			// Named #bytes create implicit label and expression macro definitions.
 			if st.Label != nil {

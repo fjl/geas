@@ -80,6 +80,17 @@ func SimpleExprMacroDef(doc *Document, name string, body Expr) *ExpressionMacroD
 	}
 }
 
+// SyntheticExprMacroDef creates an expression macro definition attached to the given source
+// position. This is used for the macros generated from struct definitions, so errors point
+// at the originating field.
+func SyntheticExprMacroDef(doc *Document, line, column int, name string, body Expr) *ExpressionMacroDef {
+	return &ExpressionMacroDef{
+		stbase: stbase{src: doc, line: line, column: column},
+		Ident:  name,
+		Body:   body,
+	}
+}
+
 // MakeNumber creates a number literal with the given value.
 func MakeNumber(v *lzint.Value) *LiteralExpr {
 	return &LiteralExpr{

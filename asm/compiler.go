@@ -195,6 +195,10 @@ func (c *Compiler) compile(lprog *loader.Program) (output []byte) {
 		}
 	}
 
+	// Pre-evaluate struct field sizes/offsets to constants. This happens before labels are
+	// assigned, so a struct field that references a label is rejected here.
+	c.preEvaluateStructs(e, prog)
+
 	// Pre-evaluate all arguments that don't depend on labels.
 	c.preEvaluateArgs(e, prog)
 	e.registerLabels(prog.labels)

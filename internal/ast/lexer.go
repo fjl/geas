@@ -373,6 +373,21 @@ func lexIdentifier(l *lexer) stateFn {
 	}
 	l.acceptRun(isIdent)
 
+	// Identifiers may contain internal dots, as in struct field accessors like
+	// "signature.r.offset". Builtin identifiers (those starting with '.') do not. A dot
+	// must always be followed by an identifier character, so identifiers cannot end in a
+	// dot.
+	if !firstIsDot {
+		for l.peek() == '.' {
+			l.next() // consume '.'
+			if !isIdent(l.peek()) {
+				l.emit(invalidToken)
+				return lexNext
+			}
+			l.acceptRun(isIdent)
+		}
+	}
+
 	if l.peek() == ':' {
 		if firstIsDot {
 			l.emit(dottedLabel)

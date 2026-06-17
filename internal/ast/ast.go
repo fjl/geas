@@ -168,7 +168,24 @@ type (
 		// will be documented.
 		StartComment *Comment
 	}
+
+	StructDef struct {
+		stbase
+		Ident  string
+		Fields []*StructField
+	}
 )
+
+// StructField is a single field in a struct definition. A field is either sized, in which
+// case Size holds its byte size expression, or it embeds another struct, in which case Type
+// holds the name of that struct.
+type StructField struct {
+	Name   string
+	Type   string // name of embedded struct, empty for sized fields
+	Size   Expr   // byte size expression, nil for embedded struct fields
+	Line   int
+	Column int
+}
 
 func (st *InstructionMacroCall) Description() string {
 	return fmt.Sprintf("invocation of %%%s", st.Ident)
@@ -204,6 +221,10 @@ func (st *InstructionMacroDef) Description() string {
 
 func (st *ExpressionMacroDef) Description() string {
 	return fmt.Sprintf("definition of %s", st.Ident)
+}
+
+func (st *StructDef) Description() string {
+	return fmt.Sprintf("definition of struct %s", st.Ident)
 }
 
 func (st *LabelDef) Description() string {

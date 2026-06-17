@@ -225,6 +225,11 @@ func parseDirective(p *Parser, tok token) Statement {
 			p.throwError(tok, "nested macro definitions are not allowed")
 		}
 		return parseMacroDef(p)
+	case "#defstruct":
+		if !p.atDocumentTop() {
+			p.throwError(tok, "#defstruct is only allowed at the top level")
+		}
+		return parseStructDef(p, tok)
 	case "#include":
 		return parseInclude(p, tok)
 	case "#assemble":
@@ -355,6 +360,62 @@ commentLoop:
 	}
 	doc.Creation = def
 	return def
+}
+
+func parseStructDef(p *Parser, d token) *StructDef {
+	name := p.next()
+	if name.typ != identifier {
+		p.unexpected(name)
+	}
+	def := &StructDef{
+		stbase: stbase{src: p.doc, line: name.line, column: name.column},
+		Ident:  name.text,
+	}
+	if tok := p.next(); tok.typ != openBrace {
+		p.throwError(tok, "expected '{' after struct name")
+	}
+	for {
+		switch tok := p.next(); tok.typ {
+		case lineStart, lineEnd, comment:
+			// blank lines and comments are ignored in the body
+		case closeBrace:
+			return def
+		case eof:
+			p.throwError(tok, "unexpected EOF in struct definition")
+		case label:
+			def.Fields = append(def.Fields, parseStructField(p, tok))
+		default:
+			p.unexpected(tok)
+		}
+	}
+}
+
+func parseStructField(p *Parser, nameTok token) *StructField {
+	field := &StructField{Name: nameTok.text, Line: nameTok.line, Column: nameTok.column}
+
+	// A field declares either a size or a type. A bare number or a parenthesized
+	// expression is a size; a bare identifier is the name of an embedded struct. Size
+	// expressions must be parenthesized so they remain distinct from struct names.
+	switch tok := p.next(); tok.typ {
+	case numberLiteral, openParen:
+		field.Size = parsePrimaryExpr(p, tok)
+	case identifier:
+		field.Type = tok.text
+	default:
+		p.throwError(tok, "expected field size or struct name following %q", nameTok.text)
+	}
+
+	// Consume the rest of the line.
+	switch tok := p.next(); tok.typ {
+	case lineEnd, eof, comment:
+	case closeBrace:
+		p.unread(tok)
+	case arith:
+		p.throwError(tok, "unexpected %s after field size, wrap expressions in parentheses", tok.text)
+	default:
+		p.unexpected(tok)
+	}
+	return field
 }
 
 func parseInclude(p *Parser, d token) *Include {

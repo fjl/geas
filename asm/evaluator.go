@@ -36,6 +36,10 @@ type evaluator struct {
 	compiler    *Compiler // for assemble macro
 	cache       evalCache
 	labelsValid bool // while false, evaluating labels returns unassignedLabelErr
+
+	// structVals holds the pre-computed values of macros generated from struct definitions.
+	// These are evaluated once before labels are assigned, so they are guaranteed constant.
+	structVals map[*ast.ExpressionMacroDef]*lzint.Value
 }
 
 type evalLabelKey struct {
@@ -97,6 +101,7 @@ func newEvaluator(c *Compiler, overrides map[string]*ast.ExpressionMacroDef) *ev
 		usedLabels: make(map[*ast.LabelDef]struct{}),
 		compiler:   c,
 		cache:      newEvalCache(),
+		structVals: make(map[*ast.ExpressionMacroDef]*lzint.Value),
 	}
 }
 
@@ -340,6 +345,11 @@ func (e *evaluator) evalMacroCall(expr *ast.MacroCallExpr, env *evalEnvironment)
 		return nil, fmt.Errorf("%w %s", ecUndefinedMacro, expr.Ident)
 	}
 
+	// Struct-generated macros are pre-computed to constants, so use the cached value.
+	if v, ok := e.structVals[def]; ok {
+		return v, nil
+	}
+
 	// Prevent recursion.
 	if !e.enterMacro(def) {
 		return nil, fmt.Errorf("%w %s", ecRecursiveCall, expr.Ident)
@@ -364,6 +374,19 @@ func (e *evaluator) evalMacroCall(expr *ast.MacroCallExpr, env *evalEnvironment)
 
 	// Compute the macro result value.
 	return e.eval(def.Body, macroEnv)
+}
+
+// evalStructMacro pre-computes the value of a macro generated from a struct definition and
+// caches it. It is called before labels are assigned, so a struct field that references a
+// label (directly or transitively) yields an unassignedLabelError here.
+func (e *evaluator) evalStructMacro(prog *compilerProg, def *ast.ExpressionMacroDef) error {
+	env := &evalEnvironment{prog: prog, doc: def.Document()}
+	v, err := e.eval(def.Body, env)
+	if err != nil {
+		return err
+	}
+	e.structVals[def] = v
+	return nil
 }
 
 func checkArgCount(expr *ast.MacroCallExpr, n int) error {

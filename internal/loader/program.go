@@ -34,12 +34,17 @@ type Program struct {
 	defs         map[*ast.Document]definitions
 	global       definitions
 	macroGLabels set.Set[string] // global labels defined in macro bodies
+
+	// structMacros holds the expression macros generated from struct definitions, grouped
+	// per struct and in definition order. The compiler pre-evaluates these to constants.
+	structMacros [][]*ast.ExpressionMacroDef
 }
 
 type definitions struct {
 	label      map[string]*ast.LabelDef
 	instrMacro map[string]*ast.InstructionMacroDef
 	exprMacro  map[string]*ast.ExpressionMacroDef
+	structs    map[string]*structLayout
 }
 
 func newDefinitions() definitions {
@@ -47,6 +52,7 @@ func newDefinitions() definitions {
 		label:      make(map[string]*ast.LabelDef),
 		instrMacro: make(map[string]*ast.InstructionMacroDef),
 		exprMacro:  make(map[string]*ast.ExpressionMacroDef),
+		structs:    make(map[string]*structLayout),
 	}
 }
 
@@ -62,6 +68,8 @@ func NewProgram(top *ast.Document) *Program {
 			p.registerExprMacro(top, st)
 		case *ast.InstructionMacroDef:
 			p.registerInstrMacro(top, st)
+		case *ast.StructDef:
+			p.defineStruct(top, st)
 		}
 	}
 	return p
@@ -75,6 +83,12 @@ func newProgram(top *ast.Document) *Program {
 		includes:     make(map[*ast.Include]*ast.Document),
 		defs:         make(map[*ast.Document]definitions),
 	}
+}
+
+// StructMacros returns the expression macros generated from struct definitions, grouped per
+// struct.
+func (p *Program) StructMacros() [][]*ast.ExpressionMacroDef {
+	return p.structMacros
 }
 
 // LookupExprMacro finds the definition of a expression macro.
