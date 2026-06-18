@@ -22,6 +22,8 @@ import (
 	"fmt"
 	"io"
 	"strconv"
+	"strings"
+	"unicode"
 
 	"github.com/fjl/geas/internal/ast"
 )
@@ -394,7 +396,7 @@ func (p *Printer) comment(st *ast.Comment, attached bool) {
 	if lvl == 2 {
 		p.string(p.indent)
 	}
-	p.string(st.Text)
+	p.string(strings.TrimRightFunc(st.Text, unicode.IsSpace))
 }
 
 func (p *Printer) quotedString(s string) {
