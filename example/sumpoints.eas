@@ -1,0 +1,82 @@
+;;; Example program for structs.
+;;;
+;;; Reads 'point' records from calldata, and sums up their x and y
+;;; fields. Records where 'point.skip' is non-zero are skipped.
+
+#defstruct point {
+    x: 32
+    y: 32
+    skip: 1
+}
+
+#defstruct mem {
+    xsum: 32
+    ysum: 32
+}
+
+;;; Program start
+
+    ;; check that input size is a multiple of point size
+    calldatasize            ; [calldatasize]
+    push point.size         ; [item, calldatasize]
+    mod                     ; [mod]
+    jumpi @invalidSize      ; []
+
+    ;; summing loop
+    push 0                  ; [ptr]
+loop:
+    ;; skip if flagged
+    dup1                    ; [ptr, ptr]
+    push point.skip.offset  ; [f, ptr, ptr]
+    add                     ; [offset]
+    calldataload            ; [skipw]
+    push 8*31               ; [shft, skipw]
+    shr                     ; [skip, ptr]
+    jumpi @next             ; [ptr]
+
+    ;; load x
+    dup1                    ; [ptr, ptr]
+    push point.x.offset     ; [f, ptr, ptr]
+    add                     ; [offset, ptr]
+    calldataload            ; [x, ptr]
+
+    ;; sum into x accumulator
+    push mem.xsum.offset    ; [offset, x, ptr]
+    mload                   ; [accum, x, ptr]
+    add                     ; [newaccum]
+    push mem.xsum.offset    ; [offset, newaccum, ptr]
+    mstore                  ; [ptr]
+
+    ;; load y
+    dup1                    ; [ptr, ptr]
+    push point.y.offset     ; [f, ptr, ptr]
+    add                     ; [offset, ptr]
+    calldataload            ; [y, ptr]
+
+    ;; sum into y accumulator
+    push mem.ysum.offset    ; [offset, y, ptr]
+    mload                   ; [accum, y, ptr]
+    add                     ; [newaccum]
+    push mem.ysum.offset    ; [offset, newaccum, ptr]
+    mstore                  ; [ptr]
+
+next:                       ; [ptr]
+    ;; move to next input point
+    push point.size         ; [sz, ptr]
+    add                     ; [ptr]
+    dup1                    ; [ptr, ptr]
+    calldatasize            ; [calldatasize, ptr]
+    gt                      ; [calldatasize>ptr, ptr]
+    jumpi @loop             ; [ptr]
+
+    pop                     ; []
+
+    ;; return sums
+    push mem.size           ; [size]
+    push 0                  ; [offset, size]
+    return                  ; []
+
+invalidSize:
+    push 0                  ; [size]
+    push 0                  ; [offset, size]
+    revert                  ; []
