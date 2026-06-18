@@ -35,71 +35,71 @@
 
 ;;; %do_revert sets up and then executes a revert(0,0) operation.
 #define %do_revert {
-    push 0           ; [0]
-    push 0           ; [0, 0]
-    revert           ; []
+    push 0             ; [0]
+    push 0             ; [0, 0]
+    revert             ; []
 }
 
 ;;; -----------------------------------------------------------------------------
 ;;; PROGRAM START----------------------------------------------------------------
 
     ;; Protect the submit routine by verifying the caller is equal to sysaddr.
-    caller           ; [caller]
-    push sysaddr     ; [sysaddr, caller]
-    eq               ; [sysaddr == caller]
-    jumpi @submit    ; []
+    caller             ; [caller]
+    push sysaddr       ; [sysaddr, caller]
+    eq                 ; [sysaddr == caller]
+    jumpi @submit      ; []
 
     ;; Fallthrough if addresses don't match -- this means the caller intends
     ;; to read a root.
 
     ;; Check if calldata is equal to 32 bytes.
-    push 32          ; [32]
-    calldatasize     ; [calldatasize, 32]
-    eq               ; [calldatasize == 32]
+    push 32            ; [32]
+    calldatasize       ; [calldatasize, 32]
+    eq                 ; [calldatasize == 32]
 
     ;; Jump to continue if length-check passed, otherwise revert.
-    jumpi @loadtime  ; []
-    %do_revert       ; []
+    jumpi @loadtime    ; []
+    %do_revert         ; []
 
 loadtime:
     ;; Load input timestamp.
-    push 0           ; [0]
-    calldataload     ; [input_timestamp]
-    dup1             ; [input_timestamp, input_timestamp]
+    push 0             ; [0]
+    calldataload       ; [input_timestamp]
+    dup1               ; [input_timestamp, input_timestamp]
 
     ;; Verify input timestamp is non-zero.
-    iszero           ; [input_timestamp == 0, input_timestamp]
-    jumpi @throw     ; [input_timestamp]
+    iszero             ; [input_timestamp == 0, input_timestamp]
+    jumpi @throw       ; [input_timestamp]
 
     ;; Compute the timestamp index and load from storage.
-    push buflen      ; [buflen, input_timestamp]
-    dup2             ; [input_timestamp, buflen, input_timestamp]
-    mod              ; [time_index, input_timestamp]
-    swap1            ; [input_timestamp, time_index]
-    dup2             ; [time_index, input_timestamp, time_index]
-    sload            ; [stored_timestamp, input_timestamp, time_index]
+    push buflen        ; [buflen, input_timestamp]
+    dup2               ; [input_timestamp, buflen, input_timestamp]
+    mod                ; [time_index, input_timestamp]
+    swap1              ; [input_timestamp, time_index]
+    dup2               ; [time_index, input_timestamp, time_index]
+    sload              ; [stored_timestamp, input_timestamp, time_index]
 
     ;; Verify stored timestamp matches input timestamp. It's possible these
     ;; don't match if the slot has been overwritten by the ring buffer or if
     ;; the timestamp input wasn't a valid previous timestamp.
-    eq               ; [stored_timestamp == input_timestamp, time_index]
-    jumpi @loadroot  ; [time_index]
-    %do_revert       ; []
+    eq                 ; [stored_timestamp == input_timestamp, time_index]
+    jumpi @loadroot    ; [time_index]
+    %do_revert         ; []
 
 loadroot:
     ;; Extend index to get root index.
-    push buflen      ; [buflen, time_index]
-    add              ; [root_index]
-    sload            ; [root]
+    push buflen        ; [buflen, time_index]
+    add                ; [root_index]
+    sload              ; [root]
 
     ;; Write the retrieved root to memory so it can be returned.
-    push 0           ; [0, root]
-    mstore           ; []
+    push 0             ; [0, root]
+    mstore             ; []
 
     ;; Return the root.
-    push 32          ; [size]
-    push 0           ; [offset, size]
-    return           ; []
+    push 32            ; [size]
+    push 0             ; [offset, size]
+    return             ; []
 
 throw:
     ;; Reverts current execution with no return data.
@@ -108,24 +108,24 @@ throw:
 submit:
     ;; Calculate the index the timestamp should be stored at, e.g.
     ;; time_index = (time % buflen).
-    push buflen      ; [buflen]
-    timestamp        ; [time, buflen]
-    mod              ; [time % buflen]
+    push buflen        ; [buflen]
+    timestamp          ; [time, buflen]
+    mod                ; [time % buflen]
 
     ;; Write timestamp into storage slot at time_index.
-    timestamp        ; [time, time_index]
-    dup2             ; [time_index, time, time_index]
-    sstore           ; [time_index]
+    timestamp          ; [time, time_index]
+    dup2               ; [time_index, time, time_index]
+    sstore             ; [time_index]
 
     ;; Get root from calldata and write into root_index. No validation is
     ;; done on the input root. Becuase the routine is protected by a caller
     ;; check against sysaddr, it's okay to assume the value is correctly
     ;; given.
-    push 0           ; [0, time_index]
-    calldataload     ; [root, time_index]
-    swap1            ; [time_index, root]
-    push buflen      ; [buflen, time_index, root]
-    add              ; [root_index, root]
-    sstore           ; []
+    push 0             ; [0, time_index]
+    calldataload       ; [root, time_index]
+    swap1              ; [time_index, root]
+    push buflen        ; [buflen, time_index, root]
+    add                ; [root_index, root]
+    sstore             ; []
 
-    stop             ; []
+    stop               ; []
