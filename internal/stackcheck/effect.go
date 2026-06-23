@@ -24,8 +24,9 @@ import (
 
 // stackEffect represents the stack effect of a code sequence (macro body, included document).
 type stackEffect struct {
-	in, out []string
-	jumps   []externalJump // jumps to labels not defined in the code sequence
+	in, out  []string
+	jumps    []externalJump // jumps to labels not defined in the code sequence
+	terminal bool           // true if control never falls through the end (e.g. always reverts)
 }
 
 func (e *stackEffect) StackIn(imm byte) []string  { return e.in }

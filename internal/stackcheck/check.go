@@ -65,9 +65,10 @@ func (a *analyzer) analyzeDocument(doc *ast.Document, inferred bool) *stackEffec
 	if inferred {
 		eff := effectFromStack(result.inferredInputs, result.exitItems)
 		eff.jumps = result.externalJumps
+		eff.terminal = !result.fallsThrough
 		return eff
 	}
-	return &stackEffect{out: result.exitItems, jumps: result.externalJumps}
+	return &stackEffect{out: result.exitItems, jumps: result.externalJumps, terminal: !result.fallsThrough}
 }
 
 // analyzeDefs pre-analyzes all instruction macro definitions and include statements
@@ -120,6 +121,7 @@ func (a *analyzer) analyzeMacro(def *ast.InstructionMacroDef) {
 		eff = effectFromStack(result.inferredInputs, result.exitItems)
 	}
 	eff.jumps = result.externalJumps
+	eff.terminal = !result.fallsThrough
 	a.macroEffects[def] = eff
 }
 
@@ -136,11 +138,32 @@ func (a *analyzer) analyzeInclude(inc *ast.Include) {
 	a.includeEffects[inc] = eff
 }
 
+// isTerminalCall reports whether a macro or include call statement always terminates
+// execution (never returns to the following statement). Effects are precomputed by
+// analyzeDefs before the enclosing document's blocks are split, so the lookups here
+// are populated for calls to already-defined macros and includes.
+func (a *analyzer) isTerminalCall(st ast.Statement, doc *ast.Document) bool {
+	switch st := st.(type) {
+	case *ast.InstructionMacroCall:
+		def := a.prog.LookupInstrMacro(st.Ident, doc)
+		if def == nil {
+			return false
+		}
+		eff := a.macroEffects[def]
+		return eff != nil && eff.terminal
+	case *ast.Include:
+		eff := a.includeEffects[st]
+		return eff != nil && eff.terminal
+	}
+	return false
+}
+
 // analysisResult holds the output of analyzeBlocks.
 type analysisResult struct {
 	exitItems      []string       // stack items after the last reachable block
 	inferredInputs []string       // inferred inputs (only for inferred mode)
 	externalJumps  []externalJump // jumps to labels not defined in this document
+	fallsThrough   bool           // whether control can reach the end of the sequence
 }
 
 // blockState holds the per-block state computed during worklist propagation.
@@ -171,7 +194,9 @@ const initialPred = -1
 //   - Phase 2 (checking): walk all reachable blocks once with the stable entry
 //     states and report warnings for comment mismatches.
 func (a *analyzer) analyzeBlocks(doc *ast.Document, initialItems []string, inferred bool) analysisResult {
-	blocks, labelIndex := splitBlocks(doc, a.prog)
+	blocks, labelIndex := splitBlocks(doc, a.prog, func(st ast.Statement) bool {
+		return a.isTerminalCall(st, doc)
+	})
 	if len(blocks) == 0 {
 		return analysisResult{exitItems: initialItems}
 	}
@@ -204,7 +229,13 @@ func (a *analyzer) analyzeBlocks(doc *ast.Document, initialItems []string, infer
 			})
 		}
 	}
-	return analysisResult{exitItems: exit, inferredInputs: inferredInputs, externalJumps: extJumps}
+
+	// Control reaches the end of the sequence only if the last block in source order
+	// is reachable and does not itself terminate or jump away unconditionally.
+	last := blocks[len(blocks)-1]
+	fallsThrough := states[len(blocks)-1].reached && !last.endsWithTerminal && !last.endsWithUnconditionalJump
+
+	return analysisResult{exitItems: exit, inferredInputs: inferredInputs, externalJumps: extJumps, fallsThrough: fallsThrough}
 }
 
 // propagateStates runs the worklist to compute stable entry/exit states for all
@@ -619,15 +650,19 @@ func (a *analyzer) walkBlock(blk *basicBlock, doc *ast.Document, s *stack.Stack,
 // represent those jumps translated to the caller's stack context.
 func (a *analyzer) applyStatement(st ast.Statement, doc *ast.Document, s *stack.Stack, report bool) []externalJump {
 	var (
-		op    stack.Op
-		imm   byte
-		jumps []externalJump // external jumps from macro/include effect
+		op       stack.Op
+		imm      byte
+		jumps    []externalJump // external jumps from macro/include effect
+		terminal bool           // statement halts execution (no resulting stack to verify)
 	)
 	switch st := st.(type) {
 	case *ast.Opcode:
 		op, imm = a.resolveOpcode(st)
 		if op == nil {
 			return nil
+		}
+		if evmOp := a.prog.Fork.OpByName(strings.ToUpper(st.Op)); evmOp != nil {
+			terminal = evmOp.Term
 		}
 
 	case *ast.InstructionMacroCall:
@@ -641,6 +676,7 @@ func (a *analyzer) applyStatement(st ast.Statement, doc *ast.Document, s *stack.
 		}
 		op = eff
 		jumps = eff.jumps
+		terminal = eff.terminal
 
 	case *ast.Include:
 		eff := a.includeEffects[st]
@@ -649,6 +685,7 @@ func (a *analyzer) applyStatement(st ast.Statement, doc *ast.Document, s *stack.
 		}
 		op = eff
 		jumps = eff.jumps
+		terminal = eff.terminal
 
 	default:
 		return nil // skip other statements
@@ -662,9 +699,12 @@ func (a *analyzer) applyStatement(st ast.Statement, doc *ast.Document, s *stack.
 		edges = externalJumpEdges(s, op, jumps)
 	}
 
-	// Parse the comment.
+	// Parse the comment. A comment on a terminal statement (one that always halts,
+	// like a revert macro) documents nothing verifiable — execution does not continue,
+	// so there is no resulting stack to check it against. Skip it; the operation is
+	// still applied below so its inputs are checked for underflow.
 	var comment []string
-	if c := st.Comment(); c != nil && c.IsStackComment() {
+	if c := st.Comment(); c != nil && c.IsStackComment() && !terminal {
 		var err error
 		if comment, err = stack.ParseComment(c.InnerText()); err != nil {
 			if report {

@@ -46,7 +46,11 @@ type basicBlock struct {
 //   - non-dotted label definitions (JUMPDEST boundaries)
 //   - after terminal instructions (STOP, RETURN, REVERT, etc.)
 //   - after jumps
-func splitBlocks(doc *ast.Document, prog *loader.Program) ([]*basicBlock, map[string]int) {
+//   - after instruction macro / include calls that never return (isTerminal)
+//
+// isTerminal reports whether a non-opcode statement (macro or include call) always
+// terminates execution. It may be nil, in which case such calls are never terminal.
+func splitBlocks(doc *ast.Document, prog *loader.Program, isTerminal func(ast.Statement) bool) ([]*basicBlock, map[string]int) {
 	var blocks []*basicBlock
 	cur := &basicBlock{canFallThrough: true}
 
@@ -103,6 +107,14 @@ func splitBlocks(doc *ast.Document, prog *loader.Program) ([]*basicBlock, map[st
 
 		default:
 			cur.statements = append(cur.statements, st)
+			// A macro or include call that never returns ends the block, just like a
+			// terminal opcode. Without this, the next label would get a spurious
+			// fall-through predecessor with the wrong stack depth.
+			if isTerminal != nil && isTerminal(st) {
+				cur.endsWithTerminal = true
+				blocks = append(blocks, cur)
+				cur = &basicBlock{canFallThrough: false}
+			}
 		}
 	}
 
