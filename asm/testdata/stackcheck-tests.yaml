@@ -200,21 +200,30 @@ terminal-macro-no-fallthrough:
   output:
     bytecode: "6001 6008 57 5f 5f fd 5b 6005 6006 01 00"
 
-# A stack comment on a terminal statement documents nothing verifiable: execution
-# halts, so there is no resulting stack to check it against. Here the stack still
-# holds [x] when %rev() runs, but the "[]" comment must not be flagged.
-terminal-statement-comment-not-checked:
+# A terminal opcode still has a stack effect (it consumes its inputs), so its comment
+# documents the virtual post-stack and is checked like any other. Here return consumes
+# [offset, size], leaving nothing, so "[]" is correct.
+terminal-opcode-comment-ok:
   input:
     code: |
-      #define %rev() {
-        push 0
-        push 0
-        revert
-      }
-      push 7       ; [x]
-      %rev()       ; []
+      push 0       ; [size]
+      push 0       ; [offset, size]
+      return       ; []
   output:
-    bytecode: "6007 5f 5f fd"
+    bytecode: "5f 5f f3"
+
+# A wrong comment on a terminal opcode is still flagged: return leaves an empty stack,
+# so claiming one item remains is an underflow.
+terminal-opcode-comment-wrong:
+  input:
+    code: |
+      push 0       ; [size]
+      push 0       ; [offset, size]
+      return       ; [leftover]
+  output:
+    bytecode: "5f 5f f3"
+    warnings:
+      - ':3:0: stack comment underflow: stack has 0 items, comment declares 1'
 
 include-effect:
   input:

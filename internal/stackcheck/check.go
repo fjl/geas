@@ -650,19 +650,15 @@ func (a *analyzer) walkBlock(blk *basicBlock, doc *ast.Document, s *stack.Stack,
 // represent those jumps translated to the caller's stack context.
 func (a *analyzer) applyStatement(st ast.Statement, doc *ast.Document, s *stack.Stack, report bool) []externalJump {
 	var (
-		op       stack.Op
-		imm      byte
-		jumps    []externalJump // external jumps from macro/include effect
-		terminal bool           // statement halts execution (no resulting stack to verify)
+		op    stack.Op
+		imm   byte
+		jumps []externalJump // external jumps from macro/include effect
 	)
 	switch st := st.(type) {
 	case *ast.Opcode:
 		op, imm = a.resolveOpcode(st)
 		if op == nil {
 			return nil
-		}
-		if evmOp := a.prog.Fork.OpByName(strings.ToUpper(st.Op)); evmOp != nil {
-			terminal = evmOp.Term
 		}
 
 	case *ast.InstructionMacroCall:
@@ -676,7 +672,6 @@ func (a *analyzer) applyStatement(st ast.Statement, doc *ast.Document, s *stack.
 		}
 		op = eff
 		jumps = eff.jumps
-		terminal = eff.terminal
 
 	case *ast.Include:
 		eff := a.includeEffects[st]
@@ -685,7 +680,6 @@ func (a *analyzer) applyStatement(st ast.Statement, doc *ast.Document, s *stack.
 		}
 		op = eff
 		jumps = eff.jumps
-		terminal = eff.terminal
 
 	default:
 		return nil // skip other statements
@@ -699,12 +693,9 @@ func (a *analyzer) applyStatement(st ast.Statement, doc *ast.Document, s *stack.
 		edges = externalJumpEdges(s, op, jumps)
 	}
 
-	// Parse the comment. A comment on a terminal statement (one that always halts,
-	// like a revert macro) documents nothing verifiable — execution does not continue,
-	// so there is no resulting stack to check it against. Skip it; the operation is
-	// still applied below so its inputs are checked for underflow.
+	// Parse the comment.
 	var comment []string
-	if c := st.Comment(); c != nil && c.IsStackComment() && !terminal {
+	if c := st.Comment(); c != nil && c.IsStackComment() {
 		var err error
 		if comment, err = stack.ParseComment(c.InnerText()); err != nil {
 			if report {
