@@ -145,7 +145,8 @@ type analysisResult struct {
 
 // blockState holds the per-block state computed during worklist propagation.
 type blockState struct {
-	entry      []string              // merged entry state (nil = not yet reached)
+	reached    bool                  // whether the block has any predecessor (is reachable)
+	entry      []string              // merged entry state
 	exit       []string              // exit state after processing
 	predExits  map[int][]string      // predecessor block index → exit state (-1 = initial)
 	predWild   map[int]bool          // predecessor block index → exit wildcard flag
@@ -185,7 +186,7 @@ func (a *analyzer) analyzeBlocks(doc *ast.Document, initialItems []string, infer
 	// Return the exit state of the last reachable block.
 	var exit []string
 	for i := len(blocks) - 1; i >= 0; i-- {
-		if states[i].entry != nil {
+		if states[i].reached {
 			exit = states[i].exit
 			break
 		}
@@ -194,7 +195,7 @@ func (a *analyzer) analyzeBlocks(doc *ast.Document, initialItems []string, infer
 	// Collect external jumps from blocks with unresolved jump targets.
 	var extJumps []externalJump
 	for i, blk := range blocks {
-		if blk.hasExternalJump && states[i].exit != nil {
+		if blk.hasExternalJump && states[i].reached {
 			extJumps = append(extJumps, externalJump{
 				target: blk.jumpTarget,
 				items:  states[i].exit,
@@ -272,6 +273,7 @@ func (a *analyzer) propagateStates(blocks []*basicBlock, labelIndex map[string]i
 	if initItems == nil {
 		initItems = []string{}
 	}
+	states[0].reached = true
 	states[0].predExits = map[int][]string{initialPred: initItems}
 	states[0].predWild = map[int]bool{initialPred: initWild}
 	states[0].entry = initItems
@@ -310,7 +312,11 @@ func mergePredecessor(succ *blockState, predKey int, items []string, wild bool) 
 		succ.predExits = make(map[int][]string)
 		succ.predWild = make(map[int]bool)
 	}
-	if slices.Equal(succ.predExits[predKey], items) && succ.predWild[predKey] == wild {
+	// The first time a block is reached always enqueues it.
+	firstReach := !succ.reached
+	succ.reached = true
+
+	if prev, seen := succ.predExits[predKey]; seen && slices.Equal(prev, items) && succ.predWild[predKey] == wild {
 		return false // no change
 	}
 	succ.predExits[predKey] = items
@@ -319,12 +325,10 @@ func mergePredecessor(succ *blockState, predKey int, items []string, wild bool) 
 	// Recompute the merged entry state from all predecessor exits.
 	newEntry := succ.baseNames()
 	newWild := succ.anyPredWild()
-	if slices.Equal(succ.entry, newEntry) && succ.entryWild == newWild {
-		return false // entry didn't change
-	}
+	changed := firstReach || !slices.Equal(succ.entry, newEntry) || succ.entryWild != newWild
 	succ.entry = newEntry
 	succ.entryWild = newWild
-	return true
+	return changed
 }
 
 // applyLabelComment applies the block's label comment to the stack (if any),
@@ -343,7 +347,7 @@ func (a *analyzer) applyLabelComment(blk *basicBlock, s *stack.Stack) {
 // reports comment mismatch warnings.
 func (a *analyzer) checkComments(blocks []*basicBlock, doc *ast.Document, states []blockState, initialItems []string, inferred bool) {
 	for i, blk := range blocks {
-		if states[i].entry == nil {
+		if !states[i].reached {
 			continue // unreachable
 		}
 
@@ -481,7 +485,7 @@ func (a *analyzer) checkLabelComment(blk *basicBlock, bs *blockState, s *stack.S
 // have been validated, and only checks labels whose comments are correct.
 func (a *analyzer) checkJumpDepths(blocks []*basicBlock, states []blockState) {
 	for i, blk := range blocks {
-		if states[i].entry == nil || blk.labelComment == nil {
+		if !states[i].reached || blk.labelComment == nil {
 			continue
 		}
 		comment, err := stack.ParseComment(blk.labelComment.InnerText())
