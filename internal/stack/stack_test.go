@@ -197,6 +197,20 @@ func TestStackAnalysis(t *testing.T) {
 			fmt.Errorf("%w: item %d differs (expected %q, have %q) in [b, a]", ErrMismatch, 0, "a", "b"),
 		)
 	})
+
+	// DUP reuses the input item for both output positions, so the duplicated value
+	// occupies two stack slots as one item. A comment that names those slots
+	// differently contradicts itself and must be flagged. Here "a" was already
+	// popped, so its name is no longer bound to a live item — the inconsistency must
+	// still be caught via the shared item identity, not via name bookkeeping.
+	t.Run("dupNamedInconsistently", func(t *testing.T) {
+		st := newTest(t, "[a]")
+		st.applyOK(pop, 0, "[]")
+		st.applyOK(push1, 0, "[b]")
+		st.applyErr(dup1, 0, "[a, b]",
+			fmt.Errorf("%w: items %d and %d are the same value but named %q and %q", ErrMismatch, 0, 1, "a", "b"),
+		)
+	})
 }
 
 // This test verifies that unconfirmed names from merge-point Init

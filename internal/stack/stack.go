@@ -183,6 +183,7 @@ func (s *Stack) checkComment(comment []string) error {
 	// In inferred mode, comments that extend beyond the current stack are
 	// silently truncated since the extra items can't be verified.
 	var namingError error
+	firstPos := make(map[int]int) // stack item -> comment index that first named it
 	for i, name := range comment {
 		stackItem, ok := s.peek(i)
 		if !ok {
@@ -190,6 +191,18 @@ func (s *Stack) checkComment(comment []string) error {
 				break // can't verify deeper items
 			}
 			return fmt.Errorf("%w: stack has %d items, comment declares %d", ErrCommentUnderflow, len(s.stack), len(comment))
+		}
+		// A value duplicated onto the stack (e.g. by DUP) occupies more than one
+		// position as the same item: the op's stack effect repeats the input name in
+		// its output, so the checker knows these positions hold a single value. If the
+		// comment names those positions differently, it contradicts itself about that
+		// value. This holds regardless of whether the value was previously confirmed.
+		if fp, dup := firstPos[stackItem]; dup {
+			if comment[fp] != name && namingError == nil {
+				namingError = fmt.Errorf("%w: items %d and %d are the same value but named %q and %q", ErrMismatch, fp, i, comment[fp], name)
+			}
+		} else {
+			firstPos[stackItem] = i
 		}
 		// Name is taken by a different item. Allow this if:
 		// - The current item is NEW (new items can reuse names for duplicate values

@@ -49,6 +49,22 @@ rename-no-cascade:
     warnings:
       - ":3:0: stack comment renames item: a renamed to renamed"
 
+# DUP places the duplicated value on the stack as a single item occupying two
+# positions. A comment that names those positions differently contradicts itself
+# about one value and must be flagged, even when the recycled name ("a", already
+# popped here) is no longer bound to a live stack item.
+dup-named-inconsistently:
+  input:
+    code: |
+      push 1     ; [a]
+      pop        ; []
+      push 2     ; [b]
+      dup1       ; [a, b]
+  output:
+    bytecode: "6001 50 6002 80"
+    warnings:
+      - ':4:0: stack comment item mismatch: items 0 and 1 are the same value but named "a" and "b"'
+
 # Here, a comment has more items than the virtual stack.
 comment-overflow:
   input:
