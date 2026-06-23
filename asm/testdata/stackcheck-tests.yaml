@@ -862,19 +862,18 @@ macro-external-jump-wildcard-suppresses:
   output:
     bytecode: "6001 5f 6063 90 600c 57 50 50 00 5b 00"
 
-# Non-wildcard comment declares fewer items than the stack has.
-comment-depth-mismatch:
+# An instruction comment may elide items at the bottom of the stack: listing
+# only the top item is permitted, the rest remain.
+comment-elide-bottom:
   input:
     code: |
       push 1    ; [a]
       push 2    ; [b]
   output:
     bytecode: "6001 6002"
-    warnings:
-      - ':2:0: stack comment depth mismatch: stack has 2 items, comment declares 1'
 
-# An empty comment on a non-empty stack warns.
-comment-depth-empty:
+# Eliding everything (an empty comment) is permitted; the stack is left intact.
+comment-elide-all:
   input:
     code: |
       push 1    ; [a]
@@ -882,8 +881,6 @@ comment-depth-empty:
       pop       ; []
   output:
     bytecode: "6001 6002 50"
-    warnings:
-      - ':3:0: stack comment depth mismatch: stack has 1 items, comment declares 0'
 
 # Correct full-stack comment: no warning.
 comment-depth-ok:
@@ -904,21 +901,19 @@ comment-depth-wildcard-ok:
   output:
     bytecode: "6001 6002"
 
-# A depth mismatch should not cascade: after the first warning, the stack
-# is truncated to match the comment so subsequent comments stay consistent.
-comment-depth-no-cascade:
+# Eliding the bottom does not discard the unlisted items: they remain tracked, so
+# later comments that list them again stay consistent and produce no warnings.
+comment-elide-keeps-items:
   input:
     code: |
       push 1    ; [a]
       push 2    ; [b]
       push 3    ; [c, b]
-      pop       ; [b]
-      pop       ; []
+      pop       ; [b, a]
+      pop       ; [a]
       stop
   output:
     bytecode: "6001 6002 6003 50 50 00"
-    warnings:
-      - ':2:0: stack comment depth mismatch: stack has 2 items, comment declares 1'
 
 # When a macro jumps to an external label with the wrong depth,
 # the error should be reported at the macro call site, not the label.

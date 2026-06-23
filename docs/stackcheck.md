@@ -68,6 +68,10 @@ However, a comment must not declare *more* items than are on the stack:
         push 2              ; [b, a]
         add                 ; [sum, extra]  <- warning: stack has 1 item, comment declares 2
 
+Note, a [label comment](#labels-and-merge-points) must always declare the full stack,
+since that depth is checked against the incoming jumps; eliding bottom items there is
+reported as a depth mismatch.
+
 ## Stack Underflow
 
 When an instruction requires more inputs than are available, the checker reports an

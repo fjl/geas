@@ -151,8 +151,9 @@ func (s *Stack) Apply(op Op, imm byte, comment []string) error {
 		}
 	}
 
-	// Check the comment, and apply its names to the stack.
-	return s.checkComment(comment)
+	// Check the comment, and apply its names to the stack. Instruction comments may
+	// elide items at the bottom of the stack: the unlisted items simply remain.
+	return s.checkComment(comment, true)
 }
 
 // CheckComment verifies a standalone stack comment against the current stack state.
@@ -160,14 +161,19 @@ func (s *Stack) Apply(op Op, imm byte, comment []string) error {
 // transformation is performed — only the comment's names are checked and applied.
 // Unconfirmed names can be freely overwritten. All names touched by the comment
 // become confirmed.
+//
+// Unlike instruction comments, a label comment may not elide bottom items: the
+// declared depth is part of the merge contract, checked against incoming jumps.
 func (s *Stack) CheckComment(comment []string) error {
 	clear(s.opNewItems)
-	return s.checkComment(comment)
+	return s.checkComment(comment, false)
 }
 
 // checkComment is the shared comment-checking logic used by both [Apply] and
-// [CheckComment]. It assumes opNewItems has been set up by the caller.
-func (s *Stack) checkComment(comment []string) error {
+// [CheckComment]. It assumes opNewItems has been set up by the caller. If allowElide
+// is true, a comment that lists fewer items than the stack holds is accepted, naming
+// only the top items and leaving the rest in place.
+func (s *Stack) checkComment(comment []string, allowElide bool) error {
 	if comment == nil {
 		return nil
 	}
@@ -234,10 +240,12 @@ func (s *Stack) checkComment(comment []string) error {
 		s.confirmedNames.Add(stackItem)
 	}
 
-	// A non-wildcard comment declares the full stack contents. If it names fewer
-	// items than the stack has, the user has lost track of something. Truncate the
-	// stack to match the comment so that subsequent checks don't cascade.
-	if !wild && len(comment) < len(s.stack) {
+	// A comment that lists fewer items than the stack holds elides the items at the
+	// bottom. For instruction comments (allowElide) this is permitted: the unlisted
+	// items remain on the stack unchanged. For label comments the declared depth is
+	// part of the merge contract, so a shorter comment is a depth mismatch; truncate
+	// the stack to match it so subsequent checks don't cascade.
+	if !wild && !allowElide && len(comment) < len(s.stack) {
 		depth := len(s.stack)
 		s.stack = s.stack[depth-len(comment):]
 		return fmt.Errorf("%w: stack has %d items, comment declares %d", ErrCommentDepth, depth, len(comment))
