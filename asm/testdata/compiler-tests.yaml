@@ -237,6 +237,10 @@ comments-on-label:
       ADD ;; comment
   output:
     bytecode: "6003 56 5b 01"
+    # @label is reached via the unconditional JUMP with an empty stack, so ADD
+    # underflows. This block used to be skipped by the checker entirely.
+    warnings:
+      - ':3:0: stack underflow: op requires 2 items, stack has 0'
 
 dot-label-at-end:
   input:
@@ -781,6 +785,9 @@ instr-macro-inner-label:
     bytecode: "6001 6007 57 6002 5b 6001 5b 00"
     warnings:
       - ':10:0: warning: label @theLabel unused in program'
+      # The inner theLabel is reached both by the jumpi (stack empty) and by
+      # falling through after 'push 2' (one item), so its depth is inconsistent.
+      - ':4:0: stack depth mismatch at merge point: predecessors have depths [0 1]'
 
 instr-macro-outer-label:
   input:
@@ -794,6 +801,10 @@ instr-macro-outer-label:
       outer: stop
   output:
     bytecode: "6001 6007 57 6002 5b 00"
+    # @outer is reached by the macro's jumpi (stack empty) and by falling through
+    # after 'push 2' (one item), so the merge has inconsistent depth.
+    warnings:
+      - ':7:0: stack depth mismatch at merge point: predecessors have depths [0 1]'
 
 instr-macro-global-ref-local:
   input:

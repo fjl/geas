@@ -160,6 +160,62 @@ jump-with-arg:
   output:
     bytecode: "6001 6002 6007 56 5b 01 00"
 
+# A block reached only via a jump that leaves the stack empty must still be
+# checked. The empty entry state must not be mistaken for "unreachable".
+jump-target-empty-stack:
+  input:
+    code: |
+      push 0       ; [cond]
+      jumpi @t     ; []
+      stop
+      t:
+      push 5       ; [a]
+      push 6       ; [b, a]
+      swap1        ; [a, wrong]
+      stop
+  output:
+    bytecode: "5f 6005 57 00 5b 6005 6006 90 00"
+    warnings:
+      - ':7:0: stack comment renames item: b renamed to wrong'
+
+# An instruction macro whose body always terminates (here it reverts) must not
+# create a fall-through edge into the following label. Otherwise @ok would get a
+# spurious empty-stack predecessor and report a bogus depth mismatch.
+terminal-macro-no-fallthrough:
+  input:
+    code: |
+      #define %rev() {
+        push 0
+        push 0
+        revert
+      }
+      push 1       ; [cond]
+      jumpi @ok    ; []
+      %rev()
+      ok:
+      push 5       ; [a]
+      push 6       ; [b, a]
+      add          ; [sum]
+      stop
+  output:
+    bytecode: "6001 6008 57 5f 5f fd 5b 6005 6006 01 00"
+
+# A stack comment on a terminal statement documents nothing verifiable: execution
+# halts, so there is no resulting stack to check it against. Here the stack still
+# holds [x] when %rev() runs, but the "[]" comment must not be flagged.
+terminal-statement-comment-not-checked:
+  input:
+    code: |
+      #define %rev() {
+        push 0
+        push 0
+        revert
+      }
+      push 7       ; [x]
+      %rev()       ; []
+  output:
+    bytecode: "6007 5f 5f fd"
+
 include-effect:
   input:
     code: |
