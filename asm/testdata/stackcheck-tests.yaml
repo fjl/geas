@@ -7,7 +7,7 @@ name-mismatch:
   output:
     bytecode: "6001 6002 90"
     warnings:
-      - ':3:0: stack comment item mismatch: item 1 differs (expected "a", have "b") in [a, b]'
+      - ':3:0: stack comment item mismatch: item 1 differs (comment "a", actual "b") in [a, b]'
 
 # This checks that a mismatch error on line 3 doesn't produce
 # additional warnings on line 4, where the mismatched name is used again.
@@ -21,7 +21,7 @@ name-mismatch-no-cascade:
   output:
     bytecode: "6001 6002 90 50"
     warnings:
-      - ':3:0: stack comment item mismatch: item 1 differs (expected "a", have "b") in [a, b]'
+      - ':3:0: stack comment item mismatch: item 1 differs (comment "a", actual "b") in [a, b]'
 
 rename-error:
   input:
@@ -305,7 +305,7 @@ macro-mismatch:
   output:
     bytecode: "6001 6002 90"
     warnings:
-      - ':4:4: stack comment item mismatch: item 1 differs (expected "a", have "b") in [a, b]'
+      - ':4:4: stack comment item mismatch: item 1 differs (comment "a", actual "b") in [a, b]'
 
 # Loop with a label comment that agrees with both the forward edge
 # and the back-edge. Should produce no warnings.
@@ -397,7 +397,7 @@ loop-body-mismatch:
   output:
     bytecode: "6001 6002 5b 90 90 5f 6004 57 00"
     warnings:
-      - ':4:0: stack comment item mismatch: item 1 differs (expected "a", have "b") in [a, b]'
+      - ':4:0: stack comment item mismatch: item 1 differs (comment "a", actual "b") in [a, b]'
 
 # The label comment at the loop header declares more items than
 # available. Both predecessors have depth 1, so declaring 2 items
@@ -521,7 +521,7 @@ loop-no-label-comment-mismatch:
   output:
     bytecode: "6001 6002 5b 90 90 5f 6004 57 00"
     warnings:
-      - ':4:0: stack comment item mismatch: item 1 differs (expected "a", have "b") in [a, b]'
+      - ':4:0: stack comment item mismatch: item 1 differs (comment "a", actual "b") in [a, b]'
 
 # Nested loops without label comments. Body comments are correct.
 nested-loops-no-label-comments:
@@ -686,7 +686,7 @@ nested-loop-inner-body-mismatch:
   output:
     bytecode: "5f 5b 5f 5b 90 90 6001 01 80 600a 10 6003 57 50 6001 01 80 6003 10 6001 57 00"
     warnings:
-      - ':5:0: stack comment item mismatch: item 1 differs (expected "outer", have "inner") in [outer, inner]'
+      - ':5:0: stack comment item mismatch: item 1 differs (comment "outer", actual "inner") in [outer, inner]'
 
 # Four-way merge where two branches arrive with depth 1 and two with
 # depth 2. The warning reports the inconsistent depths.
@@ -758,7 +758,7 @@ wildcard-name-mismatch:
   output:
     bytecode: "6001 6002 90"
     warnings:
-      - ':3:0: stack comment item mismatch: item 1 differs (expected "a", have "b") in [a, b, ..]'
+      - ':3:0: stack comment item mismatch: item 1 differs (comment "a", actual "b") in [a, b, ..]'
 
 # Loop overflow at block 0, without a label comment. The loop body
 # pushes one extra item per iteration.

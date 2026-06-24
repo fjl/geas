@@ -126,7 +126,7 @@ func TestStackAnalysis(t *testing.T) {
 	t.Run("commentMismatch", func(t *testing.T) {
 		st := newTest(t, "[a, b, c, d]")
 		st.applyErr(add, 0, "[sum, d, c]",
-			fmt.Errorf("%w: item %d differs (expected %q, have %q) in [sum, c, d]", ErrMismatch, 1, "d", "c"),
+			fmt.Errorf("%w: item %d differs (comment %q, actual %q) in [sum, c, d]", ErrMismatch, 1, "d", "c"),
 		)
 	})
 	t.Run("opUnderflows", func(t *testing.T) {
@@ -194,7 +194,7 @@ func TestStackAnalysis(t *testing.T) {
 		// After SWAP1, the stack is [b, a], not [a, b].
 		// Claiming it's still [a, b] should error at position 0.
 		st.applyErr(swap1, 0, "[a, b]",
-			fmt.Errorf("%w: item %d differs (expected %q, have %q) in [b, a]", ErrMismatch, 0, "a", "b"),
+			fmt.Errorf("%w: item %d differs (comment %q, actual %q) in [b, a]", ErrMismatch, 0, "a", "b"),
 		)
 	})
 
@@ -370,7 +370,7 @@ func TestInferred(t *testing.T) {
 		// After SWAP1, the stack is [a, b]. Claiming [a, a] should fail
 		// because position 1 contains b, not a.
 		st.applyErr(swap1, 0, "[a, a]",
-			fmt.Errorf("%w: item %d differs (expected %q, have %q) in [a, b]", ErrMismatch, 1, "a", "b"),
+			fmt.Errorf("%w: item %d differs (comment %q, actual %q) in [a, b]", ErrMismatch, 1, "a", "b"),
 		)
 	})
 
@@ -541,7 +541,7 @@ func TestWildcard(t *testing.T) {
 	t.Run("wildcardCommentChecksMismatch", func(t *testing.T) {
 		st := newTest(t, "[a, b, ..]")
 		st.applyErr(swap1, 0, "[a, a, ..]",
-			fmt.Errorf("%w: item %d differs (expected %q, have %q) in [b, a, ..]", ErrMismatch, 0, "a", "b"),
+			fmt.Errorf("%w: item %d differs (comment %q, actual %q) in [b, a, ..]", ErrMismatch, 0, "a", "b"),
 		)
 	})
 

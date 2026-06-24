@@ -238,7 +238,7 @@ func (s *Stack) checkComment(comment []string, allowElide bool) error {
 		if item, ok := s.nameToItem[name]; ok && item != stackItem {
 			if !s.opNewItems.Includes(stackItem) && s.itemToName[stackItem] != name && slices.Contains(s.stack, item) {
 				if namingError == nil {
-					namingError = fmt.Errorf("%w: item %d differs (expected %q, have %q) in %s", ErrMismatch, i, name, s.getName(stackItem), s)
+					namingError = fmt.Errorf("%w: item %d differs (comment %q, actual %q) in %s", ErrMismatch, i, name, s.getName(stackItem), s)
 				}
 			}
 		}
