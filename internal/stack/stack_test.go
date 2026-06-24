@@ -211,6 +211,45 @@ func TestStackAnalysis(t *testing.T) {
 			fmt.Errorf("%w: items %d and %d are the same value but named %q and %q", ErrMismatch, 0, 1, "a", "b"),
 		)
 	})
+
+	// An explicit "name=expr" assignment redefines a confirmed item's name without a
+	// rename warning, and the new name sticks for later comments.
+	t.Run("nameAssignmentRedefines", func(t *testing.T) {
+		swap1 := vm.OpByName("SWAP1")
+		st := newTest(t, "[a, b]")
+		// SWAP1 -> [b, a]; redefine the confirmed top "b" to "x" via assignment.
+		st.applyOK(swap1, 0, "[x=b, a]")
+		st.checkItems("[x, a]")
+	})
+}
+
+// TestAssignName checks recognition of "name=expr" assignment items.
+func TestAssignName(t *testing.T) {
+	cases := []struct {
+		item string
+		name string
+		ok   bool
+	}{
+		{"offset=size*i", "offset", true},
+		{"offset=offset+20", "offset", true},
+		{"x=y", "x", true},
+		{"a == b", "", false},   // comparison (spaces are not stripped here)
+		{"a==b", "", false},     // comparison
+		{"a!=b", "", false},     // comparison
+		{"a<=b", "", false},     // comparison
+		{"a>=b", "", false},     // comparison
+		{"plainname", "", false}, // no '='
+		{"=rhs", "", false},      // empty lhs
+		{"lhs=", "", false},      // empty rhs
+		{"a+b=c", "", false},     // lhs not an identifier
+		{"arr[0]=v", "", false},  // lhs not an identifier
+	}
+	for _, c := range cases {
+		name, ok := assignName(c.item)
+		if ok != c.ok || name != c.name {
+			t.Errorf("assignName(%q) = (%q, %v), want (%q, %v)", c.item, name, ok, c.name, c.ok)
+		}
+	}
 }
 
 // This test verifies that unconfirmed names from merge-point Init

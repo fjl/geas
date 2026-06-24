@@ -49,6 +49,47 @@ rename-no-cascade:
     warnings:
       - ":3:0: stack comment renames item: a renamed to renamed"
 
+# An item written as "name=expr" defines the item's name to be the left-hand side
+# ("offset"); the right-hand side documents the value. Later comments that use the
+# short name must not warn.
+name-assignment:
+  input:
+    code: |
+      push 5   ; [i]
+      push 100 ; [slotbase, i]
+      dup2     ; [i, slotbase, i]
+      push 32  ; [size, i, slotbase, i]
+      mul      ; [offset=size*i, slotbase, i]
+      dup2     ; [slotbase, offset, slotbase, i]
+      sload    ; [addr, offset, slotbase]
+      stop
+  output:
+    bytecode: "6005 6064 81 6020 02 81 54 00"
+
+# A "name=expr" assignment is an explicit redefinition, so it may rename even a
+# previously confirmed item without warning.
+name-assignment-redefine:
+  input:
+    code: |
+      push 5   ; [x]
+      push 0   ; [zero, x]
+      pop      ; [y=x]
+      stop
+  output:
+    bytecode: "6005 5f 50 00"
+
+# A comparison operator (==) is not an assignment: the value remains tracked under
+# its full name.
+name-assignment-not-comparison:
+  input:
+    code: |
+      caller   ; [caller]
+      push 5   ; [sysaddr, caller]
+      eq       ; [sysaddr == caller]
+      stop
+  output:
+    bytecode: "33 6005 14 00"
+
 # DUP places the duplicated value on the stack as a single item occupying two
 # positions. A comment that names those positions differently contradicts itself
 # about one value and must be flagged, even when the recycled name ("a", already

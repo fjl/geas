@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"unicode"
 
 	"github.com/fjl/geas/internal/set"
 )
@@ -97,6 +98,10 @@ func (s *Stack) Init(names []string, confirmed []bool) {
 	names, s.wildcard = StripWildcard(names)
 	s.stack = make([]int, 0, len(names))
 	for i, name := range slices.Backward(names) {
+		// An "name=expr" item defines the slot's name as the left-hand side.
+		if lhs, ok := assignName(name); ok {
+			name = lhs
+		}
 		if confirmed == nil {
 			// Full reset: duplicate names share items.
 			if item, ok := s.nameToItem[name]; ok {
@@ -169,6 +174,13 @@ func (s *Stack) CheckComment(comment []string) error {
 	return s.checkComment(comment, false)
 }
 
+// nameAt records the comment position and resolved name where a stack item was first
+// named within a single comment, used to detect inconsistent names for one value.
+type nameAt struct {
+	pos  int
+	name string
+}
+
 // checkComment is the shared comment-checking logic used by both [Apply] and
 // [CheckComment]. It assumes opNewItems has been set up by the caller. If allowElide
 // is true, a comment that lists fewer items than the stack holds is accepted, naming
@@ -189,7 +201,7 @@ func (s *Stack) checkComment(comment []string, allowElide bool) error {
 	// In inferred mode, comments that extend beyond the current stack are
 	// silently truncated since the extra items can't be verified.
 	var namingError error
-	firstPos := make(map[int]int) // stack item -> comment index that first named it
+	firstPos := make(map[int]nameAt) // stack item -> where it was first named in this comment
 	for i, name := range comment {
 		stackItem, ok := s.peek(i)
 		if !ok {
@@ -198,17 +210,25 @@ func (s *Stack) checkComment(comment []string, allowElide bool) error {
 			}
 			return fmt.Errorf("%w: stack has %d items, comment declares %d", ErrCommentUnderflow, len(s.stack), len(comment))
 		}
+		// An item written as "name=expr" explicitly (re)defines the slot's name to be
+		// the left-hand side. This is an intentional redefinition, so it never warns as
+		// a rename, even when the slot already had a confirmed name.
+		explicit := false
+		if lhs, ok := assignName(name); ok {
+			name = lhs
+			explicit = true
+		}
 		// A value duplicated onto the stack (e.g. by DUP) occupies more than one
 		// position as the same item: the op's stack effect repeats the input name in
 		// its output, so the checker knows these positions hold a single value. If the
 		// comment names those positions differently, it contradicts itself about that
 		// value. This holds regardless of whether the value was previously confirmed.
 		if fp, dup := firstPos[stackItem]; dup {
-			if comment[fp] != name && namingError == nil {
-				namingError = fmt.Errorf("%w: items %d and %d are the same value but named %q and %q", ErrMismatch, fp, i, comment[fp], name)
+			if fp.name != name && namingError == nil {
+				namingError = fmt.Errorf("%w: items %d and %d are the same value but named %q and %q", ErrMismatch, fp.pos, i, fp.name, name)
 			}
 		} else {
-			firstPos[stackItem] = i
+			firstPos[stackItem] = nameAt{i, name}
 		}
 		// Name is taken by a different item. Allow this if:
 		// - The current item is NEW (new items can reuse names for duplicate values
@@ -225,8 +245,9 @@ func (s *Stack) checkComment(comment []string, allowElide bool) error {
 		// The comment is not supposed to rename items that weren't produced by
 		// this operation. Items that have never been explicitly named (e.g. items
 		// created by inferred-input growth) may be named freely. Items with
-		// unconfirmed names (inherited from a merge point) may also be renamed.
-		if !s.opNewItems.Includes(stackItem) && s.nameToItem[name] == 0 {
+		// unconfirmed names (inherited from a merge point) may also be renamed. An
+		// explicit "name=expr" assignment is always allowed to redefine the name.
+		if !explicit && !s.opNewItems.Includes(stackItem) && s.nameToItem[name] == 0 {
 			if s.confirmedNames.Includes(stackItem) {
 				if namingError == nil {
 					namingError = fmt.Errorf("%w: %s renamed to %s", ErrRename, s.itemToName[stackItem], name)
@@ -375,4 +396,42 @@ func (s *Stack) getName(item int) string {
 		return name
 	}
 	return fmt.Sprintf("_%d", item)
+}
+
+// assignName recognizes a comment item of the form "name=expr", which explicitly
+// (re)defines the stack item's name to be the left-hand side. The right-hand side
+// documents how the value was derived and is not otherwise checked. It returns the
+// assigned name. The '=' must be a single character: comparison operators (==, !=,
+// <=, >=) are not assignments, and the left-hand side must be a plain identifier.
+func assignName(item string) (name string, ok bool) {
+	eq := strings.IndexByte(item, '=')
+	if eq <= 0 || eq == len(item)-1 {
+		return "", false
+	}
+	if item[eq+1] == '=' { // "=="
+		return "", false
+	}
+	switch item[eq-1] { // "!=", "<=", ">="
+	case '!', '<', '>':
+		return "", false
+	}
+	name = item[:eq]
+	if !isIdentifier(name) {
+		return "", false
+	}
+	return name, true
+}
+
+// isIdentifier reports whether s is a non-empty run of letters, digits and
+// underscores not starting with a digit.
+func isIdentifier(s string) bool {
+	for i, r := range s {
+		switch {
+		case r == '_' || unicode.IsLetter(r):
+		case i > 0 && unicode.IsDigit(r):
+		default:
+			return false
+		}
+	}
+	return s != ""
 }
