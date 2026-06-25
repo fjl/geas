@@ -65,6 +65,7 @@ func usage() {
 
 	 -w                 write result to (source) file instead of stdout
 	 -check             exit with error if file is not formatted
+	 -col <n>           align line comments to column n (0 = auto)
 
  -i: INFORMATION
 
@@ -250,10 +251,14 @@ func formatter(args []string) {
 		fs             = newFlagSet("-f")
 		writeBack      = fs.Bool("w", false, "")
 		checkFormatted = fs.Bool("check", false, "")
+		commentCol     = fs.Int("col", 0, "")
 	)
 	parseFlags(fs, args)
 	if *writeBack && *checkFormatted {
 		exit(2, fmt.Errorf("can't use -w and -check at the same time"))
+	}
+	if *commentCol < 0 {
+		exit(2, fmt.Errorf("comment column must not be negative"))
 	}
 
 	// Read input.
@@ -321,6 +326,9 @@ func formatter(args []string) {
 		output = os.Stdout
 	}
 	var p printer.Printer
+	if *commentCol > 0 {
+		p.SetCommentColumn(*commentCol)
+	}
 	if err := p.Document(output, doc); err != nil {
 		exit(1, err)
 	}
