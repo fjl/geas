@@ -124,8 +124,8 @@ allowed be negative.
 The EVM has two jump instructions, JUMP and JUMPI (conditional jump). Jumps can only
 target the location of pre-declared JUMPDEST instructions.
 
-JUMPDESTS are written as a label followed by the colon (:) characte and can be referred to
-using the notation `@label` within expressions.
+JUMPDESTS are written as a label followed by the colon (:) character and can be referred
+to using the notation `@label` within expressions.
 
         push 1              ; [sum]
     begin:
