@@ -179,15 +179,15 @@ func (c *Compiler) warnDeprecatedMacro(expr ast.Expr, name, replacement string) 
 
 // compileDocument creates bytecode from the AST.
 func (c *Compiler) compile(lprog *loader.Program) (output []byte) {
+	// First, the AST document tree is expanded into a flat list of instructions.
 	prog := newCompilerProg(lprog)
-
-	// Next, the AST document tree is expanded into a flat list of instructions.
 	c.expand(lprog.Toplevel, prog)
 	prog.finishExpansion()
 	// Expansion is now done, and all further steps work on prog.
 
 	// Create the evaluator, applying global macro overrides.
-	// Here we also check
+	// Here we also check that macro overrides are not applied to macros
+	// with parameters.
 	e := newEvaluator(c, c.macroOverrides)
 	for _, name := range slices.Sorted(maps.Keys(c.macroOverrides)) {
 		if def := prog.LookupExprMacro(name, nil); def != nil && len(def.Params) > 0 {
@@ -197,6 +197,8 @@ func (c *Compiler) compile(lprog *loader.Program) (output []byte) {
 
 	// Pre-evaluate all arguments that don't depend on labels.
 	c.preEvaluateArgs(e, prog)
+	// Then register labels in the evaluator, which enables them for use
+	// in expressions.
 	e.registerLabels(prog.labels)
 
 	for {
@@ -228,7 +230,7 @@ func (c *Compiler) compile(lprog *loader.Program) (output []byte) {
 		return nil // no output if source has errors
 	}
 
-	// Run analysis. Note this is also disabled if there are errors because there could
+	// Run analysis. Note this is disabled if there are errors because there could
 	// be lots of useless warnings otherwise.
 	c.checkLabelsUsed(prog, e)
 	if c.doStackCheck {
