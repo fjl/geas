@@ -83,8 +83,7 @@ always extends to the end of the current line.
 By convention, top-level comments start with three semicolons. Groups of instructions are
 titled by two semicolons, and the comment is indented like the instruction. A single
 semicolon is used for instruction-level comments, typically a documentation of the
-post-stack of the instruction. Here's a fully commented example showing the commenting
-convention:
+post-stack of the instruction. Here's a full example showing the commenting convention:
 
     ;;; This is a top-level comment which explains the program.
     ;;; Note the three semicolons.
