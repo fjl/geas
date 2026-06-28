@@ -31,6 +31,9 @@ To see all supported flags, run `geas` with no arguments.
 
 ### Editor Support
 
+For Emacs, this repository offers [geas.el](./geas.el), an extension of `asm-mode` with
+additional features specific to geas.
+
 VIM users may be interested in [vim-geas](https://github.com/lightclient/vim-geas).
 
 ### Use as a Go Library
