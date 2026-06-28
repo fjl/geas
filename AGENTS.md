@@ -3,15 +3,15 @@
 Geas is an EVM assembler. It enables users to write low-level programs for the Ethereum
 Virtual Machine (EVM). The Geas assembly language is similar in spirit to the Go
 programming language, but also takes inspiration from Perl. In addition to writing basic
-opcodes, the user can use instruction macros to capture common opcodde sequences. The
+opcodes, the user can use instruction macros to capture common opcode sequences. The
 language also allows 'expression macros' which are useful for inserting constants and
 pre-calculated numbers and binary data into the bytecode.
 
 The assembler should try to be maximally helpful to its user and give good error messages
-when the program has a mistake. Being a compiler for a low-level language, Geas cannot
-verify the correctness of the user's program, but it should ensure the program does not
-contain surface-level bugs such as invalid instructions, jumps to invalid destinations,
-and stack management issues.
+when the input program has a mistake. Being a compiler for a low-level language, Geas
+cannot verify the correctness of the user's program, but it should ensure the program does
+not contain surface-level bugs such as invalid instructions, jumps to invalid
+destinations, and stack management issues.
 
 # Project Structure
 
