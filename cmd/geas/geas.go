@@ -70,8 +70,9 @@ func usage() {
  -i: INFORMATION
 
 	 -targets           show supported target fork names
-	 -ops <target>      show all opcodes in target
+	 -ops <target>      show all opcodes in target ("all" = all forks)
 	 -lineage <target>  show target fork chain
+	 -stack <op>        show stack effect of an opcode
 
  -h: HELP
 
@@ -335,55 +336,113 @@ func formatter(args []string) {
 }
 
 func information(args []string) {
-	var ran bool
-	checkRunOnce := func() {
-		if ran {
-			exit(2, fmt.Errorf("can't show more than one thing at once in -i mode"))
-		}
-		ran = true
-	}
-	showTargets := func(arg string) error {
-		checkRunOnce()
-		for _, name := range evm.AllForks() {
-			fmt.Println(name)
-		}
-		return nil
-	}
-	showOps := func(arg string) error {
-		checkRunOnce()
-		is := evm.FindInstructionSet(arg)
-		if is == nil {
-			return fmt.Errorf("unknown fork %q", arg)
-		}
-		for _, op := range is.AllOps() {
-			fmt.Println(op.Name)
-		}
-		return nil
-	}
-	showParents := func(arg string) error {
-		checkRunOnce()
-		is := evm.FindInstructionSet(arg)
-		if is == nil {
-			return fmt.Errorf("unknown fork %q", arg)
-		}
-		for _, f := range is.Parents() {
-			fmt.Println(f)
-		}
+	// The flag callbacks just record the selected topic and its argument;
+	// the work happens after parsing so it can be done in regular functions.
+	var topic, arg string
+	var count int
+	record := func(name, value string) error {
+		topic, arg, count = name, value, count+1
 		return nil
 	}
 
-	var fs = newFlagSet("-i")
-	fs.BoolFunc("targets", "", showTargets)
-	fs.Func("ops", "", showOps)
-	fs.Func("lineage", "", showParents)
+	fs := newFlagSet("-i")
+	fs.BoolFunc("targets", "", func(string) error { return record("targets", "") })
+	fs.Func("ops", "", func(v string) error { return record("ops", v) })
+	fs.Func("stack", "", func(v string) error { return record("stack", v) })
+	fs.Func("lineage", "", func(v string) error { return record("lineage", v) })
 	parseFlags(fs, args)
-	if !ran {
+
+	if count > 1 {
+		exit(2, fmt.Errorf("can't show more than one thing at once in -i mode"))
+	}
+	if topic == "" {
 		usage()
 		exit(2, fmt.Errorf("please select information topic"))
 	}
 	if fs.NArg() > 0 {
 		exit(2, fmt.Errorf("too many arguments"))
 	}
+
+	var err error
+	switch topic {
+	case "targets":
+		err = showTargets()
+	case "ops":
+		err = showOps(arg)
+	case "stack":
+		err = showStack(arg)
+	case "lineage":
+		err = showLineage(arg)
+	}
+	if err != nil {
+		exit(2, err)
+	}
+}
+
+func showTargets() error {
+	for _, name := range evm.AllForks() {
+		fmt.Println(name)
+	}
+	return nil
+}
+
+func showOps(target string) error {
+	var ops []*evm.Op
+	if target == "all" {
+		ops = evm.AllOps()
+	} else {
+		is := evm.FindInstructionSet(target)
+		if is == nil {
+			return fmt.Errorf("unknown fork %q", target)
+		}
+		ops = is.AllOps()
+	}
+	for _, op := range ops {
+		fmt.Println(op.Name)
+	}
+	return nil
+}
+
+func showLineage(target string) error {
+	is := evm.FindInstructionSet(target)
+	if is == nil {
+		return fmt.Errorf("unknown fork %q", target)
+	}
+	for _, f := range is.Parents() {
+		fmt.Println(f)
+	}
+	return nil
+}
+
+// showStack prints the stack effect of an opcode.
+func showStack(arg string) error {
+	opcode, err := ast.NewParser("<arg>", []byte(arg)).ParseOpcode()
+	if err != nil {
+		return err
+	}
+	op := evm.OpByName(strings.ToUpper(opcode.Op))
+	if op == nil {
+		return fmt.Errorf("unknown opcode %q", opcode.Op)
+	}
+	var imm byte
+	switch {
+	case op.HasImmediate:
+		if len(opcode.Immediates) == 0 {
+			return fmt.Errorf("%s requires an immediate, e.g. %s[17]",
+				op.Name, strings.ToLower(op.Name))
+		}
+		if imm, err = op.EncodeImmediateArgs(opcode.Immediates); err != nil {
+			return fmt.Errorf("%s: %v", op.Name, err)
+		}
+	case len(opcode.Immediates) > 0:
+		return fmt.Errorf("%s does not take an immediate", op.Name)
+	}
+	// Print the stack effect as "NAME [inputs] -> [outputs]", with the
+	// inputs/outputs listed bottom-to-top.
+	in := op.StackIn(imm)
+	out := op.StackOut(imm)
+	fmt.Printf("%s [%s] -> [%s]\n", op.Name, strings.Join(in, ", "), strings.Join(out, ", "))
+	return nil
 }
 
 func newFlagSet(mode string) *flag.FlagSet {
