@@ -2,9 +2,10 @@
 
 This is Geas – the Good Ethereum Assembler[^1] – a macro assembler for the EVM.
 
-You can use it to create any contract for Ethereum, though it's probably a bad idea. For
-real contracts, you should use a well-tested language compiler like Solidity. The purpose
-of Geas is mostly creating specialty programs and tinkering with the EVM at a low level.
+You can use it to create any contract for Ethereum, though it's probably a bad idea to
+write your complicated business logic using EVM assembly. For most contracts, you should
+use a high-level language compiler like Solidity. The purpose of Geas is creating
+specialty programs and tinkering with the EVM at a low level.
 
 [^1]: Under no circumstances must it be called the geth assembler.
 
@@ -21,7 +22,7 @@ For development of geas, clone the repository and then run `go build ./cmd/geas`
 
 To create bytecode from an assembly file, run the tool with a filename as argument.
 
-    ./geas file.eas
+    ./geas -a file.eas
 
 There is also a disassembler. To disassemble hex bytecode from standard input, run:
 
