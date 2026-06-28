@@ -18,6 +18,7 @@ package evm
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -444,6 +445,17 @@ var oplist = []*Op{
 	},
 }
 
+// OpByName returns the opcode with the given name, or nil if there is none.
+// NAME must be uppercase.
+func OpByName(name string) *Op {
+	return opm[name]
+}
+
+// AllOps returns all known opcodes across all forks, sorted by name.
+func AllOps() []*Op {
+	return oplist
+}
+
 func computeOpsMap() map[string]*Op {
 	stacknames := make(set.Set[string], 20)
 	m := make(map[string]*Op, len(oplist))
@@ -514,6 +526,7 @@ func init() {
 	for i := range stackwords {
 		stackwords[i] = fmt.Sprintf("v%d", i)
 	}
+	slices.SortFunc(oplist, func(a, b *Op) int { return strings.Compare(a.Name, b.Name) })
 }
 
 func dupnStackIn(imm uint8) []string {
