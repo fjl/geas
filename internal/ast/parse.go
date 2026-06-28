@@ -135,6 +135,34 @@ func (p *Parser) ParseExpression() (expr Expr, err error) {
 	return nil, nil
 }
 
+// ParseOpcode parses the input as a single opcode with an optional immediate.
+func (p *Parser) ParseOpcode() (op *Opcode, err error) {
+	defer p.drainLexer()
+	defer func() {
+		e := recover()
+		if pe, ok := e.(*ParseError); ok {
+			err = pe
+		} else if e != nil {
+			panic(e)
+		}
+	}()
+
+	tok := p.next()
+	if tok.typ == lineStart {
+		tok = p.next()
+	}
+	if tok.typ != identifier {
+		p.unexpected(tok)
+	}
+	op = parseOpcode(p, tok)
+	switch tok := p.next(); tok.typ {
+	case lineEnd, eof, comment:
+	default:
+		p.unexpected(tok)
+	}
+	return op, nil
+}
+
 // atDocumentTop reports whether the parser is at the toplevel.
 // This returns false while parsing an instruction macro definition.
 func (p *Parser) atDocumentTop() bool {
