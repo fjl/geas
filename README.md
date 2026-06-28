@@ -32,7 +32,7 @@ To see all supported flags, run `geas` with no arguments.
 ### Editor Support
 
 For Emacs, this repository offers [geas.el](./geas.el), an extension of `asm-mode` with
-additional features specific to Geas.
+features specific to Geas.
 
 VIM users may be interested in [vim-geas](https://github.com/lightclient/vim-geas).
 
@@ -120,11 +120,11 @@ allowed be negative.
 
 ### Labels and Jumps
 
-The EVM supports two jump instructions, JUMP and JUMPI (conditional jump). Jumps can only
-target pre-declared JUMPDEST instructions.
+The EVM has two jump instructions, JUMP and JUMPI (conditional jump). Jumps can only
+target the location of pre-declared JUMPDEST instructions.
 
-Jump destinations are written as a label followed by the colon (:) characte and can be
-referred to using the notation `@label` within expressions.
+JUMPDESTS are written as a label followed by the colon (:) characte and can be referred to
+using the notation `@label` within expressions.
 
         push 1              ; [sum]
     begin:
@@ -133,9 +133,9 @@ referred to using the notation `@label` within expressions.
         push @begin         ; [label, sum]
         jump                ; [sum]
 
-For convenience, Geas allows writing jump instructions with an argument. When written in
-this way, the jump turns into a push of the label followed by the jump instruction, so the
-above snippet can also be written as:
+For convenience, Geas allows writing jump instructions with an argument. When written this
+way, the jump turns into a push of the label followed by the jump instruction, so the
+above snippet can also be expressed as:
 
         push 1              ; [sum]
     begin:
@@ -152,9 +152,9 @@ argument to JUMP, they can be used with PUSH to measure code offsets.
         eq
     .end:
 
-Finally, please note that jump destinations can be written explicitly if desired. The
-assembler does not require use of the label syntax, but it is much easier to read, and
-safer, too.
+Finally, please note that `jumpdest` instructions can be written explicitly if desired.
+The assembler does not require use of the label syntax, but it is much easier to read, and
+also safer.
 
 ### #bytes
 
@@ -173,8 +173,8 @@ Bytes can also be named by adding a label definition before the expression:
     #bytes named: 0x0fffe3
 
 When used like this, the bytes value becomes available as a macro for use in expressions,
-and also defines a label that can be used to get their offset in the output. The
-definition above could be used like this to copy the bytes into memory:
+and also defines a label that can be used to get the offset in the output. The definition
+above could be used like this to copy the bytes into memory:
 
         push len(named)     ; [size]
         push @named         ; [codeOffset, size]
@@ -186,10 +186,13 @@ definition above could be used like this to copy the bytes into memory:
 Expressions are used as `push` and `#bytes` arguments.
 
 The Geas expression language is intended for simple calculations. Expressions are just
-pure functions that work on values, which are arbitrary precision integers.
+pure functions that work on values. 
 
-Intermediate results in an expression can be of any size. Calculations cannot overflow.
-Negative number values are also supported. Available arithmetic operations include:
+All values are arbitrary precision integers. This means Intermediate results in an
+expression can be of any size, and calculations cannot overflow. Negative number values
+are also supported.
+
+Available arithmetic operations include:
 
 - multiplication (*), division (/), modulo (%), bit-shifts (<<, >>), bitwise AND (&)
 - addition (+), subtraction (-), bitwise OR(|), XOR (^)
@@ -197,7 +200,7 @@ Negative number values are also supported. Available arithmetic operations inclu
 There is limited support for using strings and arbitrary byte sequences in expressions.
 You can write string literals using double quotes, and use hexadecimal literals with a
 `0x` prefix to specify bytes. Please note that strings and bytes are internally
-represented in the same way numbers are. All arithmetic and macros work on all values,
+represented in the same way numbers are. All arithmetic and builtins work on all values,
 there are no 'types'.
 
 However, there is one aspect of values where integers and bytes have a subtle difference.
