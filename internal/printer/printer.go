@@ -31,9 +31,13 @@ import (
 const (
 	defaultIndent = "    "
 
-	// If the detected comment
-	autoCommentColMin = 22
-	autoCommentColMax = 48
+	// Bounds for the automatically-detected comment column.
+	autoCommentColMin = 23
+	autoCommentColMax = 49
+
+	// Minimum number of spaces inserted between the end of an instruction and the
+	// ';' of an attached line comment.
+	commentGap = 2
 )
 
 // Printer is used to configure AST printing.
@@ -73,6 +77,7 @@ func (p *Printer) SetCommentColumn(col int) {
 func (p *Printer) reset(w io.Writer) {
 	p.out = bufio.NewWriter(w)
 	p.bufferWrapped = true
+	p.lineLength = 0
 	p.preFormatCache = make(map[ast.Statement]string)
 	p.macroDefLength = make(map[*ast.InstructionMacroDef]int)
 
@@ -232,9 +237,9 @@ func (p *Printer) document(doc *ast.Document) {
 // This is the first pass of outputting a document, and the cached outputs are used in a
 // later stage to determine the comment column.
 func (p *Printer) preFormat(doc *ast.Document) {
-	prevWriter, prevWrapped := p.out, p.bufferWrapped
+	prevWriter, prevWrapped, prevLen := p.out, p.bufferWrapped, p.lineLength
 	defer func() {
-		p.out, p.bufferWrapped = prevWriter, prevWrapped
+		p.out, p.bufferWrapped, p.lineLength = prevWriter, prevWrapped, prevLen
 	}()
 
 	var b bytes.Buffer
@@ -271,13 +276,13 @@ func (p *Printer) preFormat(doc *ast.Document) {
 func (p *Printer) computeCommentColumn() int {
 	autocol := autoCommentColMin
 	for _, entry := range p.preFormatCache {
-		col := len(entry) + 1
+		col := len(entry) + commentGap
 		if col > autocol && col < autoCommentColMax {
 			autocol = col
 		}
 	}
 	for _, length := range p.macroDefLength {
-		col := length + 1
+		col := length + commentGap
 		if col > autocol && col < autoCommentColMax {
 			autocol = col
 		}
@@ -384,10 +389,15 @@ func (p *Printer) macroDefinitionHead(st *ast.InstructionMacroDef) {
 func (p *Printer) comment(st *ast.Comment, attached bool) {
 	lvl := st.Level()
 	if lvl == 1 || attached {
-		for p.lineLength < p.commentCol {
+		// Align the ';' to the comment column. If the instruction already reaches
+		// (or passes) the column, fall back to a single separating space.
+		if p.lineLength >= p.commentCol {
 			p.byte(' ')
+		} else {
+			for p.lineLength < p.commentCol {
+				p.byte(' ')
+			}
 		}
-		p.byte(' ')
 		// Strip leading whitespace in comment text.
 		p.string("; ")
 		p.string(st.InnerText())
