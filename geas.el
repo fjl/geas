@@ -151,8 +151,7 @@ flush left; everything else is indented `geas-indent-offset'."
 
 (defvar geas--stack-cache (make-hash-table :test 'equal)
   "Cache of opcode stack effects, keyed by uppercase opcode name.
-Each value is the stack-effect string, or the symbol `none' if the
-opcode is unknown.")
+Each value is the stack-effect string.")
 
 (defvar geas--opcode-cache (make-hash-table :test 'equal)
   "Cache of opcode-name lists for completion, keyed by target fork name.")
@@ -217,14 +216,15 @@ directive or macro invocation."
   ;; Note: variable-size `push' pseudo-op is not a real opcode, so we
   ;; translate it here.
   (let* ((name (let ((u (upcase opcode))) (if (string= u "PUSH") "PUSH1" u)))
-         (cached (gethash name geas--stack-cache 'miss)))
-    (if (eq cached 'miss)
+         (cached (gethash name geas--stack-cache)))
+    (if (not cached)
         (geas--query-stack
          name
          (lambda (effect)
-           (puthash name (or effect 'none) geas--stack-cache)
+           (when effect
+             (puthash name effect geas--stack-cache))
            (funcall callback effect)))
-      (funcall callback (and (not (eq cached 'none)) cached)))))
+      (funcall callback cached))))
 
 (defun geas-show-stack-effect ()
   "Display the stack effect of the opcode on the current line."
