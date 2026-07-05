@@ -283,8 +283,20 @@ func (a *analyzer) analyzeBlocks(doc *ast.Document, initialItems []string, infer
 func (a *analyzer) propagateStates(blocks []*basicBlock, labelIndex map[string]int, doc *ast.Document, initialItems []string, inferred bool, preGrow int) ([]blockState, []string, int) {
 	states := make([]blockState, len(blocks))
 
-	// nextVPred allocates virtual predecessor keys for external jumps.
+	// Virtual predecessor keys for external jumps. Keys are stable per
+	// (source block, edge index), so that re-walking a block updates its
+	// edges instead of adding new ones.
 	nextVPred := initialPred
+	vpredKeys := make(map[[2]int]int)
+	vpredKey := func(blockIdx, edgeIdx int) int {
+		k := [2]int{blockIdx, edgeIdx}
+		if key, ok := vpredKeys[k]; ok {
+			return key
+		}
+		nextVPred--
+		vpredKeys[k] = nextVPred
+		return nextVPred
+	}
 
 	worklist := make([]int, 0, len(blocks))
 	queued := make([]bool, len(blocks))
@@ -313,14 +325,14 @@ func (a *analyzer) propagateStates(blocks []*basicBlock, labelIndex map[string]i
 			}
 			setPredSource(&states[succ], idx, lastSt)
 		}
-		for _, edge := range edges {
+		for i, edge := range edges {
 			if targetIdx, ok := labelIndex[edge.target]; ok {
-				nextVPred--
-				if mergePredecessor(&states[targetIdx], nextVPred, edge.items, edge.wild) {
+				key := vpredKey(idx, i)
+				if mergePredecessor(&states[targetIdx], key, edge.items, edge.wild) {
 					enqueue(targetIdx)
 				}
 				if edge.jumpSt != nil {
-					setPredSource(&states[targetIdx], nextVPred, edge.jumpSt)
+					setPredSource(&states[targetIdx], key, edge.jumpSt)
 				}
 			}
 		}

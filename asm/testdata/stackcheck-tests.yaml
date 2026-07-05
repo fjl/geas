@@ -909,6 +909,32 @@ macro-external-jump:
 # A macro jumps to a label in the outer document, but the macro has an
 # extra item on the stack at the jump point. The label comment declares
 # one item, but two arrive. The checker detects the depth mismatch.
+# A label targeted only by a jump inside a macro must not accumulate edges from
+# intermediate propagation states when the calling block is re-walked. Only the
+# real depth mismatch at @mid is reported here, not a phantom mismatch at @out.
+macro-external-jump-no-stale-edges:
+  input:
+    code: |
+      #define %m() {
+          jump @out
+      }
+      push 0
+      push 1
+      push 1
+      jumpi @mid
+      later:
+      pop
+      jump @mid
+      mid:
+      %m()
+      out:       ; [x]
+      stop
+  output:
+    bytecode: "5f 6001 6001 600d 57 5b 50 600d 56 5b 6011 56 5b 00"
+    warnings:
+      - ':8:0: warning: label @later unused in program'
+      - ':11:0: stack depth mismatch at merge point: predecessors have depths [1 2]'
+
 macro-external-jump-depth-mismatch:
   input:
     code: |
