@@ -189,7 +189,7 @@ func digitsOfPC(codesize int) int {
 		return 2
 	case codesize < (1<<24 - 1):
 		return 3
-	case codesize < (1<<32 - 1):
+	case int64(codesize) < (1<<32 - 1):
 		return 4
 	default:
 		return 8
