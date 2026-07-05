@@ -332,7 +332,7 @@ expr-macro-passing-literal-to-builtin:
 expr-macro-recursion:
   input:
     code: |
-      #define rec(a) = rec(a+1) + 2
+      #define rec(a) = rec($a+1) + 2
       #define parent(x) = rec(5)
       PUSH parent(1)
   output:
@@ -1183,6 +1183,14 @@ macro-call:
       ADD
   output:
     bytecode: "6034 6002 01"
+
+macro-call-nested-same:
+  input:
+    code: |
+      #define double(x) = $x * 2
+      PUSH double(double(2))
+  output:
+    bytecode: "6008"
 
 macro-ref:
   input:

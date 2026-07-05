@@ -340,20 +340,12 @@ func (e *evaluator) evalMacroCall(expr *ast.MacroCallExpr, env *evalEnvironment)
 		return nil, fmt.Errorf("%w %s", ecUndefinedMacro, expr.Ident)
 	}
 
-	// Prevent recursion.
-	if !e.enterMacro(def) {
-		return nil, fmt.Errorf("%w %s", ecRecursiveCall, expr.Ident)
-	}
-	defer e.exitMacro(def)
-
-	// Bind arguments.
+	// Bind arguments. Note this happens before entering the macro, since the
+	// argument expressions are evaluated in the callsite context.
 	if err := checkArgCount(expr, len(def.Params)); err != nil {
 		return nil, err
 	}
 	macroEnv := env.makeCallEnvironment(def.Document(), def)
-	if len(expr.Args) != len(def.Params) {
-		return nil, fmt.Errorf("%w, macro %s takes %d", ecInvalidArgumentCount, expr.Ident, len(def.Params))
-	}
 	for i, param := range def.Params {
 		v, err := e.eval(expr.Args[i], env)
 		if err != nil {
@@ -361,6 +353,12 @@ func (e *evaluator) evalMacroCall(expr *ast.MacroCallExpr, env *evalEnvironment)
 		}
 		macroEnv.variables[param] = v
 	}
+
+	// Prevent recursion while evaluating the body.
+	if !e.enterMacro(def) {
+		return nil, fmt.Errorf("%w %s", ecRecursiveCall, expr.Ident)
+	}
+	defer e.exitMacro(def)
 
 	// Compute the macro result value.
 	return e.eval(def.Body, macroEnv)
