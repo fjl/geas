@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/fjl/geas/internal/lzint"
 )
@@ -88,6 +89,9 @@ func (p *Parser) throwError(tok token, format string, args ...any) {
 
 // unexpected signals that an unexpected token occurred in the input.
 func (p *Parser) unexpected(tok token) {
+	if tok.typ == invalidToken && strings.HasPrefix(tok.text, "\"") {
+		p.throwError(tok, "unterminated string literal")
+	}
 	p.throwError(tok, "unexpected %v %s", tok.typ, tok.text)
 }
 

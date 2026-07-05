@@ -313,17 +313,31 @@ func lexPercent(l *lexer) stateFn {
 	return lexNext
 }
 
-// lexInsideString lexes the inside of a string until
-// the state function finds the closing quote.
-// It returns the lex text state function.
+// lexInsideString lexes the inside of a string until the closing quote.
+// Escape sequences are kept in the token text and processed by the parser.
+// Strings cannot span multiple lines; an unterminated string is emitted as
+// an invalid token.
 func lexInsideString(l *lexer) stateFn {
-	// TODO: allow escaping quotes
-	if l.acceptRunUntil('"') {
-		l.start += 1 // remove beginning quote
-		l.emit(stringLiteral)
-		l.next() // consume "
+	for {
+		switch l.next() {
+		case '\\':
+			switch l.next() {
+			case '\n', 0:
+				l.backup()
+			}
+		case '"':
+			l.backup() // exclude closing quote
+			l.start += 1 // remove beginning quote
+			l.emit(stringLiteral)
+			l.next() // consume "
+			l.ignore()
+			return lexNext
+		case '\n', 0:
+			l.backup()
+			l.emit(invalidToken)
+			return lexNext
+		}
 	}
-	return lexNext
 }
 
 func lexNumber(l *lexer) stateFn {

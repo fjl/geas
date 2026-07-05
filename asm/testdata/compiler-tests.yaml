@@ -152,6 +152,48 @@ bytes-directive-string-escape-invalid:
     errors:
       - ":1:8: incomplete hex escape sequence in string"
 
+bytes-directive-string-escaped-quote:
+  input:
+    code: |
+      #bytes "a\"b"
+  output:
+    bytecode: '612262'
+
+string-concat:
+  input:
+    code: |
+      push "a"+"b"
+  output:
+    bytecode: '60c3'
+
+string-unterminated:
+  input:
+    code: |
+      push "abc
+      gas
+  output:
+    errors:
+      - ':1:5: unterminated string literal'
+
+string-unterminated-eof:
+  input:
+    code: |
+      gas
+      stop "hello
+  output:
+    errors:
+      - ':2:5: unterminated string literal'
+
+string-line-numbers:
+  input:
+    code: |
+      push "a"
+      push "b"
+      badop
+  output:
+    errors:
+      - ':3:0: unknown op BADOP'
+
 bytes-directive-label-error:
   input:
     code: |

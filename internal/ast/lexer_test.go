@@ -86,6 +86,21 @@ func TestLexer(t *testing.T) {
 			input:  "push 3 ;; comment\nadd",
 			tokens: []token{{typ: lineStart, line: 1, column: 0}, {typ: identifier, text: "push", line: 1, column: 0}, {typ: numberLiteral, text: "3", line: 1, column: 5}, {typ: comment, text: ";; comment", line: 1, column: 7}, {typ: lineEnd, text: "\n", line: 1, column: 17}, {typ: lineStart, line: 2, column: 0}, {typ: identifier, line: 2, column: 0, text: "add"}, {typ: eof, line: 2, column: 3}},
 		},
+		// string followed by operator: closing quote must not leak into the next token
+		{
+			input:  `"a"+"b"`,
+			tokens: []token{{typ: lineStart, line: 1, column: 0}, {typ: stringLiteral, text: "a", line: 1, column: 1}, {typ: arith, text: "+", line: 1, column: 3}, {typ: stringLiteral, text: "b", line: 1, column: 5}, {typ: eof, line: 1, column: 7}},
+		},
+		// escaped quote inside string
+		{
+			input:  `push "a\"b"`,
+			tokens: []token{{typ: lineStart, line: 1, column: 0}, {typ: identifier, text: "push", line: 1, column: 0}, {typ: stringLiteral, text: `a\"b`, line: 1, column: 6}, {typ: eof, line: 1, column: 11}},
+		},
+		// unterminated string ends at newline and does not affect line numbering
+		{
+			input:  "push \"abc\ngas",
+			tokens: []token{{typ: lineStart, line: 1, column: 0}, {typ: identifier, text: "push", line: 1, column: 0}, {typ: invalidToken, text: `"abc`, line: 1, column: 5}, {typ: lineEnd, text: "\n", line: 1, column: 9}, {typ: lineStart, line: 2, column: 0}, {typ: identifier, text: "gas", line: 2, column: 0}, {typ: eof, line: 2, column: 3}},
+		},
 	}
 
 	for _, test := range tests {
