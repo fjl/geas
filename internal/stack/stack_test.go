@@ -198,6 +198,28 @@ func TestStackAnalysis(t *testing.T) {
 		)
 	})
 
+	// The copy produced by DUP (its top output) may be given its own name through
+	// assignment syntax, which splits it into a distinct item.
+	t.Run("dupCopyNameAssigned", func(t *testing.T) {
+		st := newTest(t, "[b]")
+		st.applyOK(dup1, 0, "[x=b, b]")
+		st.applyOK(add, 0, "[sum]")
+	})
+
+	// The assignment even works with a name that is bound to a live item.
+	t.Run("dupCopyNameAssignedInUse", func(t *testing.T) {
+		st := newTest(t, "[c, a]")
+		st.applyOK(dup1, 0, "[a=c, c, a]")
+	})
+
+	// Without assignment syntax, naming the copy differently is an error.
+	t.Run("dupCopyNameInUse", func(t *testing.T) {
+		st := newTest(t, "[c, a]")
+		st.applyErr(dup1, 0, "[a, c, a]",
+			fmt.Errorf("%w: item %d differs (comment %q, actual %q) in [c, c, a]", ErrMismatch, 0, "a", "c"),
+		)
+	})
+
 	// DUP reuses the input item for both output positions, so the duplicated value
 	// occupies two stack slots as one item. A comment that names those slots
 	// differently contradicts itself and must be flagged. Here "a" was already

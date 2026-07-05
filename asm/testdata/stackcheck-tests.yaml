@@ -90,6 +90,39 @@ name-assignment-not-comparison:
   output:
     bytecode: "33 6005 14 00"
 
+# The copy produced by DUP (its top output) may be given its own name through
+# assignment syntax, splitting it into a distinct item.
+dup-copy-name-assigned:
+  input:
+    code: |
+      push 2     ; [b]
+      dup1       ; [x=b, b]
+      add        ; [sum]
+  output:
+    bytecode: "6002 80 01"
+
+# The assignment even works with a name that is bound to a live item.
+dup-copy-name-assigned-in-use:
+  input:
+    code: |
+      push 1     ; [a]
+      push 2     ; [c, a]
+      dup1       ; [a=c, c, a]
+  output:
+    bytecode: "6001 6002 80"
+
+# Without assignment syntax, naming the copy differently is an error.
+dup-copy-name-in-use:
+  input:
+    code: |
+      push 1     ; [a]
+      push 2     ; [c, a]
+      dup1       ; [a, c, a]
+  output:
+    bytecode: "6001 6002 80"
+    warnings:
+      - ':3:0: stack comment item mismatch: item 0 differs (comment "a", actual "c") in [c, c, a]'
+
 # DUP places the duplicated value on the stack as a single item occupying two
 # positions. A comment that names those positions differently contradicts itself
 # about one value and must be flagged, even when the recycled name ("a", already

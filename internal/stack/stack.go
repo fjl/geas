@@ -52,6 +52,7 @@ type Stack struct {
 	// buffers for apply
 	opItems    map[string]int
 	opNewItems set.Set[int]
+	opCopyPos  map[int]int // output position holding a copy -> position of the source
 }
 
 // New creates a stack initialized with the given item names.
@@ -63,6 +64,7 @@ func New(items []string, confirmed []bool) *Stack {
 		confirmedNames: make(set.Set[int]),
 		opItems:        make(map[string]int),
 		opNewItems:     make(set.Set[int]),
+		opCopyPos:      make(map[int]int),
 	}
 	if len(items) > 0 {
 		s.Init(items, confirmed)
@@ -164,6 +166,19 @@ func (s *Stack) Apply(op Op, imm byte, comment []string) error {
 		}
 	}
 
+	// Determine output positions holding a copy of a value that also exists deeper in
+	// the output (e.g. the top output of DUP). Comments may assign a distinct name to
+	// these positions.
+	clear(s.opCopyPos)
+	for i := range outputs {
+		for j := i + 1; j < len(outputs); j++ {
+			if outputs[i] == outputs[j] {
+				s.opCopyPos[i] = j
+				break
+			}
+		}
+	}
+
 	// Check the comment, and apply its names to the stack. Instruction comments may
 	// elide items at the bottom of the stack: the unlisted items simply remain.
 	return s.checkComment(comment, true)
@@ -179,6 +194,7 @@ func (s *Stack) Apply(op Op, imm byte, comment []string) error {
 // declared depth is part of the merge contract, checked against incoming jumps.
 func (s *Stack) CheckComment(comment []string) error {
 	clear(s.opNewItems)
+	clear(s.opCopyPos)
 	return s.checkComment(comment, false)
 }
 
@@ -225,6 +241,25 @@ func (s *Stack) checkComment(comment []string, allowElide bool) error {
 		if lhs, ok := assignName(name); ok {
 			name = lhs
 			explicit = true
+		}
+		// A copy produced by the operation (e.g. the top output of DUP) may be given
+		// its own name through assignment syntax, splitting the copy into a distinct
+		// item. When the comment names copy and source identically, the positions
+		// keep sharing one item.
+		if srcPos, isCopy := s.opCopyPos[i]; isCopy && explicit {
+			srcName := s.itemToName[stackItem]
+			if srcPos < len(comment) {
+				srcName = comment[srcPos]
+				if lhs, ok := assignName(srcName); ok {
+					srcName = lhs
+				}
+			}
+			if name != srcName {
+				item := s.newItem()
+				s.stack[len(s.stack)-1-i] = item
+				s.opNewItems.Add(item)
+				stackItem = item
+			}
 		}
 		// A value duplicated onto the stack (e.g. by DUP) occupies more than one
 		// position as the same item: the op's stack effect repeats the input name in
