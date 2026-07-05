@@ -33,6 +33,7 @@ var exprTests = []struct {
 	{"0x03", "0x03"},                       // hex number literal
 	{`"abc"`, `"abc"`},                     // string literal
 	{`"newline\n"`, `"newline\n"`},         // string literal with escape
+	{"\"multi\nline\"", "\"multi\nline\""}, // multi-line string literal
 	{"-2", "-2"},                           // unary op
 	{"-(1 + 3)", "-(1 + 3)"},               // binary in unary
 	{"-1 + 3", "-1 + 3"},                   // unary in binary

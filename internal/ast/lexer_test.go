@@ -96,10 +96,16 @@ func TestLexer(t *testing.T) {
 			input:  `push "a\"b"`,
 			tokens: []token{{typ: lineStart, line: 1, column: 0}, {typ: identifier, text: "push", line: 1, column: 0}, {typ: stringLiteral, text: `a\"b`, line: 1, column: 6}, {typ: eof, line: 1, column: 11}},
 		},
-		// unterminated string ends at newline and does not affect line numbering
+		// multi-line string: token is positioned at the opening quote,
+		// and line numbering continues correctly after it
+		{
+			input:  "push \"a\nb\" add",
+			tokens: []token{{typ: lineStart, line: 1, column: 0}, {typ: identifier, text: "push", line: 1, column: 0}, {typ: stringLiteral, text: "a\nb", line: 1, column: 6}, {typ: identifier, text: "add", line: 2, column: 3}, {typ: eof, line: 2, column: 6}},
+		},
+		// unterminated string runs to EOF and becomes an invalid token
 		{
 			input:  "push \"abc\ngas",
-			tokens: []token{{typ: lineStart, line: 1, column: 0}, {typ: identifier, text: "push", line: 1, column: 0}, {typ: invalidToken, text: `"abc`, line: 1, column: 5}, {typ: lineEnd, text: "\n", line: 1, column: 9}, {typ: lineStart, line: 2, column: 0}, {typ: identifier, text: "gas", line: 2, column: 0}, {typ: eof, line: 2, column: 3}},
+			tokens: []token{{typ: lineStart, line: 1, column: 0}, {typ: identifier, text: "push", line: 1, column: 0}, {typ: invalidToken, text: "\"abc\ngas", line: 1, column: 5}, {typ: eof, line: 2, column: 3}},
 		},
 		// NUL character is invalid, not end of file
 		{

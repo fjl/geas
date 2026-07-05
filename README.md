@@ -200,7 +200,8 @@ Available arithmetic operations include:
 
 There is limited support for using strings and arbitrary byte sequences in expressions.
 You can write string literals using double quotes, and use hexadecimal literals with a
-`0x` prefix to specify bytes. Please note that strings and bytes are internally
+`0x` prefix to specify bytes. String literals can span multiple lines; line breaks are
+part of the string content. Please note that strings and bytes are internally
 represented in the same way numbers are. All arithmetic and builtins work on all values,
 there are no 'types'.
 

@@ -147,9 +147,14 @@ func (p *Printer) newline() {
 	p.lineLength = 0
 }
 
-// string outputs a string.
+// string outputs a string. Note s can contain line breaks, e.g. when printing
+// multi-line string literals.
 func (p *Printer) string(s string) {
-	p.lineLength += len(s)
+	if nl := strings.LastIndexByte(s, '\n'); nl >= 0 {
+		p.lineLength = len(s) - nl - 1
+	} else {
+		p.lineLength += len(s)
+	}
 	_, err := p.out.WriteString(s)
 	if err != nil {
 		panic(printError{err})

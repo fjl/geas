@@ -176,7 +176,13 @@ func (l *lexer) acceptRunUntil(until rune) bool {
 
 // emit creates a new token and sends it to token channel for processing.
 func (l *lexer) emit(t tokenType) {
-	token := token{line: l.lineno, column: l.start - l.linestart, text: l.input[l.start:l.pos], typ: t}
+	l.emitAt(t, l.lineno, l.start-l.linestart)
+}
+
+// emitAt creates a new token with an explicit position. This is used for tokens
+// spanning multiple lines, which are positioned at their start.
+func (l *lexer) emitAt(t tokenType, line, column int) {
+	token := token{line: line, column: column, text: l.input[l.start:l.pos], typ: t}
 	l.tokens <- token
 	l.start = l.pos
 }
@@ -319,26 +325,33 @@ func lexPercent(l *lexer) stateFn {
 
 // lexInsideString lexes the inside of a string until the closing quote.
 // Escape sequences are kept in the token text and processed by the parser.
-// Strings cannot span multiple lines; an unterminated string is emitted as
-// an invalid token.
+// Strings can span multiple lines; an unterminated string is emitted as
+// an invalid token positioned at the opening quote.
 func lexInsideString(l *lexer) stateFn {
+	line, column := l.lineno, l.start-l.linestart
 	for {
 		switch l.next() {
 		case '\\':
 			switch l.next() {
-			case '\n', 0:
+			case '\n':
+				l.lineno++
+				l.linestart = l.pos
+			case 0:
 				l.backup()
 			}
+		case '\n':
+			l.lineno++
+			l.linestart = l.pos
 		case '"':
 			l.backup() // exclude closing quote
 			l.start += 1 // remove beginning quote
-			l.emit(stringLiteral)
+			l.emitAt(stringLiteral, line, column+1)
 			l.next() // consume "
 			l.ignore()
 			return lexNext
-		case '\n', 0:
+		case 0:
 			l.backup()
-			l.emit(invalidToken)
+			l.emitAt(invalidToken, line, column)
 			return lexNext
 		}
 	}

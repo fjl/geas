@@ -166,6 +166,24 @@ string-concat:
   output:
     bytecode: '60c3'
 
+string-multiline:
+  input:
+    code: |
+      #bytes "Hello,
+      world."
+  output:
+    bytecode: '48656c6c6f2c0a776f726c642e'
+
+string-multiline-line-numbers:
+  input:
+    code: |
+      push "a
+      b"
+      badop
+  output:
+    errors:
+      - ':3:0: unknown op BADOP'
+
 string-unterminated:
   input:
     code: |
