@@ -212,7 +212,7 @@ func (l *Loader) parseIncludeFile(file string, st *ast.Include, depth int) *ast.
 
 func ResolveRelative(basepath string, filename string) (string, error) {
 	res := path.Clean(path.Join(path.Dir(basepath), filename))
-	if strings.Contains(res, "..") {
+	if res == ".." || strings.HasPrefix(res, "../") {
 		return "", fmt.Errorf("path %q escapes project root", filename)
 	}
 	return res, nil

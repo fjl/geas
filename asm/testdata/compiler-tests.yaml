@@ -752,6 +752,24 @@ include-relative-path:
   output:
     bytecode: "676e65696768626f72"
 
+include-filename-with-dots:
+  input:
+    code: |
+      #include "lib..v2.eas"
+    files:
+      lib..v2.eas: |
+        push 1
+  output:
+    bytecode: "6001"
+
+include-escapes-root:
+  input:
+    code: |
+      #include "../file.eas"
+  output:
+    errors:
+      - ':1:0: path "../file.eas" escapes project root'
+
 instr-macro-def-with-params:
   input:
     code: |
