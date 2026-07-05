@@ -291,6 +291,24 @@ macro-with-start-comment:
   output:
     bytecode: "6005 6001 01"
 
+# A macro calling another macro that is defined later in the file must use the
+# callee's real stack effect.
+macro-forward-reference:
+  input:
+    code: |
+      #define %a() {
+          %b()
+      }
+      #define %b() {
+          push 1
+          push 2
+      }
+      %a()
+      pop
+      pop
+  output:
+    bytecode: "6001 6002 50 50"
+
 # Mismatch inside a macro body: swap1 reorders [b, a] to [a, b],
 # but the comment claims [a, a].
 macro-mismatch:

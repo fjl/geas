@@ -84,11 +84,23 @@ func (a *analyzer) analyzeDefs(doc *ast.Document) {
 	}
 }
 
+// macroEffect returns the stack effect of an instruction macro, analyzing it
+// on first use. It returns nil while the macro's own analysis is in progress,
+// i.e. for recursive calls.
+func (a *analyzer) macroEffect(def *ast.InstructionMacroDef) *stackEffect {
+	if eff, ok := a.macroEffects[def]; ok {
+		return eff
+	}
+	a.analyzeMacro(def)
+	return a.macroEffects[def]
+}
+
 // analyzeMacro analyzes an instruction macro body and stores its effect.
 func (a *analyzer) analyzeMacro(def *ast.InstructionMacroDef) {
 	if _, ok := a.macroEffects[def]; ok {
-		return // already analyzed
+		return // already analyzed (or in progress)
 	}
+	a.macroEffects[def] = nil // mark in progress
 
 	// Determine the initial stack from the StartComment.
 	var (
@@ -125,6 +137,16 @@ func (a *analyzer) analyzeMacro(def *ast.InstructionMacroDef) {
 	a.macroEffects[def] = eff
 }
 
+// includeEffect returns the stack effect of an include statement, analyzing the
+// included document on first use.
+func (a *analyzer) includeEffect(inc *ast.Include) *stackEffect {
+	if eff, ok := a.includeEffects[inc]; ok {
+		return eff
+	}
+	a.analyzeInclude(inc)
+	return a.includeEffects[inc]
+}
+
 // analyzeInclude analyzes an included document and stores its effect.
 func (a *analyzer) analyzeInclude(inc *ast.Include) {
 	if _, ok := a.includeEffects[inc]; ok {
@@ -134,14 +156,13 @@ func (a *analyzer) analyzeInclude(inc *ast.Include) {
 	if incdoc == nil {
 		return
 	}
+	a.includeEffects[inc] = nil // mark in progress
 	eff := a.analyzeDocument(incdoc, true)
 	a.includeEffects[inc] = eff
 }
 
 // isTerminalCall reports whether a macro or include call statement always terminates
-// execution (never returns to the following statement). Effects are precomputed by
-// analyzeDefs before the enclosing document's blocks are split, so the lookups here
-// are populated for calls to already-defined macros and includes.
+// execution (never returns to the following statement).
 func (a *analyzer) isTerminalCall(st ast.Statement, doc *ast.Document) bool {
 	switch st := st.(type) {
 	case *ast.InstructionMacroCall:
@@ -149,10 +170,10 @@ func (a *analyzer) isTerminalCall(st ast.Statement, doc *ast.Document) bool {
 		if def == nil {
 			return false
 		}
-		eff := a.macroEffects[def]
+		eff := a.macroEffect(def)
 		return eff != nil && eff.terminal
 	case *ast.Include:
-		eff := a.includeEffects[st]
+		eff := a.includeEffect(st)
 		return eff != nil && eff.terminal
 	}
 	return false
@@ -666,7 +687,7 @@ func (a *analyzer) applyStatement(st ast.Statement, doc *ast.Document, s *stack.
 		if def == nil {
 			return nil
 		}
-		eff := a.macroEffects[def]
+		eff := a.macroEffect(def)
 		if eff == nil {
 			return nil
 		}
@@ -674,7 +695,7 @@ func (a *analyzer) applyStatement(st ast.Statement, doc *ast.Document, s *stack.
 		jumps = eff.jumps
 
 	case *ast.Include:
-		eff := a.includeEffects[st]
+		eff := a.includeEffect(st)
 		if eff == nil {
 			return nil
 		}
