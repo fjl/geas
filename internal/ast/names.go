@@ -38,5 +38,5 @@ func IsPush0(op string) bool {
 
 // IsJump reports whether an op is a jump.
 func IsJump(op string) bool {
-	return strings.HasPrefix(op, "JUMP")
+	return op == "JUMP" || op == "JUMPI"
 }

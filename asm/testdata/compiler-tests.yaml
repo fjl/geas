@@ -1087,6 +1087,15 @@ jump-without-argument:
   output:
     bytecode: "6003 56 5b"
 
+jumpdest-with-argument:
+  input:
+    code: |
+      label:
+      JUMPDEST @label
+  output:
+    errors:
+      - ':2:0: only JUMP* and PUSH* support immediate arguments'
+
 label-def-after-use:
   input:
     code: |
