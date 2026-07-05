@@ -856,7 +856,7 @@ func (a *analyzer) resolveOpcode(op *ast.Opcode) (stack.Op, byte) {
 	// Handle JUMP/JUMPI with label argument: these are compiled as PUSH + JUMP.
 	// The push produces a value, and the jump consumes it. The net effect is
 	// just consuming the other JUMP inputs (for JUMPI, that's the condition).
-	if ast.IsJump(name) && op.Arg != nil {
+	if evm.IsJump(name) && op.Arg != nil {
 		evmOp := a.prog.Fork.OpByName(name)
 		if evmOp == nil {
 			return nil, 0

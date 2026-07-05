@@ -86,7 +86,7 @@ func (op opcodeStatement) expand(c *Compiler, doc *ast.Document, prog *compilerP
 			return ecPushWithoutArgument
 		}
 
-	case ast.IsJump(opcode):
+	case evm.IsJump(opcode):
 		if err := c.validateJumpArg(prog, doc, op.Arg); err != nil {
 			return err
 		}

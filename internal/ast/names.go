@@ -35,8 +35,3 @@ func IsPush(op string) bool {
 func IsPush0(op string) bool {
 	return strings.EqualFold(op, "PUSH0")
 }
-
-// IsJump reports whether an op is a jump.
-func IsJump(op string) bool {
-	return op == "JUMP" || op == "JUMPI"
-}

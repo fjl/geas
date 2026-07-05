@@ -451,6 +451,13 @@ func OpByName(name string) *Op {
 	return opm[name]
 }
 
+// IsJump reports whether the named op is a jump instruction.
+// NAME must be uppercase.
+func IsJump(name string) bool {
+	op := opm[name]
+	return op != nil && op.Jump
+}
+
 // AllOps returns all known opcodes across all forks, sorted by name.
 func AllOps() []*Op {
 	return oplist
