@@ -157,9 +157,8 @@ func (p *compilerProg) addLabel(l *ast.LabelDef, doc *ast.Document) {
 	}
 }
 
-// addInstruction appends an instruction to the current section. This returns the labels
-// that refer to the added instruction, as a temporary slice. The return value will become
-// invalid on the next call to addLabel, so copy it if needed.
+// addInstruction appends an instruction to the current section. Pending labels
+// are linked to the instruction.
 func (p *compilerProg) addInstruction(inst *instruction) {
 	p.elems = append(p.elems, inst)
 	for _, cl := range p.currentLabels {
