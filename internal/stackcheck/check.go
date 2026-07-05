@@ -645,9 +645,25 @@ func (bs *blockState) baseNames() []string {
 	if len(bs.predExits) == 0 {
 		return nil
 	}
+	// Predecessors are visited in a stable order so that ties on minimum depth
+	// resolve deterministically. The initial predecessor and real blocks in source
+	// order are preferred over virtual predecessors from external jumps.
+	keys := slices.SortedFunc(maps.Keys(bs.predExits), func(a, b int) int {
+		if (a < initialPred) != (b < initialPred) {
+			if a < initialPred {
+				return 1
+			}
+			return -1
+		}
+		if a < initialPred {
+			return b - a // both virtual: allocation order
+		}
+		return a - b
+	})
 	minLen := -1
 	var base []string
-	for _, items := range bs.predExits {
+	for _, k := range keys {
+		items := bs.predExits[k]
 		if minLen < 0 || len(items) < minLen {
 			minLen = len(items)
 			base = items

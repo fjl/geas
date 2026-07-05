@@ -909,6 +909,23 @@ macro-external-jump:
 # A macro jumps to a label in the outer document, but the macro has an
 # extra item on the stack at the jump point. The label comment declares
 # one item, but two arrive. The checker detects the depth mismatch.
+# When predecessors tie for minimum depth at a merge point, the entry names must
+# be picked deterministically (from the earliest block in source order).
+merge-depth-tie-deterministic:
+  input:
+    code: |
+      push 1     ; [x]
+      push 2     ; [y, x]
+      push 0
+      jumpi @merge
+      swap1      ; [x, y]
+      merge:     ; [y, x]
+      pop
+      pop
+      stop
+  output:
+    bytecode: "6001 6002 5f 6009 57 90 5b 50 50 00"
+
 # A label targeted only by a jump inside a macro must not accumulate edges from
 # intermediate propagation states when the calling block is re-walked. Only the
 # real depth mismatch at @mid is reported here, not a phantom mismatch at @out.
