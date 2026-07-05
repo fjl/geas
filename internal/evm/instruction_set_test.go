@@ -156,3 +156,20 @@ func TestImmediateEncoding(t *testing.T) {
 		}
 	}
 }
+
+func TestImmediateEncodingInvalid(t *testing.T) {
+	tests := []struct {
+		op   string
+		args []int
+	}{
+		{"EXCHANGE", []int{5, 5}},
+		{"EXCHANGE", []int{5, 4}},
+	}
+	for _, tt := range tests {
+		op := opm[tt.op]
+		imm, err := op.EncodeImmediateArgs(tt.args)
+		if err == nil {
+			t.Errorf("%s%v: expected encode error, got immediate %d", tt.op, tt.args, imm)
+		}
+	}
+}

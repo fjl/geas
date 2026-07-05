@@ -645,8 +645,8 @@ func encodeImmediatePair(n, m int) (byte, error) {
 	if n < 1 || n > 13 {
 		return 0, fmt.Errorf("first position %d out of range (1-13)", n)
 	}
-	if m < n || m > 29 {
-		return 0, fmt.Errorf("second position %d out of range (%d-29)", m, n)
+	if m <= n || m > 29 {
+		return 0, fmt.Errorf("second position %d out of range (%d-29)", m, n+1)
 	}
 	if n+m > 30 {
 		return 0, fmt.Errorf("invalid positions %d, %d (n+m > 30)", n, m)

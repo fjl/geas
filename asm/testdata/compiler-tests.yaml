@@ -1035,12 +1035,14 @@ immediate-exchange-range-errors:
       exchange[14, 15]
       exchange[1, 30]
       exchange[13, 29]
+      exchange[5, 5]
       #pragma target "amsterdam"
   output:
     errors:
       - ':1:0: EXCHANGE first position 14 out of range (1-13)'
-      - ':2:0: EXCHANGE second position 30 out of range (1-29)'
+      - ':2:0: EXCHANGE second position 30 out of range (2-29)'
       - ':3:0: EXCHANGE invalid positions 13, 29 (n+m > 30)'
+      - ':4:0: EXCHANGE second position 5 out of range (6-29)'
 
 opcode-unknown-in-fork:
   input:
