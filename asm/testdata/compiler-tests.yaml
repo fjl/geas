@@ -1208,6 +1208,18 @@ percent-modulo-macro:
   output:
     bytecode: '6003 6004'
 
+push-invalid-size:
+  input:
+    code: |
+      push33 1
+      push257 1
+      pushfoo 1
+  output:
+    errors:
+      - ':1:0: unknown op PUSH33'
+      - ':2:0: unknown op PUSH257'
+      - ':3:0: unknown op PUSHFOO'
+
 push-expression:
   input:
     code: |

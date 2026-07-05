@@ -461,7 +461,7 @@ func parseOpcode(p *Parser, tok token) *Opcode {
 		Op:     tok.text,
 	}
 	size, isPush := parsePushSize(tok.text)
-	if isPush {
+	if isPush && size >= 0 && size <= 32 {
 		st.PushSize = byte(size + 1)
 	}
 
@@ -521,7 +521,10 @@ func parsePushSize(name string) (int, bool) {
 		return 0, false
 	}
 	if len(m[1]) > 0 {
-		sz, _ := strconv.Atoi(m[1])
+		sz, err := strconv.Atoi(m[1])
+		if err != nil {
+			return 0, false
+		}
 		return sz, true
 	}
 	return -1, true

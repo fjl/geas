@@ -76,6 +76,12 @@ func (op opcodeStatement) expand(c *Compiler, doc *ast.Document, prog *compilerP
 
 	switch {
 	case ast.IsPush(opcode) && opcode != "PUSH0":
+		// Note "PUSH" is not an opcode name, it is resolved by size later on.
+		if opcode != "PUSH" {
+			if _, err := prog.resolveOp(opcode); err != nil {
+				return err
+			}
+		}
 		if op.Arg == nil {
 			return ecPushWithoutArgument
 		}
