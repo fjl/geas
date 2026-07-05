@@ -101,6 +101,11 @@ func TestLexer(t *testing.T) {
 			input:  "push \"abc\ngas",
 			tokens: []token{{typ: lineStart, line: 1, column: 0}, {typ: identifier, text: "push", line: 1, column: 0}, {typ: invalidToken, text: `"abc`, line: 1, column: 5}, {typ: lineEnd, text: "\n", line: 1, column: 9}, {typ: lineStart, line: 2, column: 0}, {typ: identifier, text: "gas", line: 2, column: 0}, {typ: eof, line: 2, column: 3}},
 		},
+		// NUL character is invalid, not end of file
+		{
+			input:  "push 1\x00gas",
+			tokens: []token{{typ: lineStart, line: 1, column: 0}, {typ: identifier, text: "push", line: 1, column: 0}, {typ: numberLiteral, text: "1", line: 1, column: 5}, {typ: invalidToken, text: "\x00", line: 1, column: 6}, {typ: identifier, text: "gas", line: 1, column: 7}, {typ: eof, line: 1, column: 10}},
+		},
 	}
 
 	for _, test := range tests {

@@ -168,7 +168,7 @@ func (l *lexer) acceptRunUntil(until rune) bool {
 			l.pos--
 			return true
 		}
-		if i == 0 {
+		if i == 0 && l.width == 0 {
 			return false // eof
 		}
 	}
@@ -272,7 +272,11 @@ func lexNext(l *lexer) stateFn {
 			l.ignore()
 
 		case r == 0:
-			return nil // eof
+			if l.width == 0 {
+				return nil // eof
+			}
+			// NUL character in input, not end of file.
+			l.emit(invalidToken)
 
 		default:
 			l.emit(invalidToken)
