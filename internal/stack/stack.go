@@ -85,6 +85,14 @@ func (s *Stack) HasWildcard() bool {
 	return s.wildcard
 }
 
+// GrowBottom extends the stack downward by n unnamed items. In inferred-input
+// mode, the items are tracked as inferred inputs.
+func (s *Stack) GrowBottom(n int) {
+	if n > 0 {
+		s.growBottom(n)
+	}
+}
+
 // Init clears the stack and sets its contents. If confirmed is nil, all names are
 // marked as confirmed, and duplicate names share a single item (representing the same
 // value appearing multiple times). If confirmed is non-nil, only names at positions

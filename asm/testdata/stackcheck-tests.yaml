@@ -279,6 +279,27 @@ include-effect:
   output:
     bytecode: "6001 6002 01 50"
 
+# Input inference continues past labels in included files: the include consumes
+# two items, so the trailing pop in the main file underflows.
+include-inferred-inputs-after-label:
+  input:
+    code: |
+      push 1
+      push 2
+      #include "inc.eas"
+      pop
+      stop
+    files:
+      inc.eas: |
+        pop
+        lab:
+        pop
+  output:
+    bytecode: "6001 6002 50 5b 50 50 00"
+    warnings:
+      - 'inc.eas:2:0: warning: label @lab unused in program'
+      - ':4:0: stack underflow: op requires 1 items, stack has 0'
+
 macro-with-start-comment:
   input:
     code: |

@@ -222,11 +222,26 @@ func (a *analyzer) analyzeBlocks(doc *ast.Document, initialItems []string, infer
 		return analysisResult{exitItems: initialItems}
 	}
 
-	// Phase 1: compute stable entry/exit states.
-	states, inferredInputs := a.propagateStates(blocks, labelIndex, doc, initialItems, inferred)
+	// Phase 1: compute stable entry/exit states. In inferred mode, blocks other than
+	// the first can also consume items below the document's initial stack. Such
+	// consumption is discovered during propagation, and the analysis is re-run with
+	// the initial stack extended downward until no more underflow occurs.
+	var (
+		states         []blockState
+		inferredInputs []string
+		preGrow        int
+	)
+	for {
+		var need int
+		states, inferredInputs, need = a.propagateStates(blocks, labelIndex, doc, initialItems, inferred, preGrow)
+		if need == 0 {
+			break
+		}
+		preGrow += need
+	}
 
 	// Phase 2: check comments.
-	a.checkComments(blocks, doc, states, initialItems, inferred)
+	a.checkComments(blocks, doc, states, initialItems, inferred, preGrow)
 	a.checkJumpDepths(blocks, states)
 
 	// Return the exit state of the last reachable block.
@@ -261,8 +276,11 @@ func (a *analyzer) analyzeBlocks(doc *ast.Document, initialItems []string, infer
 
 // propagateStates runs the worklist to compute stable entry/exit states for all
 // reachable blocks. It returns the block states and, for inferred mode, the
-// inferred input items.
-func (a *analyzer) propagateStates(blocks []*basicBlock, labelIndex map[string]int, doc *ast.Document, initialItems []string, inferred bool) ([]blockState, []string) {
+// inferred input items. The preGrow parameter extends the initial stack downward,
+// providing items for consumption by blocks other than the first. The third return
+// value reports how many more such items are needed; the caller re-runs the
+// propagation until it is zero.
+func (a *analyzer) propagateStates(blocks []*basicBlock, labelIndex map[string]int, doc *ast.Document, initialItems []string, inferred bool, preGrow int) ([]blockState, []string, int) {
 	states := make([]blockState, len(blocks))
 
 	// nextVPred allocates virtual predecessor keys for external jumps.
@@ -313,6 +331,7 @@ func (a *analyzer) propagateStates(blocks []*basicBlock, labelIndex map[string]i
 	s := stack.New(initialItems, nil)
 	if inferred {
 		s.SetInferred()
+		s.GrowBottom(preGrow)
 	}
 	edges := a.walkBlock(blocks[0], doc, s, false)
 	if inferred {
@@ -337,6 +356,7 @@ func (a *analyzer) propagateStates(blocks []*basicBlock, labelIndex map[string]i
 	mergeSuccessors(0, edges)
 
 	// Run the worklist until all entry states are stable.
+	var need int
 	for len(worklist) > 0 {
 		idx := worklist[len(worklist)-1]
 		worklist = worklist[:len(worklist)-1]
@@ -347,14 +367,20 @@ func (a *analyzer) propagateStates(blocks []*basicBlock, labelIndex map[string]i
 			entry = append(entry, stack.Wildcard)
 		}
 		s := stack.New(entry, nil)
+		if inferred {
+			s.SetInferred()
+		}
 		a.applyLabelComment(blocks[idx], s)
 		edges := a.walkBlock(blocks[idx], doc, s, false)
+		if inferred {
+			need = max(need, len(s.InferredInputs()))
+		}
 		states[idx].exit = s.Items()
 		states[idx].exitWild = s.HasWildcard()
 
 		mergeSuccessors(idx, edges)
 	}
-	return states, inferredInputs
+	return states, inferredInputs, need
 }
 
 // mergePredecessor merges a predecessor's exit state into a successor block's entry.
@@ -397,7 +423,7 @@ func (a *analyzer) applyLabelComment(blk *basicBlock, s *stack.Stack) {
 
 // checkComments walks all reachable blocks with their stable entry states and
 // reports comment mismatch warnings.
-func (a *analyzer) checkComments(blocks []*basicBlock, doc *ast.Document, states []blockState, initialItems []string, inferred bool) {
+func (a *analyzer) checkComments(blocks []*basicBlock, doc *ast.Document, states []blockState, initialItems []string, inferred bool, preGrow int) {
 	for i, blk := range blocks {
 		if !states[i].reached {
 			continue // unreachable
@@ -408,6 +434,7 @@ func (a *analyzer) checkComments(blocks []*basicBlock, doc *ast.Document, states
 			s = stack.New(initialItems, nil)
 			if inferred {
 				s.SetInferred()
+				s.GrowBottom(preGrow)
 			}
 			// When block 0 is a loop head (has back-edge predecessors beyond the
 			// initial virtual predecessor), check for unbalanced stack effects.
@@ -418,6 +445,9 @@ func (a *analyzer) checkComments(blocks []*basicBlock, doc *ast.Document, states
 		} else {
 			names, confirmed := states[i].computeConfirmed()
 			s = stack.New(names, confirmed)
+			if inferred {
+				s.SetInferred()
+			}
 			a.checkMergeDepth(blk, &states[i], i)
 			a.checkLoopBalance(blk, &states[i], i)
 			a.checkLabelComment(blk, &states[i], s)
