@@ -1197,6 +1197,15 @@ macro-ref-call-empty-2:
   output:
     bytecode: 6064
 
+percent-modulo-macro:
+  input:
+    code: |
+      #define B = 4
+      push 7%B
+      push 1+7%B
+  output:
+    bytecode: '6003 6004'
+
 push-expression:
   input:
     code: |

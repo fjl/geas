@@ -561,6 +561,15 @@ func parseArith(p *Parser, left Expr, tok token, minPrecedence int) Expr {
 				p.unread(tok)
 				return left
 			}
+		case instMacroIdent:
+			// The lexer tokenizes '%name' as a macro identifier, but within an
+			// expression it is the modulo operator followed by an identifier.
+			op = ArithMod
+			if op.Precedence() < minPrecedence {
+				p.unread(tok)
+				return left
+			}
+			p.unread(token{typ: identifier, text: tok.text, line: tok.line, column: tok.column})
 		default:
 			// End of binary expression.
 			p.unread(tok)
@@ -595,6 +604,13 @@ func parseArithInner(p *Parser, right Expr, curPrecedence int) Expr {
 		case arith:
 			nextop := tokenArithOp(tok)
 			if nextop.Precedence() <= curPrecedence {
+				p.unread(tok)
+				return right
+			}
+			right = parseArith(p, right, tok, curPrecedence+1)
+
+		case instMacroIdent:
+			if ArithMod.Precedence() <= curPrecedence {
 				p.unread(tok)
 				return right
 			}
