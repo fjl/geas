@@ -488,7 +488,10 @@ func parseImmediates(p *Parser) []int {
 	for {
 		switch tok := p.next(); tok.typ {
 		case numberLiteral:
-			n, _ := lzint.ParseNumberLiteral(tok.text)
+			n, err := lzint.ParseNumberLiteral(tok.text)
+			if err != nil {
+				p.throwError(tok, "invalid number literal: %v", err)
+			}
 			if n.IntegerBitLen() > 8 {
 				p.throwError(tok, "immediate value > 8 bits")
 			}

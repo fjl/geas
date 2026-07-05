@@ -1029,6 +1029,15 @@ immediate-dupn-range-errors:
       - ':1:0: DUPN stack depth 2 out of range (17-235)'
       - ':2:0: DUPN stack depth 245 out of range (17-235)'
 
+immediate-invalid-number:
+  input:
+    code: |
+      dupn [0x]
+      #pragma target "amsterdam"
+  output:
+    errors:
+      - ':1:6: invalid number literal: invalid hex: 0x'
+
 immediate-exchange-range-errors:
   input:
     code: |
