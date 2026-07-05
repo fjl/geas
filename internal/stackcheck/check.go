@@ -345,6 +345,7 @@ func (a *analyzer) propagateStates(blocks []*basicBlock, labelIndex map[string]i
 		s.SetInferred()
 		s.GrowBottom(preGrow)
 	}
+	a.applyLabelComment(blocks[0], s)
 	edges := a.walkBlock(blocks[0], doc, s, false)
 	if inferred {
 		inferredInputs = s.InferredInputs()
@@ -452,8 +453,8 @@ func (a *analyzer) checkComments(blocks []*basicBlock, doc *ast.Document, states
 			// initial virtual predecessor), check for unbalanced stack effects.
 			if len(states[0].predExits) > 1 {
 				a.checkLoopBalance(blk, &states[0], 0)
-				a.checkLabelComment(blk, &states[0], s)
 			}
+			a.checkLabelComment(blk, &states[0], s)
 		} else {
 			names, confirmed := states[i].computeConfirmed()
 			s = stack.New(names, confirmed)

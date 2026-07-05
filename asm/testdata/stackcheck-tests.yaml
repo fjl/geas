@@ -909,6 +909,20 @@ macro-external-jump:
 # A macro jumps to a label in the outer document, but the macro has an
 # extra item on the stack at the jump point. The label comment declares
 # one item, but two arrive. The checker detects the depth mismatch.
+# A label comment on the very first block is checked against the initial stack.
+label-comment-on-first-block:
+  input:
+    code: |
+      start:     ; [a, b, c]
+      pop
+      stop
+  output:
+    bytecode: "5b 50 00"
+    warnings:
+      - ':1:0: warning: label @start unused in program'
+      - ':1:0: stack comment underflow: stack has 0 items, comment declares 3'
+      - ':2:0: stack underflow: op requires 1 items, stack has 0'
+
 # When predecessors tie for minimum depth at a merge point, the entry names must
 # be picked deterministically (from the earliest block in source order).
 merge-depth-tie-deterministic:
