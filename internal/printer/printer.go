@@ -128,7 +128,7 @@ func (p *Printer) finishToplevel(err *error) {
 		// Internal error thrown.
 		*err = pe.e
 	} else {
-		panic(err)
+		panic(panicErr)
 	}
 }
 

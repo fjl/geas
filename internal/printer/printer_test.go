@@ -67,6 +67,28 @@ func TestPrintExpr(t *testing.T) {
 	}
 }
 
+type bogusExpr struct{}
+
+func (bogusExpr) Position() ast.Position { return ast.Position{} }
+
+// This checks that internal panics reach the caller with their original value.
+func TestPrintExprPanic(t *testing.T) {
+	defer func() {
+		v := recover()
+		err, ok := v.(error)
+		if !ok || !strings.Contains(err.Error(), "unhandled expr type") {
+			t.Fatalf("panic value does not carry the original error: %v", v)
+		}
+	}()
+
+	var (
+		s strings.Builder
+		p Printer
+	)
+	p.Expr(&s, bogusExpr{})
+	t.Fatal("expected panic")
+}
+
 func TestPrintDocument(t *testing.T) {
 	inputFiles, err := filepath.Glob(filepath.Join("testdata", "in.*.eas"))
 	if err != nil {
