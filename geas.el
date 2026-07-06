@@ -32,6 +32,8 @@
 ;;   - reformatting via `geas -f'
 ;;   - context-aware completion of opcodes, macros and labels
 ;;   - eldoc display of opcode stack effects
+;;   - defun navigation (C-M-a, C-M-e, C-M-h): defuns are macro #defines
+;;     and blocks of instructions started by a label
 ;;
 ;; In order for most features to work, `geas-command' must be set to
 ;; the path of a working geas binary (or geas must be in PATH).
@@ -146,6 +148,150 @@ flush left; everything else is indented `geas-indent-offset'."
     (if savep
         (save-excursion (indent-line-to indent))
       (indent-line-to indent))))
+
+;;; Defun navigation.
+
+(defconst geas--defun-start-regexp
+  "^[ \t]*\\(?:#define\\_>\\|\\.?[A-Za-z_][A-Za-z0-9_]*[ \t]*:\\)"
+  "Regexp matching the first line of a defun.
+A defun is a `#define' or a basic block introduced by a label
+definition.")
+
+(defun geas--defun-start-line-p ()
+  "Return non-nil when the current line begins a defun.
+Lines inside multi-line strings do not count."
+  (save-excursion
+    (forward-line 0)
+    (and (not (nth 8 (syntax-ppss)))
+         (looking-at-p geas--defun-start-regexp))))
+
+(defun geas--search-defun-start (backward)
+  "Move point to the start of the nearest defun-start line.
+Searches backward when BACKWARD is non-nil, forward otherwise,
+skipping matches inside strings.  Returns non-nil when a defun start
+was found; otherwise point ends up at the buffer boundary."
+  (let (found done)
+    (while (not done)
+      (if (not (if backward
+                   (re-search-backward geas--defun-start-regexp nil 'move)
+                 (re-search-forward geas--defun-start-regexp nil 'move)))
+          (setq done t)
+        (goto-char (match-beginning 0))
+        (if (not (nth 8 (syntax-ppss)))
+            (setq found t done t)
+          (unless backward (goto-char (match-end 0))))))
+    found))
+
+(defun geas--unlabeled-block-start (pos)
+  "Return the start of the unlabeled instruction block following POS, or nil.
+POS is the end of a defun, or `point-min'.  The block begins at the
+first following line holding an instruction; blank lines, comments,
+closing braces and directives are skipped.  Returns nil when a new
+defun begins before any instruction is found."
+  (save-excursion
+    (goto-char pos)
+    (unless (bolp) (forward-line 1))
+    (let (result done)
+      (while (not done)
+        (cond
+         ((eobp) (setq done t))
+         ((geas--defun-start-line-p) (setq done t))
+         ((looking-at-p "[ \t]*\\(?:$\\|[;}#]\\)") (forward-line 1))
+         (t (setq result (point)) (setq done t))))
+      result)))
+
+(defun geas--beginning-of-defun-1 ()
+  "Move point to the start of the defun at or before it, once.
+Return non-nil when a defun start was found; otherwise point ends up at
+the beginning of the buffer."
+  (let* ((orig (point))
+         (cur (and (geas--search-defun-start t) (point))))
+    ;; With no #define or label before point, the buffer may still open
+    ;; with an unlabeled instruction block.
+    (unless cur
+      (let ((block (geas--unlabeled-block-start (point))))
+        (when (and block (< block orig))
+          (setq cur block))))
+    (when cur
+      ;; ORIG may lie beyond the found defun's end, in an unlabeled
+      ;; instruction block (or a chain of them, separated by `;;;'
+      ;; comments) following it; descend to the block containing ORIG.
+      (let (done)
+        (while (not done)
+          (let ((end (save-excursion (goto-char cur)
+                                     (geas--end-of-defun)
+                                     (point))))
+            (if (>= end orig)
+                (setq done t)
+              (let ((block (geas--unlabeled-block-start end)))
+                (if (and block (< block orig))
+                    (setq cur block)
+                  (setq done t)))))))
+      (goto-char cur))
+    (and cur t)))
+
+(defun geas--next-defun-start ()
+  "Move point to the start of the next defun following it.
+Return non-nil when one was found; otherwise point moves to the end of
+the buffer."
+  (let ((orig (point))
+        (cand (save-excursion
+                (end-of-line)
+                (and (geas--search-defun-start nil) (point)))))
+    ;; An unlabeled instruction block may begin before CAND, following
+    ;; the end of the defun at or before point.
+    (let ((block (save-excursion
+                   (if (geas--beginning-of-defun-1)
+                       (progn (geas--end-of-defun)
+                              (geas--unlabeled-block-start (point)))
+                     (geas--unlabeled-block-start (point))))))
+      (when (and block (> block orig) (or (not cand) (< block cand)))
+        (setq cand block)))
+    (goto-char (or cand (point-max)))
+    (and cand t)))
+
+(defun geas--beginning-of-defun (&optional arg)
+  "Move backward to the beginning of a defun; see `beginning-of-defun'.
+With ARG, do it that many times; negative ARG moves forward to the
+start of a following defun.  Intended as `beginning-of-defun-function'."
+  (let ((arg (or arg 1))
+        (found t))
+    (while (and (> arg 0) found)
+      (setq found (geas--beginning-of-defun-1))
+      (setq arg (1- arg)))
+    (while (and (< arg 0) found)
+      (setq found (geas--next-defun-start))
+      (setq arg (1+ arg)))
+    found))
+
+(defun geas--end-of-defun ()
+  "Move point to the end of the defun starting at point.
+A `#define' extends to the end of its line, or to the closing `}' when
+the definition opens a brace block.  A basic block (labelled or
+unlabeled) extends to the next defun start, a closing `}', a top-level
+`;;;' comment, or the end of the buffer.  Intended as
+`end-of-defun-function'."
+  (let ((start (point)))
+    (if (looking-at-p "[ \t]*#define\\_>")
+        (let ((brace nil))
+          (save-excursion
+            (let ((eol (line-end-position)))
+              (while (and (not brace) (search-forward "{" eol t))
+                (unless (nth 8 (syntax-ppss))
+                  (setq brace (1- (point)))))))
+          (if brace
+              (progn (goto-char brace)
+                     (condition-case nil (forward-sexp)
+                       (scan-error (end-of-line))))
+            (end-of-line)))
+      ;; Basic block.
+      (forward-line 1)
+      (while (not (or (eobp)
+                      (looking-at-p "[ \t]*\\(?:}\\|;;;\\)")
+                      (geas--defun-start-line-p)))
+        (forward-line 1))
+      (skip-chars-backward " \t\n" start)
+      (end-of-line))))
 
 ;;; Opcode information from the geas tool.
 
@@ -368,6 +514,11 @@ for `completion-at-point-functions'."
   (setq-local indent-line-function #'geas-indent-line)
   ;; geas -f uses spaces
   (setq-local indent-tabs-mode nil)
+  (setq-local beginning-of-defun-function #'geas--beginning-of-defun)
+  (setq-local end-of-defun-function #'geas--end-of-defun)
+  ;; `geas--end-of-defun' scans macro bodies with `forward-sexp'; braces
+  ;; in comments must not confuse it.
+  (setq-local parse-sexp-ignore-comments t)
   ;; Re-indent the line when a flush-left character is typed.
   (setq-local electric-indent-chars (append '(?# ?} ?:) electric-indent-chars))
   (add-hook 'eldoc-documentation-functions #'geas-eldoc-function nil t)
