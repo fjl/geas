@@ -226,8 +226,12 @@ func (c *Compiler) compile(lprog *loader.Program) (output []byte) {
 		}
 	}
 
+	// Verify PC assertions made by numeric labels.
+	c.checkPCLabels(prog)
+
+	// No output if source has errors.
 	if c.errors.HasError() {
-		return nil // no output if source has errors
+		return nil
 	}
 
 	// Run analysis. Note this is disabled if there are errors because there could

@@ -54,6 +54,37 @@ exchange[1, 19]
 	}
 }
 
+func TestPCLabels(t *testing.T) {
+	bytecode, _ := hex.DecodeString("60035660086008575b005b")
+	expectedOutput := `    push1 0x03
+    jump
+    push1 0x08
+    push1 0x08
+    jumpi
+0x08:
+    jumpdest
+    stop
+0x0a:
+    jumpdest`
+
+	var buf strings.Builder
+	d := New()
+	d.SetShowBlocks(false)
+	d.SetPCLabels(true)
+	d.Disassemble(bytecode, &buf)
+	output := strings.TrimRight(buf.String(), "\n")
+	if output != expectedOutput {
+		t.Fatalf("wrong output:\ngot:\n%s\n\nwant:\n%s", output, expectedOutput)
+	}
+
+	// try round trip
+	a := asm.New(nil)
+	rtcode := a.CompileString(output)
+	if !bytes.Equal(rtcode, bytecode) {
+		t.Errorf("disassembly did not round-trip: %v", a.Errors())
+	}
+}
+
 func TestImmediateOpcodeTruncated(t *testing.T) {
 	bytecode, _ := hex.DecodeString("e6")
 	expectedOutput := "#bytes 0xe6"

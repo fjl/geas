@@ -54,6 +54,7 @@ const (
 	ecMissingImmediate
 	ecUnexpectedImmediate
 	ecDuplicateParam
+	ecPCLabelMismatch
 )
 
 func (e compilerError) Error() string {
@@ -100,6 +101,8 @@ func (e compilerError) Error() string {
 		return "unexpected immediate"
 	case ecDuplicateParam:
 		return "duplicate parameter"
+	case ecPCLabelMismatch:
+		return "PC value mismatch at label"
 	default:
 		return fmt.Sprintf("invalid error %d", e)
 	}

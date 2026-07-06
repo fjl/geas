@@ -62,6 +62,7 @@ const (
 	dottedLabelRef                      // dotted label reference
 	label                               // label definition
 	dottedLabel                         // dotted label definition
+	pcLabel                             // pc label definition
 	numberLiteral                       // number literal
 	stringLiteral                       // string literal
 	openParen                           // open parenthesis
@@ -363,7 +364,21 @@ func lexNumber(l *lexer) stateFn {
 		acceptance = isHex
 	}
 	l.acceptRun(acceptance)
-	l.emit(numberLiteral)
+
+	// A number followed by ':' is a pc label. Note the digits of an unprefixed
+	// number may continue with hex characters here (as in "00af:"). The 0x prefix
+	// is required for pc labels, but this is checked by the parser, in order to
+	// give a good error message for unprefixed labels.
+	pos := l.pos
+	l.acceptRun(isHex)
+	if l.peek() == ':' {
+		l.emit(pcLabel)
+		l.next() // consume ':'
+		l.ignore()
+	} else {
+		l.pos = pos
+		l.emit(numberLiteral)
+	}
 	return lexNext
 }
 

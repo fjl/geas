@@ -64,6 +64,25 @@ func TestLexer(t *testing.T) {
 			input:  "00123abc",
 			tokens: []token{{typ: lineStart, line: 1, column: 0}, {typ: numberLiteral, text: "00123", line: 1, column: 0}, {typ: identifier, text: "abc", line: 1, column: 5}, {typ: eof, line: 1, column: 8}},
 		},
+		// pc labels: 0x-prefixed hex number followed by ':'
+		{
+			input:  "0x23: jumpdest",
+			tokens: []token{{typ: lineStart, line: 1, column: 0}, {typ: pcLabel, text: "0x23", line: 1, column: 0}, {typ: identifier, text: "jumpdest", line: 1, column: 6}, {typ: eof, line: 1, column: 14}},
+		},
+		{
+			input:  "0x00af: push 0x23",
+			tokens: []token{{typ: lineStart, line: 1, column: 0}, {typ: pcLabel, text: "0x00af", line: 1, column: 0}, {typ: identifier, text: "push", line: 1, column: 8}, {typ: numberLiteral, text: "0x23", line: 1, column: 13}, {typ: eof, line: 1, column: 17}},
+		},
+		// unprefixed numbers followed by ':' also lex as pc label;
+		// the missing 0x prefix is reported by the parser
+		{
+			input:  "0023:",
+			tokens: []token{{typ: lineStart, line: 1, column: 0}, {typ: pcLabel, text: "0023", line: 1, column: 0}, {typ: eof, line: 1, column: 5}},
+		},
+		{
+			input:  "00af:",
+			tokens: []token{{typ: lineStart, line: 1, column: 0}, {typ: pcLabel, text: "00af", line: 1, column: 0}, {typ: eof, line: 1, column: 5}},
+		},
 		{
 			input:  "@foo",
 			tokens: []token{{typ: lineStart, line: 1, column: 0}, {typ: labelRef, text: "foo", line: 1, column: 1}, {typ: eof, line: 1, column: 4}},

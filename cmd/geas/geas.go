@@ -58,7 +58,8 @@ func usage() {
 	 -target <name>     configure instruction set
 	 -o <file>          output file name
 	 -blocks            blank lines between logical blocks
-	 -pc                show program counter
+	 -pc                show program counter on all lines
+	 -pclabel           show program counter at jumpdest instructions
 	 -uppercase         show instruction names as uppercase
 
  -f: SOURCE FORMATTER
@@ -189,6 +190,7 @@ func disassembler(args []string) {
 		fs         = newFlagSet("-d")
 		outputFile = fs.String("o", "", "")
 		showPC     = fs.Bool("pc", false, "")
+		pcLabels   = fs.Bool("pclabel", false, "")
 		showBlocks = fs.Bool("blocks", true, "")
 		uppercase  = fs.Bool("uppercase", false, "")
 		binary     = fs.Bool("bin", false, "")
@@ -237,6 +239,7 @@ func disassembler(args []string) {
 	d := disasm.New()
 	d.SetShowBlocks(*showBlocks)
 	d.SetShowPC(*showPC)
+	d.SetPCLabels(*pcLabels)
 	d.SetUppercase(*uppercase)
 	if *target != "" {
 		if err := d.SetTarget(*target); err != nil {

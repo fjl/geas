@@ -157,6 +157,21 @@ Finally, please note that `jumpdest` instructions can be written explicitly if d
 The assembler does not require use of the label syntax, but it is much easier to read, and
 also safer.
 
+### PC Labels
+
+Labels can also be numeric.
+
+    0x0000: push 3
+    0x0002: jump
+    0x0003: jumpdest
+
+A numeric label is an assertion about the value of the program counter: the assembler
+checks that the code offset at the label matches its value, and reports an error if it
+doesn't. PC labels do not emit a JUMPDEST. Note that PC labels must be written in
+hexadecimal with the `0x` prefix.
+
+The disassembler (`geas -d`) emits numeric labels in `-pclabel` mode.
+
 ### #bytes
 
 The `#bytes` directive adds raw bytes into the output. This is typically used for placing

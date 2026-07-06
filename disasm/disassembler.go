@@ -22,6 +22,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 
 	"github.com/fjl/geas/internal/evm"
@@ -32,6 +33,7 @@ type Disassembler struct {
 	evm       *evm.InstructionSet
 	uppercase bool
 	showPC    bool
+	pcLabels  bool
 	noBlanks  bool
 
 	pcBuffer, pcHex []byte
@@ -69,6 +71,11 @@ func (d *Disassembler) SetShowPC(on bool) {
 	d.showPC = on
 }
 
+// SetPCLabels toggles printing of a pc label before each JUMPDEST instruction.
+func (d *Disassembler) SetPCLabels(on bool) {
+	d.pcLabels = on
+}
+
 // SetShowBlocks toggles printing of blank lines at block boundaries.
 func (d *Disassembler) SetShowBlocks(on bool) {
 	d.noBlanks = !on
@@ -86,7 +93,7 @@ func (d *Disassembler) Disassemble(bytecode []byte, outW io.Writer) error {
 	for pc := 0; pc < len(bytecode); pc++ {
 		op := d.evm.OpByCode(bytecode[pc])
 		d.newline(out, prevOp, op)
-		d.printPrefix(out, pc)
+		d.printPrefix(out, pc, op)
 		if op == nil {
 			d.printInvalid(out, bytecode[pc])
 		} else {
@@ -107,14 +114,34 @@ func (d *Disassembler) Disassemble(bytecode []byte, outW io.Writer) error {
 	return out.Flush()
 }
 
-func (d *Disassembler) printPrefix(out io.Writer, pc int) {
-	if d.showPC {
-		for i := range d.pcBuffer {
-			d.pcBuffer[len(d.pcBuffer)-1-i] = byte(pc >> (8 * i))
+func (d *Disassembler) printPrefix(out io.Writer, pc int, op *evm.Op) {
+	switch {
+	case d.showPC:
+		io.WriteString(out, "0x")
+		d.printPC(out, pc)
+		io.WriteString(out, ": ")
+	case d.pcLabels:
+		// In this mode, output is formatted like geas -f would: labels are on
+		// their own line, and instructions are indented.
+		if op != nil && op.JumpDest {
+			// The label is padded to an even number of hex digits, matching
+			// the printing of PUSH arguments.
+			s := strconv.FormatUint(uint64(pc), 16)
+			if len(s)%2 == 1 {
+				s = "0" + s
+			}
+			fmt.Fprintf(out, "0x%s:\n", s)
 		}
-		hex.Encode(d.pcHex, d.pcBuffer)
-		fmt.Fprintf(out, "%s: ", d.pcHex)
+		io.WriteString(out, "    ")
 	}
+}
+
+func (d *Disassembler) printPC(out io.Writer, pc int) {
+	for i := range d.pcBuffer {
+		d.pcBuffer[len(d.pcBuffer)-1-i] = byte(pc >> (8 * i))
+	}
+	hex.Encode(d.pcHex, d.pcBuffer)
+	out.Write(d.pcHex)
 }
 
 func (d *Disassembler) printInvalid(out io.Writer, b byte) {

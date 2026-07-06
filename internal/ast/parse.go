@@ -210,6 +210,8 @@ func parseStatement(p *Parser) (done bool) {
 			st = p.makeComment(tok)
 		case label, dottedLabel:
 			st = parseLabelDef(p, tok)
+		case pcLabel:
+			st = parsePCLabel(p, tok)
 		case directive:
 			st = parseDirective(p, tok)
 		case identifier:
@@ -247,6 +249,25 @@ func parseLabelDef(p *Parser, tok token) *LabelDef {
 		stbase: stbase{src: p.doc, line: tok.line, column: tok.column},
 		Ident:  tok.text,
 		Dotted: tok.typ == dottedLabel,
+	}
+}
+
+func parsePCLabel(p *Parser, tok token) *PCLabel {
+	text, ok := strings.CutPrefix(tok.text, "0x")
+	if !ok {
+		text, ok = strings.CutPrefix(tok.text, "0X")
+	}
+	if !ok {
+		p.throwError(tok, "missing 0x prefix in pc label %s:", tok.text)
+	}
+	pc, err := strconv.ParseUint(text, 16, 32)
+	if err != nil {
+		p.throwError(tok, "invalid pc label %s:", tok.text)
+	}
+	return &PCLabel{
+		stbase: stbase{src: p.doc, line: tok.line, column: tok.column},
+		PC:     pc,
+		Text:   tok.text,
 	}
 }
 

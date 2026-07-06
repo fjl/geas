@@ -38,6 +38,16 @@ func (c *Compiler) checkLabelsUsed(prog *compilerProg, e *evaluator) {
 	}
 }
 
+// checkPCLabels verifies the PC assertions made by numeric labels. This runs after PC
+// assignment has converged, so instruction PC values are final.
+func (c *Compiler) checkPCLabels(prog *compilerProg) {
+	for _, inst := range prog.iterInstructions() {
+		if li, ok := inst.ast.(pcLabelStatement); ok && uint64(inst.pc) != li.PC {
+			c.errors.AddAt(li, fmt.Errorf("%w %s (actual PC is 0x%x)", ecPCLabelMismatch, li.String(), inst.pc))
+		}
+	}
+}
+
 // checkDuplicateParams reports an error if the parameter list contains a repeated name.
 func (c *Compiler) checkDuplicateParams(st ast.Statement, params []string) {
 	seen := make(set.Set[string])

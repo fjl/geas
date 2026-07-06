@@ -69,6 +69,13 @@ func (li labelDefStatement) expand(c *Compiler, doc *ast.Document, prog *compile
 	return nil
 }
 
+// expand creates an empty instruction for the pc label. The instruction has no output, it
+// just serves as an anchor for checkPCLabels.
+func (li pcLabelStatement) expand(c *Compiler, doc *ast.Document, prog *compilerProg) error {
+	prog.addInstruction(newInstruction(li, ""))
+	return nil
+}
+
 // expand appends the instruction to a program. This is also where basic validation is done.
 func (op opcodeStatement) expand(c *Compiler, doc *ast.Document, prog *compilerProg) error {
 	opcode := strings.ToUpper(op.Op)

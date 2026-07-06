@@ -115,6 +115,16 @@ type (
 		Dotted bool   // whether definition is dotted
 	}
 
+	// PCLabel is a numeric label, e.g. "002a:". The number is the expected value of
+	// the program counter at the position of the label. This is what the disassembler
+	// prints in -pc mode, and making it valid input allows disassembler output to be
+	// reassembled. The assembler verifies the assertion made by the label.
+	PCLabel struct {
+		stbase
+		PC   uint64 // the program counter value, parsed as hex
+		Text string // original text of the label, without the ':'
+	}
+
 	InstructionMacroCall struct {
 		stbase
 		Ident string
@@ -208,6 +218,15 @@ func (st *ExpressionMacroDef) Description() string {
 
 func (st *LabelDef) Description() string {
 	return fmt.Sprintf("definition of %v", st.Ref())
+}
+
+func (st *PCLabel) Description() string {
+	return fmt.Sprintf("pc label %s", st.String())
+}
+
+// String returns the text of the label.
+func (st *PCLabel) String() string {
+	return st.Text + ":"
 }
 
 // Ref returns a label reference for the definition.

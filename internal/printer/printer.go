@@ -329,6 +329,9 @@ func (p *Printer) statement(st ast.Statement) {
 	case *ast.LabelDef:
 		p.string(st.String())
 
+	case *ast.PCLabel:
+		p.string(st.String())
+
 	case *ast.Assemble:
 		p.string("#assemble ")
 		p.quotedString(st.Filename)

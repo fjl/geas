@@ -1210,6 +1210,86 @@ label-same-line-as-inst:
     # TODO: compiler should output push0 zero here
     bytecode: "5b 6000 56"
 
+pc-label:
+  # pc labels assert the PC value at their position, making the -pc output
+  # of the disassembler valid assembler input.
+  input:
+    code: |
+      0x00: push 3
+      0x02: jump
+
+      0x03: jumpdest
+      0x04: stop
+  output:
+    bytecode: "6003 56 5b 00"
+
+pc-label-own-line:
+  input:
+    code: |
+      push 3
+      jump
+      0x03:
+      jumpdest
+  output:
+    bytecode: "6003 56 5b"
+
+pc-label-mismatch:
+  input:
+    code: |
+      push 3
+      jump
+      0x05: jumpdest
+  output:
+    errors:
+      - ":3:0: PC value mismatch at label 0x05: (actual PC is 0x3)"
+
+pc-label-at-end:
+  input:
+    code: |
+      push 3
+      jump
+      0x03: jumpdest
+      0x04:
+  output:
+    bytecode: "6003 56 5b"
+
+pc-label-end-mismatch:
+  input:
+    code: |
+      push 3
+      jump
+      0x03: jumpdest
+      0x0a:
+  output:
+    errors:
+      - ":4:0: PC value mismatch at label 0x0a: (actual PC is 0x4)"
+
+pc-label-no-prefix:
+  # pc labels require the 0x prefix.
+  input:
+    code: |
+      0003: jumpdest
+  output:
+    errors:
+      - ":1:0: missing 0x prefix in pc label 0003:"
+
+pc-label-no-prefix-hexchars:
+  input:
+    code: |
+      00af: jumpdest
+  output:
+    errors:
+      - ":1:0: missing 0x prefix in pc label 00af:"
+
+pc-label-invalid:
+  # pc label value overflows 32 bits.
+  input:
+    code: |
+      0x999999999: stop
+  output:
+    errors:
+      - ":1:0: invalid pc label 0x999999999:"
+
 macro-call:
   input:
     code: |

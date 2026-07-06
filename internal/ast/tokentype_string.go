@@ -19,25 +19,26 @@ func _() {
 	_ = x[dottedLabelRef-8]
 	_ = x[label-9]
 	_ = x[dottedLabel-10]
-	_ = x[numberLiteral-11]
-	_ = x[stringLiteral-12]
-	_ = x[openParen-13]
-	_ = x[closeParen-14]
-	_ = x[comma-15]
-	_ = x[directive-16]
-	_ = x[instMacroIdent-17]
-	_ = x[openBrace-18]
-	_ = x[closeBrace-19]
-	_ = x[openBracket-20]
-	_ = x[closeBracket-21]
-	_ = x[equals-22]
-	_ = x[arith-23]
-	_ = x[comment-24]
+	_ = x[pcLabel-11]
+	_ = x[numberLiteral-12]
+	_ = x[stringLiteral-13]
+	_ = x[openParen-14]
+	_ = x[closeParen-15]
+	_ = x[comma-16]
+	_ = x[directive-17]
+	_ = x[instMacroIdent-18]
+	_ = x[openBrace-19]
+	_ = x[closeBrace-20]
+	_ = x[openBracket-21]
+	_ = x[closeBracket-22]
+	_ = x[equals-23]
+	_ = x[arith-24]
+	_ = x[comment-25]
 }
 
-const _tokenType_name = "end of filebeginning of lineend of lineinvalid characteridentifierdotted identifierparameter referencelabel referencedotted label referencelabel definitiondotted label definitionnumber literalstring literalopen parenthesisclose parenthesiscommadirectivemacro identifieropen braceclosing braceopen bracketclose bracketequals signarithmetic operationcomment"
+const _tokenType_name = "end of filebeginning of lineend of lineinvalid characteridentifierdotted identifierparameter referencelabel referencedotted label referencelabel definitiondotted label definitionpc label definitionnumber literalstring literalopen parenthesisclose parenthesiscommadirectivemacro identifieropen braceclosing braceopen bracketclose bracketequals signarithmetic operationcomment"
 
-var _tokenType_index = [...]uint16{0, 11, 28, 39, 56, 66, 83, 102, 117, 139, 155, 178, 192, 206, 222, 239, 244, 253, 269, 279, 292, 304, 317, 328, 348, 355}
+var _tokenType_index = [...]uint16{0, 11, 28, 39, 56, 66, 83, 102, 117, 139, 155, 178, 197, 211, 225, 241, 258, 263, 272, 288, 298, 311, 323, 336, 347, 367, 374}
 
 func (i tokenType) String() string {
 	idx := int(i) - 0
