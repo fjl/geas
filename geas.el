@@ -184,9 +184,9 @@ was found; otherwise point ends up at the buffer boundary."
 
 (defun geas--unlabeled-block-start (pos)
   "Return the start of the unlabeled instruction block following POS, or nil.
-POS is the end of a defun, or `point-min'.  The block begins at the
-first following line holding an instruction; blank lines, comments,
-closing braces and directives are skipped.  Returns nil when a new
+POS is the end of a defun, or `point-min'. The block begins at the first
+following line holding an instruction; blank lines, comments, closing
+braces, `#define' and `#pragma' are skipped. Returns nil when a new
 defun begins before any instruction is found."
   (save-excursion
     (goto-char pos)
@@ -196,7 +196,8 @@ defun begins before any instruction is found."
         (cond
          ((eobp) (setq done t))
          ((geas--defun-start-line-p) (setq done t))
-         ((looking-at-p "[ \t]*\\(?:$\\|[;}#]\\)") (forward-line 1))
+         ((looking-at-p "[ \t]*\\(?:$\\|[;}]\\|#\\(?:define\\|pragma\\)\\_>\\)")
+          (forward-line 1))
          (t (setq result (point)) (setq done t))))
       result)))
 
